@@ -1206,7 +1206,7 @@ def _do_uninstall():
 topbar = tk.Frame(root, bg=C['panel'], height=38); topbar.pack(fill='x'); topbar.pack_propagate(False)
 tk.Label(topbar, text='⬡', font=('Consolas',16,'bold'), bg=C['panel'], fg=C['accent']).pack(side='left', padx=(14,4), pady=6)
 tk.Label(topbar, text='V0RTEX', font=('Consolas',12,'bold'), bg=C['panel'], fg=C['text']).pack(side='left')
-tk.Label(topbar, text='v0.9.7.X1', font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
+tk.Label(topbar, text='v0.9.7.X2', font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
 tk.Label(topbar, text='UNINSTALL', font=('Consolas',8,'bold'), bg=C['panel'], fg=C['accent']).pack(side='right', padx=14)
 tk.Frame(root, bg=C['accent'], height=2).pack(fill='x')
 
@@ -1867,7 +1867,7 @@ def _do_reinstall():
 topbar = tk.Frame(root, bg=C['panel'], height=38); topbar.pack(fill='x'); topbar.pack_propagate(False)
 tk.Label(topbar, text='⬡', font=('Consolas',16,'bold'), bg=C['panel'], fg=C['accent']).pack(side='left', padx=(14,4), pady=6)
 tk.Label(topbar, text='V0RTEX', font=('Consolas',12,'bold'), bg=C['panel'], fg=C['text']).pack(side='left')
-tk.Label(topbar, text='v0.9.7.X1', font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
+tk.Label(topbar, text='v0.9.7.X2', font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
 tk.Label(topbar, text='REINSTALL', font=('Consolas',8,'bold'), bg=C['panel'], fg=C['accent']).pack(side='right', padx=14)
 tk.Frame(root, bg=C['accent'], height=2).pack(fill='x')
 
@@ -2105,7 +2105,7 @@ def _run_setup_ui():
     )
 
     root = tk.Tk()
-    root.title("V0RTEX v0.9.7.X1 — Setup")
+    root.title("V0RTEX v0.9.7.X2 — Setup")
     root.configure(bg=C["bg"])
     root.resizable(False, False)
     W, H = 720, 640
@@ -2133,7 +2133,7 @@ def _run_setup_ui():
     done_evt   = threading.Event()
 
     script_dir   = os.path.dirname(os.path.abspath(sys.argv[0]))
-    dir_var.set(os.path.join(script_dir, "V0rtex_System", "V0RTEX_v0.9.7.X1"))
+    dir_var.set(os.path.join(script_dir, "V0rtex_System", "V0RTEX_v0.9.7.X2"))
 
     log_widget           = [None]
     dbg_widget           = [None]
@@ -3577,7 +3577,7 @@ def _run_setup_ui():
                 _ilog_path  = os.path.join(_ilog_dir, f"install_{_ilog_ts}.txt")
                 _ilog_lines = [
                     "=" * 72,
-                    f"  V0RTEX v0.9.7.X1 — INSTALLATION LOG",
+                    f"  V0RTEX v0.9.7.X2 — INSTALLATION LOG",
                     f"  Timestamp  : {_dti.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
                     f"  Python     : {sys.version}",
                     f"  Platform   : {platform.system()} {platform.release()} ({sys.platform})",
@@ -3635,7 +3635,7 @@ def _run_setup_ui():
             _prog(100, "Setup complete!")
             _log("", "NORM")
             _log("━"*52, "HEAD")
-            _log("  ✓  V0RTEX v0.9.7.X1 is ready", "OK")
+            _log("  ✓  V0RTEX v0.9.7.X2 is ready", "OK")
             _log(f"  ✓  Installed to: {base}", "OK")
             _log("  →  Click  LAUNCH  to start", "INFO")
             _log("━"*52, "HEAD")
@@ -3666,7 +3666,7 @@ def _run_setup_ui():
              bg=C["panel"], fg=C["accent"]).pack(side="left", padx=(14,4), pady=6)
     tk.Label(topbar, text="V0RTEX", font=("Consolas", 12, "bold"),
              bg=C["panel"], fg=C["text"]).pack(side="left")
-    tk.Label(topbar, text="v0.9.7.X1", font=("Consolas", 8),
+    tk.Label(topbar, text="v0.9.7.X2", font=("Consolas", 8),
              bg=C["panel"], fg=C["muted"]).pack(side="left", padx=(4,0), pady=(10,0))
     tk.Label(topbar, text="FIRST-RUN SETUP", font=("Consolas", 8),
              bg=C["panel"], fg=C["muted"]).pack(side="right", padx=14)
@@ -3693,14 +3693,14 @@ def _run_setup_ui():
         p = tfd.askdirectory(title="Choose parent folder",
                               initialdir=os.path.dirname(dir_var.get()))
         if p:
-            dir_var.set(os.path.join(p, "V0rtex_System", "V0RTEX_v0.9.7.X1"))
+            dir_var.set(os.path.join(p, "V0rtex_System", "V0RTEX_v0.9.7.X2"))
     tk.Button(dir_row, text="Browse", font=("Consolas", 8),
               bg=C["border"], fg="black", relief="flat", bd=0,
               activebackground=C["muted"], cursor="hand2",
               command=_browse, padx=10, pady=6).pack(side="left")
 
     tk.Label(card1,
-             text="Structure: V0rtex_System / V0RTEX_v0.9.7.X1 (app)  ·  installation_media  ·  debug_log  ·  backups",
+             text="Structure: V0rtex_System / V0RTEX_v0.9.7.X2 (app)  ·  installation_media  ·  debug_log  ·  backups",
              font=("Consolas", 7), bg=C["card"], fg=C["muted"]).pack(anchor="w", pady=(3,0))
 
     card2 = tk.Frame(root, bg=C["card"], padx=16, pady=7)
@@ -3949,7 +3949,7 @@ def _run_setup_ui():
             _log("  \u2717 No directory chosen.", "ERR"); return
         install_path[0] = chosen
         btn_install[0].config(state="disabled", text="  Installing\u2026  ")
-        _log(f">_ V0RTEX v0.9.7.X1 setup \u2014 Python {sys.version.split()[0]} / {platform.system()}", "DIM")
+        _log(f">_ V0RTEX v0.9.7.X2 setup \u2014 Python {sys.version.split()[0]} / {platform.system()}", "DIM")
         threading.Thread(target=lambda: _install(chosen), daemon=True).start()
         _anim_start_fn()
         _collapse_selection(chosen)
@@ -4399,8 +4399,8 @@ def _check_first_run():
         return
 
     for _sib_rel in (
-        _o.path.join("V0rtex_System", "V0RTEX_v0.9.7.X1"),
-        "V0RTEX_v0.9.7.X1",
+        _o.path.join("V0rtex_System", "V0RTEX_v0.9.7.X2"),
+        "V0RTEX_v0.9.7.X2",
     ):
         _sib = _o.path.join(script_dir, _sib_rel)
         if _o.path.exists(_o.path.join(_sib, "_setup_complete")):
@@ -4654,7 +4654,7 @@ def _install_crash_handler():
 
 
                 tbar = _tk.Frame(pop, bg="#11111b", pady=6, padx=12); tbar.pack(fill=_tk.X)
-                _tk.Label(tbar, text="  ● ● ●   CRASH REPORT — V0RTEX v0.9.7.X1",
+                _tk.Label(tbar, text="  ● ● ●   CRASH REPORT — V0RTEX v0.9.7.X2",
                           font=("Consolas",10), bg="#11111b", fg=_DIM).pack(side=_tk.LEFT)
 
 
@@ -4789,7 +4789,7 @@ def _install_crash_handler():
                 def _view_session_log():
 
                     log_win = _tk.Toplevel(_crash_root)
-                    log_win.title("SESSION LOG — V0RTEX v0.9.7.X1")
+                    log_win.title("SESSION LOG — V0RTEX v0.9.7.X2")
                     log_win.geometry("900x580")
                     log_win.configure(bg=_BG)
                     log_win.attributes("-topmost", True)
@@ -5007,7 +5007,7 @@ def _install_crash_handler():
             tb_str_local = "".join(traceback.format_exception(exc_type, exc_val, exc_tb))
             with open(os.path.join(crash_dir, crash_fname), "w", encoding="utf-8") as f:
                 f.write("=" * 78 + "\n")
-                f.write(f"  V0RTEX v0.9.7.X1 — CRASH REPORT\n")
+                f.write(f"  V0RTEX v0.9.7.X2 — CRASH REPORT\n")
                 f.write(f"  Session #:  {sess_n}\n")
                 f.write(f"  Timestamp:  {_time_crash.strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"  Python:     {sys.version}\n")
@@ -5318,7 +5318,7 @@ def _checkpoint(phase: str, detail: str = ""):
 try:
     with open(_SESSION_LOG_PATH, "w", encoding="utf-8") as _slf:
         _slf.write("=" * 78 + "\n")
-        _slf.write(f"  V0RTEX v0.9.7.X1  —  SESSION LOG\n")
+        _slf.write(f"  V0RTEX v0.9.7.X2  —  SESSION LOG\n")
         _slf.write(f"  Session #:  {_SESSION_NUMBER}\n")
         _slf.write(f"  Started:    {_dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         _slf.write(f"  Python:     {sys.version.split()[0]}\n")
@@ -6258,7 +6258,7 @@ footer{{margin-top:20px;font-size:.7rem;color:#45475a;text-align:right}}
     </div>
   </div>
 </div>
-<footer>Generated {time.strftime("%Y-%m-%d %H:%M:%S")} · V0RTEX v0.9.7.X1 by Vider_06</footer>
+<footer>Generated {time.strftime("%Y-%m-%d %H:%M:%S")} · V0RTEX v0.9.7.X2 by Vider_06</footer>
 </body></html>"""
     with open(html_path,"w",encoding="utf-8") as f:
         f.write(html)
@@ -6593,7 +6593,7 @@ try:
 except Exception:
     root = tk.Tk(); _DND = False
 
-root.title("V0RTEX v0.9.7.X1 by Vider_06")
+root.title("V0RTEX v0.9.7.X2 by Vider_06")
 root.configure(bg=C["base"]); root.minsize(1100,680)
 root.withdraw()
 root.update()
@@ -6691,7 +6691,7 @@ _SPLASH_LINES = [
     ("[GUI]   Chart renderer: matplotlib Agg backend  ✓",    "#a6e3a1",    28),
     ("",                                                     "#cdd6f4",    10),
     ("╔══════════════════════════════════════════════╗",      "#cba6f7",    20),
-    ("║     V0RTEX  v0.9.7.X1  —  READY  ✓       ║",     "#cba6f7",    20),
+    ("║     V0RTEX  v0.9.7.X2  —  READY  ✓       ║",     "#cba6f7",    20),
     ("╚══════════════════════════════════════════════╝",      "#cba6f7",    20),
     ("",                                                     "#cdd6f4",    10),
     ("$ _",                                                   "#89b4fa",    30),
@@ -6717,7 +6717,7 @@ def _run_splash():
     logo_f = tk.Frame(sp, bg="#11111b", pady=10); logo_f.pack(fill=tk.X)
     tk.Label(logo_f, text="V0RTEX",       font=("Consolas",18,"bold"),
              bg="#11111b", fg="#cba6f7").pack(side=tk.LEFT, padx=(20,0))
-    tk.Label(logo_f, text="  v0.9.7.X1",       font=("Consolas",11),
+    tk.Label(logo_f, text="  v0.9.7.X2",       font=("Consolas",11),
              bg="#11111b", fg="#6c7086").pack(side=tk.LEFT, pady=4)
     tk.Label(logo_f, text="by Vider_06",  font=("Consolas",10),
              bg="#11111b", fg="#45475a").pack(side=tk.RIGHT, padx=20)
@@ -6829,7 +6829,7 @@ _tb.pack(fill=tk.X)
 _tbl = tk.Frame(_tb, bg=C["mantle"], padx=16, pady=10); _tbl.pack(side=tk.LEFT)
 tk.Label(_tbl, text="V0RTEX",     font=("Consolas",22,"bold"), bg=C["mantle"], fg=C["mauve"]).pack(side=tk.LEFT)
 tk.Label(_tbl, text="  ", font=("Consolas",22,"bold"), bg=C["mantle"], fg=C["text"]).pack(side=tk.LEFT)
-tk.Label(_tbl, text="  SCANNER v0.9.7.X1", font=FS, bg=C["mantle"], fg=C["overlay0"]).pack(side=tk.LEFT, pady=8)
+tk.Label(_tbl, text="  SCANNER v0.9.7.X2", font=FS, bg=C["mantle"], fg=C["overlay0"]).pack(side=tk.LEFT, pady=8)
 _tbr = tk.Frame(_tb, bg=C["mantle"], padx=16); _tbr.pack(side=tk.RIGHT, fill=tk.Y)
 tk.Label(_tbr, text="YARA · VirusTotal · PE · IOC · Entropy · tshark",
          font=FS, bg=C["mantle"], fg=C["overlay0"]).pack(side=tk.RIGHT, pady=14)
@@ -7338,7 +7338,7 @@ _dash_nb.add(_dash_sub_readme, text="  README  ")
                                                                            
 
 _dash_hdr = tk.Frame(_dash_sub_dash, bg=C["crust"], pady=10, padx=18); _dash_hdr.pack(fill=tk.X)
-tk.Label(_dash_hdr, text="⬡  V0RTEX  v0.9.7.X1",
+tk.Label(_dash_hdr, text="⬡  V0RTEX  v0.9.7.X2",
          font=("Consolas",14,"bold"), bg=C["crust"], fg=C["blue"]).pack(side=tk.LEFT)
 _dash_session_sv = tk.StringVar(value="")
 tk.Label(_dash_hdr, textvariable=_dash_session_sv, font=("Consolas",9),
@@ -7534,7 +7534,7 @@ try:
         os.path.getmtime(os.path.abspath(sys.argv[0]))).strftime("%Y-%m-%d  %H:%M:%S")
 except Exception:
     _info_build_date = "—"
-_info_row(_info_inner, "Version",       value_str="V0RTEX v0.9.7.X1  by Vider_06", color=C["mauve"])
+_info_row(_info_inner, "Version",       value_str="V0RTEX v0.9.7.X2  by Vider_06", color=C["mauve"])
 _info_row(_info_inner, "Script",        value_str=os.path.abspath(sys.argv[0]), color=C["overlay0"])
 _info_row(_info_inner, "Script mtime",  value_str=_info_build_date, color=C["overlay0"])
 _info_row(_info_inner, "BASE_DIR",      value_str=BASE_DIR, color=C["overlay0"])
@@ -7611,7 +7611,7 @@ _readme_txt = tk.Text(_readme_txt_frame, bg=C["mantle"], fg=C["text"],
                       padx=6, pady=4, wrap="word", cursor="arrow",
                       state="disabled")
 _readme_txt.pack(fill=tk.BOTH, expand=True)
-_README_CONTENT = """V0RTEX v0.9.7.X1  —  Quick Reference
+_README_CONTENT = """V0RTEX v0.9.7.X2  —  Quick Reference
 ===================================
 by Vider_06  |  github.com/Vider06/V0rtex
 
@@ -7858,7 +7858,7 @@ for _nt, _nref in _dash_nav_items:
 
 _dash_info_panel = _dash_rpanel("● ● ●  V0RTEX INFO", C["mauve"])
 _V0RTEX_INFO = [
-    ("Name",    "V0RTEX v0.9.7.X1"),
+    ("Name",    "V0RTEX v0.9.7.X2"),
     ("Author",  "Vider_06"),
     ("Meaning", "V = Vider / 0 = zero-day / R = Reconnaissance / T = Threat / E = Engine / X = eXtract"),
     ("Build",   "Python 3.10+  ·  Tkinter  ·  pefile  ·  yara-python"),
@@ -8854,7 +8854,7 @@ def _generate_folder_report(folder_path, results):
             "</tr></thead>",
             "<tbody>" + rows_html + "</tbody>",
             "</table>",
-            "<footer>Generated " + ts + " \u00b7 V0RTEX v0.9.7.X1 by Vider_06</footer>",
+            "<footer>Generated " + ts + " \u00b7 V0RTEX v0.9.7.X2 by Vider_06</footer>",
             "</body></html>",
         ]
         with open(html_path, "w", encoding="utf-8") as f:
@@ -10255,7 +10255,7 @@ def _worker():
                     "  <div class='card'><h2>Redirects</h2><table>" + rd_rows + "</table></div>",
                     "  <div class='card'><h2>IOCs</h2><table>" + (ioc_rows or "<tr><td style='color:#45475a'>None</td></tr>") + "</table></div>",
                     "</div>",
-                    "<footer>Generated " + ts_str + " · V0RTEX v0.9.7.X1 by Vider_06</footer>",
+                    "<footer>Generated " + ts_str + " · V0RTEX v0.9.7.X2 by Vider_06</footer>",
                     "</body></html>",
                 ]
                 with open(html_path, "w", encoding="utf-8") as hf:
@@ -11292,7 +11292,7 @@ def _start_tray():
             _pystray.Menu.SEPARATOR,
             _pystray.MenuItem("Quit",  _quit),
         )
-        _tray_icon = _pystray.Icon("V0RTEX", img, "V0RTEX v0.9.7.X1 by Vider_06", menu)
+        _tray_icon = _pystray.Icon("V0RTEX", img, "V0RTEX v0.9.7.X2 by Vider_06", menu)
         threading.Thread(target=_tray_icon.run, daemon=True).start()
         _log_debug("Tray icon started", "DEBUG")
     except Exception as e:
@@ -12142,7 +12142,7 @@ def _sandbox_build():
     try:
         os.makedirs(drop, exist_ok=True)
         readme_text = (
-            "V0RTEX v0.9.7.X1 — Sandbox Environment\n"
+            "V0RTEX v0.9.7.X2 — Sandbox Environment\n"
             "=" * 50 + "\n"
             f"Built: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
             "Drop folder:  sandbox_env/drop/\n"
@@ -13300,7 +13300,7 @@ def _ckpt_export():
         path = _fd.asksaveasfilename(defaultextension=".txt",
                filetypes=[("Text","*.txt"),("All","*.*")], title="Export Checkpoints")
         if not path: return
-        lines = [f"V0RTEX v0.9.7.X1 — CHECKPOINT EXPORT\n{'='*70}\n"]
+        lines = [f"V0RTEX v0.9.7.X2 — CHECKPOINT EXPORT\n{'='*70}\n"]
         for ts, n, ph, det in _ckpt_buffer:
             lines.append(f"[{ts}] #{n:04d} [{ph:<8}] {det}")
         with open(path, "w", encoding="utf-8") as f:
@@ -16005,7 +16005,7 @@ def _write_crash_log(code, reason, tb=""):
         desc = SOC_ERROR_CODES.get(code, SOC_ERROR_CODES[0])
         with open(_crash_log_path, "a", encoding="utf-8") as _f:
             _f.write("=" * 72 + "\n")
-            _f.write(f"  V0RTEX v0.9.7.X1 — CRASH REPORT\n")
+            _f.write(f"  V0RTEX v0.9.7.X2 — CRASH REPORT\n")
             _f.write(f"  Timestamp  : {ts}\n")
             _f.write(f"  Error Code : {code}\n")
             _f.write(f"  Code Name  : {desc}\n")
@@ -22631,7 +22631,7 @@ def _rptb_generate():
                   "- **HTTP Requests**: _FILL_",""]
     if _rptb_sects["Recommendations"].get():
         lines += ["## Recommendations","","1. _FILL_","2. _FILL_","3. _FILL_",""]
-    lines += ["---", f"*Generated by V0RTEX v0.9.7.X1 on {date}*"]
+    lines += ["---", f"*Generated by V0RTEX v0.9.7.X2 on {date}*"]
     report = "\n".join(lines)
     _rptb_out.delete("1.0",tk.END); _rptb_out.insert("1.0", report)
 def _rptb_save():
@@ -23369,7 +23369,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
 
     _rt.sleep(0.15)
     rr = _rtk.Tk()
-    rr.title("V0RTEX — RECOVERY TERMINAL  v0.9.7.X1")
+    rr.title("V0RTEX — RECOVERY TERMINAL  v0.9.7.X2")
     rr.configure(bg=_BG)
     rr.geometry("1120x740")
     rr.minsize(880, 580)
@@ -23400,7 +23400,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
         text=f"{_icon}V0RTEX  ›  RECOVERY TERMINAL",
         font=("Consolas",11,"bold"), bg="#080816",
         fg=_RED if _IS_CRASH else _TEA).pack(side=_rtk.LEFT)
-    _rtk.Label(_title_f, text="  v0.9.7.X1",
+    _rtk.Label(_title_f, text="  v0.9.7.X2",
         font=("Consolas",9), bg="#080816", fg=_DIM2).pack(side=_rtk.LEFT)
 
 
@@ -23445,13 +23445,13 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                 _admin_sv.set("⚠ DANGER_ADMIN_PERMISSION_GRANTED!")
                 _admin_lbl.config(bg="#2a0010")
                 _sep_f.config(bg="#1a0008")
-                try: rr.title("⚠ DANGER_ADMIN_PERMISSION_GRANTED!  —  V0RTEX RECOVERY TERMINAL  v0.9.7.X1")
+                try: rr.title("⚠ DANGER_ADMIN_PERMISSION_GRANTED!  —  V0RTEX RECOVERY TERMINAL  v0.9.7.X2")
                 except Exception: pass
             else:
                 _admin_sv.set("● user mode")
                 _admin_lbl.config(bg="#0f0f20")
                 _sep_f.config(bg="#0f0f20")
-                try: rr.title("V0RTEX — RECOVERY TERMINAL  v0.9.7.X1")
+                try: rr.title("V0RTEX — RECOVERY TERMINAL  v0.9.7.X2")
                 except Exception: pass
         except Exception:
             pass
@@ -23636,7 +23636,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
 
 
     _term_write("╔══════════════════════════════════════════════════╗\n", "PROMPT")
-    _term_write("║   V0RTEX — Recovery Terminal  v0.9.7.X1    ║\n", "PROMPT")
+    _term_write("║   V0RTEX — Recovery Terminal  v0.9.7.X2    ║\n", "PROMPT")
     _term_write("╚══════════════════════════════════════════════════╝\n", "PROMPT")
     _term_write(f"Python {_rsys.version.split()[0]}  |  cwd: {_tcwd[0]}\n", "DIM")
     if exc_type:
@@ -24382,7 +24382,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             bd = _tcwd[0]
             wp = _ros.path.join(bd, "whitelist.txt")
             with open(wp, "w", encoding="utf-8") as _f:
-                _f.write("# V0RTEX v0.9.7.X1 — Whitelist\n# One SHA-256 hash per line\n")
+                _f.write("# V0RTEX v0.9.7.X2 — Whitelist\n# One SHA-256 hash per line\n")
             _replog(">_ whitelist.txt reset.", "OK")
             _sts("whitelist reset")
         except Exception as e: _replog(f">_ Error: {e}", "ERR")
@@ -26725,8 +26725,8 @@ _wd_thread = threading.Thread(target=_watchdog_thread, daemon=True)
 _wd_thread.start()
 root.after(3000, _schedule_ping)
 
-_log_debug("V0RTEX v0.9.7.X1 ready", "INFO")
-_log_ops("V0RTEX  v0.9.7.X1  by Vider_06", "HEAD")
+_log_debug("V0RTEX v0.9.7.X2 ready", "INFO")
+_log_ops("V0RTEX  v0.9.7.X2  by Vider_06", "HEAD")
 _start_tray()
 root.after(500,   _refresh_stats)
 root.after(5000,  _perf_hist_tick)
@@ -26986,7 +26986,7 @@ _sb_admin_lbl = tk.Label(_sbar, textvariable=_sb_admin_sv, font=("Consolas",8,"b
 _sb_admin_lbl.pack(side=tk.LEFT, padx=12)
 tk.Label(_sbar, textvariable=_sb_time_sv, font=("Consolas",8),
          bg=C["crust"], fg=C["overlay0"]).pack(side=tk.RIGHT, padx=4)
-tk.Label(_sbar, text="V0RTEX v0.9.7.X1  by Vider_06",
+tk.Label(_sbar, text="V0RTEX v0.9.7.X2  by Vider_06",
          font=("Consolas",7), bg=C["crust"], fg=C["surface2"]).pack(side=tk.RIGHT, padx=12)
 
 def _sbar_tick():
@@ -27013,12 +27013,12 @@ def _sbar_tick():
         if cur_admin:
             _sb_admin_sv.set("⚠ DANGER_ADMIN_PERMISSION_GRANTED!")
             _sb_admin_lbl.config(bg="#2a0010")
-            try: root.title("⚠ DANGER_ADMIN_PERMISSION_GRANTED!  —  V0RTEX v0.9.7.X1  by Vider_06")
+            try: root.title("⚠ DANGER_ADMIN_PERMISSION_GRANTED!  —  V0RTEX v0.9.7.X2  by Vider_06")
             except Exception: pass
         else:
             _sb_admin_sv.set("")
             _sb_admin_lbl.config(bg=C["crust"])
-            try: root.title("V0RTEX  v0.9.7.X1  by Vider_06")
+            try: root.title("V0RTEX  v0.9.7.X2  by Vider_06")
             except Exception: pass
     except Exception:
         pass
