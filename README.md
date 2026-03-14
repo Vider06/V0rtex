@@ -72,24 +72,37 @@
 ## Folder Structure
 ```
 V0rtex_System/
-├── V0RTEX_v0.9/                ← main install directory (BASE_DIR)
-│   ├── v0rtex.py               ← the entire application
-│   ├── config.json             ← all user settings
-│   ├── scan_history.db         ← SQLite database
-│   ├── whitelist.txt           ← hash/path exclusions
-│   ├── notes.txt               ← scratchpad persistent storage
-│   ├── rules/                  ← YARA rule files (.yar / .yara)
-│   │   └── external/           ← community rule sets
-│   ├── reports/                ← generated HTML/PDF/JSON reports
-│   ├── modules/                ← embedded helper modules
-│   ├── debug_log/              ← session logs and crash reports
-│   ├── quarantine/             ← isolated malicious files
-│   ├── backups/                ← auto-created backup ZIPs
-│   └── _recovery/              ← recovery system working directory
-├── installation_media/         ← setup logs, installer assets
-│   ├── debug_log/
-│   └── backups/
-└── V0rtex_backups/             ← backup ZIPs (outside V0rtex_System)
+├── V0RTEX_v0.9/                    ← main install directory (BASE_DIR)
+│   ├── v0rtex.py                   ← the entire application
+│   ├── config.json                 ← all user settings
+│   ├── scan_history.db             ← SQLite database
+│   ├── whitelist.txt               ← hash/path exclusions
+│   ├── notes.txt                   ← scratchpad persistent storage
+│   ├── rules_state.json            ← YARA library download state
+│   ├── launch.bat                  ← quick launch script
+│   ├── requirements.txt            ← pip requirements
+│   ├── rules/                      ← YARA rule files (.yar / .yara)
+│   │   └── external/               ← community rule sets
+│   ├── reports/                    ← generated HTML/PDF/JSON reports
+│   ├── modules/                    ← embedded helper modules
+│   │   ├── pe_analysis.py
+│   │   ├── cuckoo_api.py
+│   │   ├── secret_scanner.py
+│   │   ├── wireshark.py
+│   │   └── __init__.py
+│   ├── debug_log/                  ← session logs and crash reports
+│   ├── quarantine/                 ← isolated malicious files
+│   ├── backups/                    ← auto-created backup ZIPs
+│   └── _recovery/                  ← recovery system working directory
+├── installation_media/
+│   ├── v0rtex.py                   ← backup copy of the script
+│   ├── setup_win.bat               ← setup batch script
+│   ├── INSTRUCTIONS.txt            ← setup instructions
+│   ├── uninstall.py                ← uninstall wizard
+│   ├── reinstall.py                ← reinstall wizard
+│   ├── debug_log/                  ← installer session logs
+│   └── backups/                    ← pre-uninstall/reinstall backups
+└── V0rtex_backups/                 ← backup ZIPs (outside V0rtex_System)
 ```
 
 ---
@@ -361,3 +374,6 @@ Also installed automatically:
 Copyright © 2024-2025 Vider_06 — All rights reserved.  
 Redistribution, resale, and repackaging are strictly prohibited.  
 See [LICENSE](./LICENSE) for full terms.
+
+If you are reading this... Why would you EVER read all of this dude
+Alr, try it and report me bugs or anything tbh - Vider_06
