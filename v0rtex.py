@@ -22657,7 +22657,7 @@ _rptb_sc.config(command=_rptb_out.yview)
 _rptb_sc.pack(side=tk.RIGHT, fill=tk.Y); _rptb_out.pack(fill=tk.BOTH, expand=True, padx=8, pady=(4,8))
 
 
-_VORTEX_VERSION      = "0.9.7.X2"
+_VORTEX_VERSION      = "0.9.7.X3"
 _GITHUB_REPO_RAW     = "https://raw.githubusercontent.com/Vider06/V0RTEX/main"
 _GITHUB_PAGE_URL     = "https://github.com/Vider06/V0RTEX"
 _GITHUB_API_RELEASE  = "https://api.github.com/repos/Vider06/V0RTEX/releases/latest"
