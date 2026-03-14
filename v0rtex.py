@@ -22657,7 +22657,7 @@ _rptb_sc.config(command=_rptb_out.yview)
 _rptb_sc.pack(side=tk.RIGHT, fill=tk.Y); _rptb_out.pack(fill=tk.BOTH, expand=True, padx=8, pady=(4,8))
 
 
-_VORTEX_VERSION      = "0.9.7.X1"
+_VORTEX_VERSION      = "0.9.7.X2"
 _GITHUB_REPO_RAW     = "https://raw.githubusercontent.com/Vider06/V0RTEX/main"
 _GITHUB_PAGE_URL     = "https://github.com/Vider06/V0RTEX"
 _GITHUB_API_RELEASE  = "https://api.github.com/repos/Vider06/V0RTEX/releases/latest"
@@ -22753,12 +22753,30 @@ def _upd_fetch_text(url, timeout=12):
         return resp.read().decode("utf-8", "replace")
 
 def _upd_version_newer(remote, local):
-    """Compare version strings like '1.2' or '1.2.3'."""
+    """Compare version strings like '1.2.3' or '0.9.7.X2' (supports alphanumeric parts)."""
+    def _parse(v):
+        parts = []
+        for x in str(v).strip().lstrip("v").split("."):
+            x = x.strip()
+            # split numeric prefix from alpha suffix: "X2" → (0, "X2"), "3" → (3, "")
+            num = ""
+            alpha = x
+            for i, c in enumerate(x):
+                if not c.isdigit():
+                    num = x[:i]
+                    alpha = x[i:]
+                    break
+            else:
+                num = x
+                alpha = ""
+            parts.append((int(num) if num else 0, alpha))
+        return parts
     try:
-        rv = tuple(int(x) for x in str(remote).strip().split("."))
-        lv = tuple(int(x) for x in str(local).strip().split("."))
+        rv = _parse(remote)
+        lv = _parse(local)
         return rv > lv
-    except: return False
+    except Exception:
+        return False
 
 def _upd_check(silent=False):
     """Check GitHub for a newer version — tries Releases API first, falls back to version.txt."""
@@ -23079,6 +23097,84 @@ def _launch_update_ui(clear_install=False):
         except Exception as e:
             _ulog(f"  ✗ Write failed: {e}","ERR")
             _upd_start_btn.config(state="normal"); return
+
+        # ── Dual-file update: also update the external launcher ──────────────
+        _ulog("\n[ 5b/6 ]  Checking for external launcher…","HEAD")
+        try:
+            _running = os.path.abspath(sys.argv[0])
+            _app_copy = script_path
+
+            if os.path.normcase(_running) != os.path.normcase(_app_copy):
+                # running from outside V0rtex_System — update that file too
+                _ulog(f"  External launcher found: {_running}","DIM")
+                try:
+                    _tmp2 = _running + ".update_tmp"
+                    with open(_tmp2, "w", encoding="utf-8") as _ef: _ef.write(new_script)
+                    _shu.move(_tmp2, _running)
+                    _ulog(f"  ✓ External launcher updated: {os.path.basename(_running)}","OK")
+                except Exception as _ee:
+                    _ulog(f"  ~ Could not update external launcher: {_ee}","WARN")
+            else:
+                # running file IS the app copy — ask user if they want to search for external launcher
+                _ulog("  Running file is the app copy — searching for external launcher…","DIM")
+
+                def _search_and_update_launcher():
+                    import tkinter as _stk
+                    import tkinter.messagebox as _smb
+                    import tkinter.filedialog as _sfd
+
+                    # quick search: parent dirs of script_path up to 4 levels
+                    _candidates = []
+                    _cur = os.path.dirname(script_path)
+                    for _ in range(4):
+                        _cur = os.path.dirname(_cur)
+                        _fp = os.path.join(_cur, "v0rtex.py")
+                        if os.path.isfile(_fp) and os.path.normcase(_fp) != os.path.normcase(script_path):
+                            _candidates.append(_fp)
+
+                    if _candidates:
+                        _found_msg = "\n".join(f"  • {p}" for p in _candidates)
+                        _ans = _smb.askyesno(
+                            "External Launcher Found",
+                            f"Found {len(_candidates)} external v0rtex.py file(s):\n\n{_found_msg}\n\n"
+                            "Update these files too?",
+                            parent=rr)
+                        if _ans:
+                            for _fp in _candidates:
+                                try:
+                                    _tmp3 = _fp + ".update_tmp"
+                                    with open(_tmp3, "w", encoding="utf-8") as _ef: _ef.write(new_script)
+                                    _shu.move(_tmp3, _fp)
+                                    rr.after(0, lambda p=_fp: _ulog(f"  ✓ Updated: {p}","OK"))
+                                except Exception as _ee2:
+                                    rr.after(0, lambda e=_ee2,p=_fp: _ulog(f"  ~ Could not update {p}: {e}","WARN"))
+                        else:
+                            rr.after(0, lambda: _ulog("  ~ External update skipped by user","DIM"))
+                    else:
+                        _ans2 = _smb.askyesno(
+                            "External Launcher",
+                            "No external v0rtex.py found automatically.\n\n"
+                            "Browse manually to locate and update it?",
+                            parent=rr)
+                        if _ans2:
+                            _manual = _sfd.askopenfilename(
+                                title="Select external v0rtex.py",
+                                parent=rr,
+                                filetypes=[("Python script","*.py"),("All files","*.*")])
+                            if _manual and os.path.isfile(_manual):
+                                try:
+                                    _tmp4 = _manual + ".update_tmp"
+                                    with open(_tmp4, "w", encoding="utf-8") as _ef: _ef.write(new_script)
+                                    _shu.move(_tmp4, _manual)
+                                    rr.after(0, lambda: _ulog(f"  ✓ Updated: {_manual}","OK"))
+                                except Exception as _ee3:
+                                    rr.after(0, lambda e=_ee3: _ulog(f"  ~ Failed: {e}","WARN"))
+                            else:
+                                rr.after(0, lambda: _ulog("  ~ No file selected","DIM"))
+
+                rr.after(0, _search_and_update_launcher)
+        except Exception as _dle:
+            _ulog(f"  ~ Launcher check error: {_dle}","WARN")
 
         _ulog("\n[ 6/6 ]  Restoring user data…","HEAD"); _uprog(80,"restore")
         if _upd_opt_cfg.get() and _saved_json:
