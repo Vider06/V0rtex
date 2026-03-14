@@ -1,20 +1,135 @@
+VORTEX SOFTWARE LICENSE
 Copyright (c) 2024-2025 Vider_06. All rights reserved.
 
-This software and its source code are the exclusive property of Vider_06.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-You may NOT:
-- Redistribute, sell, or sublicense this software or any part of it
-- Repackage or rebrand it under a different name
-- Use it as a base for commercial or public products
-- Share the source code or compiled versions without explicit written
-  permission from the author
+1. OWNERSHIP
+
+This software, its source code, compiled forms, documentation, assets, and
+all derivative components are the exclusive intellectual property of
+Vider_06 ("the Author"). No ownership, license, or rights are transferred
+to any party by the mere act of accessing, downloading, or using this
+software, except as explicitly stated in this license.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2. PERMITTED USES
 
 You MAY:
-- Use this software for personal, non-commercial purposes
-- Fork it privately for personal study
+  - Use this software solely for personal, non-commercial purposes on your
+    own devices.
+  - Fork this repository privately for personal study only, provided the
+    fork remains private and inaccessible to any third party at all times.
+  - Share the URL of the official GitHub repository
+    (https://github.com/Vider06/V0RTEX) with others.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED. THE AUTHOR IS NOT LIABLE FOR ANY DAMAGE OR DATA LOSS ARISING FROM
-THE USE OF THIS SOFTWARE.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-For permissions beyond personal use, contact the author directly.
+3. PROHIBITED USES
+
+You MAY NOT, under any circumstances:
+  - Redistribute, publish, upload, mirror, or otherwise share this software
+    or its source code in any form, partial or complete, on any platform,
+    service, or medium.
+  - Sell, sublicense, rent, lease, or otherwise commercialize this software
+    or any part of it.
+  - Repackage, rebrand, or present this software under a different name,
+    identity, or authorship.
+  - Use this software, in whole or in part, as a base, component, or
+    reference for any commercial, public, or distributed product or service.
+  - Incorporate any portion of this code into another project, whether
+    open-source or proprietary, without prior explicit written permission
+    from the Author.
+  - Decompile, reverse-engineer, or disassemble compiled forms of this
+    software for the purpose of circumventing this license.
+  - Remove, alter, or obscure this license notice, copyright headers, or
+    attribution strings in the source code or documentation.
+  - Use this software for any illegal, malicious, or unauthorized activity.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+4. DISCLAIMER OF WARRANTIES
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, TITLE, OR NON-INFRINGEMENT.
+
+THE AUTHOR MAKES NO REPRESENTATIONS OR WARRANTIES REGARDING:
+  - The accuracy, completeness, or reliability of any analysis, scan
+    result, detection, or output produced by this software.
+  - The suitability of this software for any particular purpose, including
+    security, forensic, or investigative use.
+  - The absence of bugs, errors, vulnerabilities, or interruptions.
+  - Compatibility with any specific operating system, hardware, or
+    third-party software.
+
+USE OF THIS SOFTWARE IS ENTIRELY AT YOUR OWN RISK.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5. LIMITATION OF LIABILITY AND INDEMNIFICATION
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW:
+
+  a) The Author shall not be liable, under any legal theory (tort,
+     contract, strict liability, or otherwise), for any direct, indirect,
+     incidental, special, consequential, punitive, or exemplary damages
+     arising from or related to the use, misuse, inability to use, or
+     results of using this software, even if the Author has been advised
+     of the possibility of such damages.
+
+  b) This includes, without limitation: data loss or corruption, system
+     damage, security breaches, false positives or false negatives in
+     malware detection, financial loss, loss of business, loss of privacy,
+     or any harm caused to third parties as a result of your use of this
+     software.
+
+  c) The Author bears no responsibility for any consequence arising from
+     the analysis, quarantine, deletion, or modification of files performed
+     by or through this software.
+
+  d) The Author is not liable for any legal, regulatory, or compliance
+     consequences arising from your use of this software in any
+     professional, institutional, or organizational context.
+
+  e) You agree to indemnify, defend, and hold harmless the Author from and
+     against any and all claims, damages, losses, liabilities, costs, and
+     expenses (including reasonable legal fees) arising from: your use or
+     misuse of this software; your violation of this license; your
+     violation of any applicable law or regulation; or any harm caused to
+     third parties through your use of this software.
+
+  f) The Author cannot be held liable for the actions of cybercriminals,
+     malware authors, or any third party whose software may be analyzed,
+     detected, or interacted with through V0RTEX.
+
+  g) By using this software, you explicitly acknowledge that you are not
+     relying on it as your sole security solution and that you accept full
+     personal responsibility for any security decisions made based on its
+     output.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+6. GOVERNING LAW AND JURISDICTION
+
+This license shall be interpreted in the most restrictive manner permissible
+under applicable law. Where any clause is found unenforceable in a given
+jurisdiction, the remaining clauses shall remain in full force and effect.
+
+The Author makes no representation that this software is appropriate or
+available for use in any specific jurisdiction. You are responsible for
+compliance with local laws.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+7. ACCEPTANCE
+
+By downloading, cloning, running, or interacting with this software in
+any way, you acknowledge that you have read, understood, and agree to be
+bound by all terms of this license. If you do not agree, you must
+immediately delete all copies of this software from your systems.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For permissions beyond personal use, contact the Author directly via
+GitHub: https://github.com/Vider06
