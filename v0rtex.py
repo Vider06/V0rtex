@@ -802,8 +802,8 @@ def _build_trampoline_script():
         "    except Exception as _re: _log(f'  \u2717 Error: {_d} \u2014 {_re}')\n"
         "\n"
         "if MODE == 'reinstall':\n"
-        "    _beside = os.path.join(_SELF_DIR, 'v0rtex_fresh_install.py')\n"
-        "    _v0rtex = _beside if os.path.exists(_beside) else _V0RTEX_ARG\n"
+        "    # Always use the freshly downloaded file, never a cached copy\n"
+        "    _v0rtex = _V0RTEX_ARG\n"
         "    if _v0rtex and os.path.exists(_v0rtex):\n"
         "        _log(f'Launching V0RTEX: {_v0rtex}')\n"
         "        try:\n"
@@ -1753,19 +1753,37 @@ def _do_reinstall():
     else:
         _log('  ~ Build tools removal skipped', 'DIM')
 
-    _log(f'\\n[ {{n[0]}} / {{steps}} ]  Saving v0rtex.py', 'HEAD'); n[0] += 1
-    _prog(50, 'Copying v0rtex.py…')
+    _log(f'\\\\n[ {{n[0]}} / {{steps}} ]  Fetching latest v0rtex.py', 'HEAD'); n[0] += 1
+    _prog(50, 'Downloading latest v0rtex.py…')
     v0tmp = os.path.join(_TEMP, 'v0rtex_fresh_install.py')
+    _downloaded = False
     try:
-        shutil.copy2(src, v0tmp)
-        _log(f'  ✓ Saved to TEMP: {{os.path.basename(v0tmp)}}', 'OK')
-        _dlog(f'Copy OK → {{v0tmp}}')
-    except Exception as e:
-        _log(f'  ✗ Copy failed: {{e}} — aborting', 'ERR')
-        _dlog(f'ABORT: copy error: {{e}}'); _set_done(False)
-        root.after(0, lambda: btn_start[0].config(state='normal', text='  ♻  REINSTALL  '))
-        return
-
+        _dlog('Trying GitHub: https://raw.githubusercontent.com/Vider06/V0RTEX/main/v0rtex.py')
+        import urllib.request as _ur
+        _req = _ur.Request('https://raw.githubusercontent.com/Vider06/V0RTEX/main/v0rtex.py', headers={{'User-Agent': 'V0RTEX-Reinstall/1.0'}})
+        with _ur.urlopen(_req, timeout=30) as _resp:
+            _remote = _resp.read().decode('utf-8', 'replace')
+        if len(_remote) < 10000:
+            raise ValueError(f'Download too small ({{len(_remote)}} bytes) — likely an error page')
+        with open(v0tmp, 'w', encoding='utf-8') as _vf:
+            _vf.write(_remote)
+        _log(f'  ✓ Downloaded latest from GitHub ({{len(_remote):,}} bytes)', 'OK')
+        _dlog(f'GitHub download OK → {{v0tmp}}')
+        _downloaded = True
+    except Exception as _de:
+        _log(f'  ~ GitHub download failed: {{_de}}', 'WARN')
+        _log('  → Falling back to local copy…', 'DIM')
+        _dlog(f'Download error: {{_de}}')
+    if not _downloaded:
+        try:
+            shutil.copy2(src, v0tmp)
+            _log(f'  ✓ Local copy saved to TEMP (offline reinstall)', 'OK')
+            _dlog(f'Local copy OK → {{v0tmp}}')
+        except Exception as e:
+            _log(f'  ✗ Both download and local copy failed: {{e}} — aborting', 'ERR')
+            _dlog(f'ABORT: {{e}}'); _set_done(False)
+            root.after(0, lambda: btn_start[0].config(state='normal', text='  ♻  REINSTALL  '))
+            return
     _log(f'\\n[ {{n[0]}} / {{steps}} ]  Removing old installation', 'HEAD'); n[0] += 1
     _prog(65, 'Removing folders…')
     _sprog(0, 'removing app folder…')
@@ -5150,17 +5168,25 @@ try:
 except Exception:
     pass
 
-import matplotlib
 try:
-    matplotlib.use("TkAgg")
-except Exception:
+    import matplotlib
     try:
-        matplotlib.use("Agg")
+        matplotlib.use("TkAgg")
     except Exception:
-        pass
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import matplotlib.figure as mplfig
+        try:
+            matplotlib.use("Agg")
+        except Exception:
+            pass
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+    import matplotlib.figure as mplfig
+    _MATPLOTLIB_OK = True
+except ImportError:
+    matplotlib = None
+    plt = None
+    FigureCanvasTkAgg = None
+    mplfig = None
+    _MATPLOTLIB_OK = False
 
 
 BASE_DIR          = os.path.dirname(os.path.abspath(__file__))
@@ -7921,11 +7947,16 @@ _chart_toolbar.pack(fill=tk.X)
 tk.Label(_chart_toolbar, text="Live scan analytics – updates after each scan",
          font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(side=tk.LEFT)
 
-_chart_fig    = mplfig.Figure(figsize=(13,7), facecolor=C["surface0"],
-                              tight_layout=False)
-_chart_canvas = FigureCanvasTkAgg(_chart_fig, master=_tab_charts)
-_chart_canvas.get_tk_widget().configure(bg=C["base"])
-_chart_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
+if _MATPLOTLIB_OK:
+    _chart_fig    = mplfig.Figure(figsize=(13,7), facecolor=C["surface0"],
+                                  tight_layout=False)
+    _chart_canvas = FigureCanvasTkAgg(_chart_fig, master=_tab_charts)
+    _chart_canvas.get_tk_widget().configure(bg=C["base"])
+    _chart_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
+else:
+    _chart_fig = None; _chart_canvas = None
+    tk.Label(_tab_charts, text="matplotlib not installed — run setup to fix.",
+             font=("Consolas",10), bg=C["base"], fg=C["red"]).pack(expand=True)
 _mkbtn(_chart_toolbar,"↻ Refresh",lambda: _update_charts(), C["surface2"], C["text"])
 
 _chart_last_update = 0.0
@@ -10757,8 +10788,11 @@ _perf_stat_w(_perf_stats_row, "APP RAM",    _sv_ram,    C["green"])
 _perf_stat_w(_perf_stats_row, "NET ↑",      _sv_net_up, C["teal"])
 _perf_stat_w(_perf_stats_row, "NET ↓",      _sv_net_dn, C["sapphire"])
 
-_perf_fig    = mplfig.Figure(figsize=(13,5), facecolor=C["surface0"], tight_layout=False)
-_perf_canvas = FigureCanvasTkAgg(_perf_fig, master=_tab_perf)
+if _MATPLOTLIB_OK:
+    _perf_fig    = mplfig.Figure(figsize=(13,5), facecolor=C["surface0"], tight_layout=False)
+    _perf_canvas = FigureCanvasTkAgg(_perf_fig, master=_tab_perf)
+else:
+    _perf_fig = None; _perf_canvas = None
 _perf_canvas.get_tk_widget().configure(bg=C["base"])
 _perf_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
 
@@ -10834,8 +10868,11 @@ _tl_toolbar.pack(fill=tk.X)
 tk.Label(_tl_toolbar, text="Chronological scan history",
          font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(side=tk.LEFT)
 
-_tl_fig    = mplfig.Figure(figsize=(13,5), facecolor=C["surface0"], tight_layout=False)
-_tl_canvas = FigureCanvasTkAgg(_tl_fig, master=_tab_timeline)
+if _MATPLOTLIB_OK:
+    _tl_fig    = mplfig.Figure(figsize=(13,5), facecolor=C["surface0"], tight_layout=False)
+    _tl_canvas = FigureCanvasTkAgg(_tl_fig, master=_tab_timeline)
+else:
+    _tl_fig = None; _tl_canvas = None
 _tl_canvas.get_tk_widget().configure(bg=C["base"])
 _tl_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=8, pady=(4,0))
 
