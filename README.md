@@ -1,4 +1,4 @@
-# V0RTEX v0.9.7
+# V0RTEX v0.9.7.X3
 
 **V0RTEX** is a self-contained Windows malware analysis platform built in Python + Tkinter.  
 `V = Vider · 0 = zero-day · R = Reverse · T = Threat · E = Engine · X = eXamine`
@@ -72,7 +72,7 @@
 ## Folder Structure
 ```
 V0rtex_System/
-├── V0RTEX_v0.9/                    ← main install directory (BASE_DIR)
+├── V0RTEX_v0.9.7.X3/               ← main install directory (BASE_DIR)
 │   ├── v0rtex.py                   ← the entire application
 │   ├── config.json                 ← all user settings
 │   ├── scan_history.db             ← SQLite database
@@ -84,6 +84,7 @@ V0rtex_System/
 │   ├── rules/                      ← YARA rule files (.yar / .yara)
 │   │   └── external/               ← community rule sets
 │   ├── reports/                    ← generated HTML/PDF/JSON reports
+│   ├── reports_pdf/                ← generated PDF reports
 │   ├── modules/                    ← embedded helper modules
 │   │   ├── pe_analysis.py
 │   │   ├── cuckoo_api.py
@@ -93,17 +94,29 @@ V0rtex_System/
 │   ├── debug_log/                  ← session logs and crash reports
 │   ├── quarantine/                 ← isolated malicious files
 │   ├── backups/                    ← auto-created backup ZIPs
-│   └── _recovery/                  ← recovery system working directory
+│   ├── _recovery/                  ← recovery system working directory
+│   ├── sandbox_env/                ← sandbox working environment
+│   │   └── drop/                   ← auto-scan drop folder
+│   ├── threat_feeds/               ← imported threat feed files
+│   ├── pcap_dumps/                 ← packet capture files
+│   └── diff_workspace/             ← file diff temporary workspace
 ├── installation_media/
-│   ├── v0rtex.py                   ← backup copy of the script
-│   ├── setup_win.bat               ← setup batch script
-│   ├── INSTRUCTIONS.txt            ← setup instructions
-│   ├── uninstall.py                ← uninstall wizard
-│   ├── reinstall.py                ← reinstall wizard
+│   ├── v0rtex_reinstall.py         ← reinstall wizard (generated)
+│   ├── v0rtex_uninstall.py         ← uninstall wizard (generated)
 │   ├── debug_log/                  ← installer session logs
 │   └── backups/                    ← pre-uninstall/reinstall backups
 └── V0rtex_backups/                 ← backup ZIPs (outside V0rtex_System)
 ```
+
+---
+
+## What's new in v0.9.7.X3
+
+- **Updater fix** — version comparator now correctly handles alphanumeric version tags (`X1`, `X2`, `X3`…). Previously the updater always reported "up to date" due to a `int()` parse failure on non-numeric version parts.
+- **Dual-file update** — the updater now also patches the external launcher (`v0rtex.py` outside `V0rtex_System`) if one is detected. If the running file is already the app copy, it searches parent directories automatically and shows a popup to confirm or browse manually.
+- **Reinstall — local copy default** — reinstall no longer downloads from GitHub by default. It copies the currently running script to TEMP, then launches setup. An optional checkbox `⬇ Download latest from GitHub` enables remote fetch with automatic fallback to local copy on failure. The temp file is deleted automatically after launch.
+- **Recovery REPAIR tab** — new **🧹 Clean TEMP** button removes all V0RTEX-related temp files (`v0rtex_fresh_install*.py`, trampolines, `vs_buildtools_setup*.exe`, `get-pip*.py`).
+- **Crash UI fix** — corrected ASCII X art (line 4 had a stray `╔` box character).
 
 ---
 
@@ -292,6 +305,7 @@ The main recovery workhorse. Contains these repair actions:
 | **Repair DB Schema** | Opens `scan_history.db` and recreates any missing tables or columns without touching existing scan records. Safe to run even on a partially healthy database. |
 | **Install / Repair Packages** | Runs a full pip install cycle for all required packages with multiple fallback strategies: bulk install → per-package → `--user` → system Python fallback. Also attempts to install Microsoft C++ Build Tools if `yara-python` fails. |
 | **Restore from Backup** | Opens a file picker to select a V0RTEX backup `.zip`. Extracts config, database, rules, whitelist and notes into `BASE_DIR`. Does not overwrite `v0rtex.py` unless explicitly included in the backup. |
+| **🧹 Clean TEMP** | Removes all V0RTEX-related temp files left by the installer, reinstall wizard or trampoline scripts (`v0rtex_fresh_install*.py`, `v0rtex_*_trampoline*.py`, `vs_buildtools_setup*.exe`, `get-pip*.py`). |
 
 All repair actions stream their output live to the log panel on the left side of the tab.
 
@@ -334,6 +348,9 @@ Go to **🔧 Repair** → **Repair DB Schema**. This recreates missing tables wi
 **Scenario 5 — Unknown crash:**
 Go to **💥 Crash Log**, copy the full traceback, and open a GitHub Issue with it.
 
+**Scenario 6 — Leftover temp files after reinstall:**
+Go to **🔧 Repair** → **🧹 Clean TEMP** to remove any installer temp files left in the system TEMP folder.
+
 ---
 
 ## Troubleshooting
@@ -351,6 +368,7 @@ Go to **💥 Crash Log**, copy the full traceback, and open a GitHub Issue with 
 | **High memory on startup** | Background YARA compile is running — wait 30–60 seconds |
 | **Recovery Terminal appears every launch** | Antivirus is deleting module files — add the install folder to Windows Defender exclusions (done automatically by setup) |
 | **Crash report window on every launch** | Check `debug_log/crash_log.txt` for the traceback and open a GitHub Issue |
+| **Updater says "up to date" on old version** | Update to v0.9.7.X3 — earlier versions had a version comparison bug with alphanumeric tags |
 
 ---
 
