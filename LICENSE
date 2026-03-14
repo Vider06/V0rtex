@@ -22,10 +22,57 @@ You MAY:
     fork remains private and inaccessible to any third party at all times.
   - Share the URL of the official GitHub repository
     (https://github.com/Vider06/V0RTEX) with others.
+  - Create video content (YouTube, TikTok, Instagram, Twitch, or any other
+    platform) featuring, reviewing, demonstrating, or discussing this
+    software, subject to the mandatory attribution requirements in Section 3.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-3. PROHIBITED USES
+3. MANDATORY ATTRIBUTION FOR VIDEO CONTENT
+
+Any video content that features, showcases, reviews, or discusses V0RTEX
+in any way — including but not limited to tutorials, reviews, showcases,
+reaction videos, and livestreams — MUST comply with ALL of the following
+attribution requirements without exception:
+
+  a) TITLE OR DESCRIPTION — The video title or description must include
+     the author's name "Vider_06" and the official GitHub repository URL
+     "https://github.com/Vider06/V0RTEX" clearly and without abbreviation.
+
+  b) PINNED OR FIRST-POSITION COMMENT — If the platform supports pinned
+     or featured comments, a comment containing the author credit and the
+     GitHub URL must be pinned or placed as the first visible comment.
+
+  c) ON-SCREEN CREDIT — The following information must appear visibly
+     on screen at the beginning of the video (within the first 60 seconds)
+     for a minimum of 5 continuous seconds, in a font size readable at
+     standard viewing resolution:
+
+         Software: V0RTEX
+         Author:   Vider_06
+         GitHub:   https://github.com/Vider06/V0RTEX
+
+  d) VERBAL CREDIT — If the video contains spoken audio, the creator must
+     verbally state the author's name "Vider_06" and the GitHub repository
+     at least once during the video.
+
+  e) NO MISREPRESENTATION — The creator must not claim, imply, or suggest
+     authorship, co-authorship, or ownership of V0RTEX or any part of it.
+     The software must be clearly identified as the work of Vider_06.
+
+  f) NO MONETIZATION WITHOUT PERMISSION — Video content featuring V0RTEX
+     may not be monetized (through platform ad revenue, sponsorships,
+     paid promotions, or any other mechanism) without prior explicit
+     written permission from the Author. Attribution alone does not grant
+     monetization rights.
+
+Failure to comply with any of the above requirements constitutes a
+copyright violation and revokes the video content permission granted in
+Section 2 retroactively.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+4. PROHIBITED USES
 
 You MAY NOT, under any circumstances:
   - Redistribute, publish, upload, mirror, or otherwise share this software
@@ -48,7 +95,7 @@ You MAY NOT, under any circumstances:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-4. DISCLAIMER OF WARRANTIES
+5. DISCLAIMER OF WARRANTIES
 
 THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
 OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -67,7 +114,7 @@ USE OF THIS SOFTWARE IS ENTIRELY AT YOUR OWN RISK.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-5. LIMITATION OF LIABILITY AND INDEMNIFICATION
+6. LIMITATION OF LIABILITY AND INDEMNIFICATION
 
 TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW:
 
@@ -110,7 +157,7 @@ TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-6. GOVERNING LAW AND JURISDICTION
+7. GOVERNING LAW AND JURISDICTION
 
 This license shall be interpreted in the most restrictive manner permissible
 under applicable law. Where any clause is found unenforceable in a given
@@ -122,7 +169,7 @@ compliance with local laws.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-7. ACCEPTANCE
+8. ACCEPTANCE
 
 By downloading, cloning, running, or interacting with this software in
 any way, you acknowledge that you have read, understood, and agree to be
