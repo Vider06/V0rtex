@@ -1304,7 +1304,7 @@ def _start():
         _anim_start()
         threading.Thread(target=_do_uninstall, daemon=True).start()
     except Exception as _se:
-        tmb.showerror('Uninstall', f'Could not start thread:\n{{_se}}', parent=root)
+        tmb.showerror('Uninstall', 'Could not start thread:\\n' + str(_se), parent=root)
         if b: b.config(state='normal', text='  ⛔  UNINSTALL  ')
 
 b = tk.Button(bot, text='  ⛔  UNINSTALL  ', font=('Consolas',10,'bold'),
@@ -1329,7 +1329,7 @@ def _uninstall_crash_handler(exc_type, exc_value, exc_tb):
         ts = _dt.datetime.now().strftime('%Y%m%d_%H%M%S')
         crash_path = os.path.join(BACKUP_DIR, f'uninstall_crash_{{ts}}.txt')
         with open(crash_path, 'w', encoding='utf-8') as _cf:
-            _cf.write(f'V0RTEX Uninstall Crash — {{ts}}\n\n{{tb_str}}')
+            _cf.write('V0RTEX Uninstall Crash \u2014 ' + ts + '\\n\\n' + tb_str)
     except Exception:
         crash_path = None
     try:
@@ -1645,11 +1645,11 @@ def _resolve_v0rtex_src():
     searched = '\\n'.join(f'  - {{c}}' for c in candidates)
     ans = tmb.askyesno(
         'v0rtex.py not found',
-        f'Could not locate v0rtex.py automatically.\n\nSearched:\n{{searched}}\n\nBrowse manually?',
+        'Could not locate v0rtex.py automatically.\\n\\nSearched:\\n' + searched + '\\n\\nBrowse manually?',
         parent=root)
     if not ans:
         tmb.showwarning('Reinstall cancelled',
-            'Reinstall aborted.\n\nTo fix: copy v0rtex.py into the V0rtex_System folder, then retry.',
+            'Reinstall aborted.\\n\\nTo fix: copy v0rtex.py into the V0rtex_System folder, then retry.',
             parent=root)
         return False
     p = tfd.askopenfilename(
@@ -1671,7 +1671,7 @@ def _do_reinstall():
     src    = _v0rtex_src[0]
     if not src or not os.path.isfile(src):
         root.after(0, lambda: tmb.showerror('Reinstall',
-            f'v0rtex.py not found:\n{{src}}\n\nCannot proceed.', parent=root))
+            'v0rtex.py not found:\\n' + str(src) + '\\n\\nCannot proceed.', parent=root))
         root.after(0, lambda: btn_start[0].config(state='normal', text='  ♻  REINSTALL  '))
         return
     root.after(0, lambda: [w.config(state='disabled') for w in _opts_widgets])
@@ -1935,7 +1935,7 @@ def _start():
         _anim_start()
         threading.Thread(target=_do_reinstall, daemon=True).start()
     except Exception as _se:
-        tmb.showerror('Reinstall', f'Could not start reinstall thread:\n{{_se}}', parent=root)
+        tmb.showerror('Reinstall', 'Could not start reinstall thread:\\n' + str(_se), parent=root)
         if b: b.config(state='normal', text='  ♻  REINSTALL  ')
 
 b = tk.Button(bot, text='  ♻  REINSTALL  ', font=('Consolas',10,'bold'),
@@ -1960,7 +1960,7 @@ def _reinstall_crash_handler(exc_type, exc_value, exc_tb):
         ts = _dt.datetime.now().strftime('%Y%m%d_%H%M%S')
         crash_path = os.path.join(BACKUP_DIR, f'reinstall_crash_{{ts}}.txt')
         with open(crash_path, 'w', encoding='utf-8') as _cf:
-            _cf.write(f'V0RTEX Reinstall Crash — {{ts}}\n\n{{tb_str}}')
+            _cf.write('V0RTEX Reinstall Crash \u2014 ' + ts + '\\n\\n' + tb_str)
     except Exception:
         crash_path = None
     try:
@@ -2009,23 +2009,45 @@ root.mainloop()
 
 
 def _launch_script(script_path):
-    try:
-        kw = {}
-        if sys.platform == "win32":
-            kw["creationflags"] = subprocess.CREATE_NEW_CONSOLE
-            kw["close_fds"]     = True
-        subprocess.Popen([sys.executable, script_path], **kw)
-        def _quit_after():
-            import time as _tq; _tq.sleep(0.8)
-            try: root.after(0, lambda: sys.exit(0))
-            except Exception:
-                import os as _oq; _oq._exit(0)
-        import threading as _tls
-        _tls.Thread(target=_quit_after, daemon=True).start()
-    except Exception as _e:
-        try: messagebox.showerror("Launch Error", f"Could not launch script:\n{_e}")
-        except Exception: print(f"[LAUNCH ERROR] {_e}")
+    launched = False
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            # Ricava python.exe da sys.executable (pythonw.exe + CREATE_NEW_CONSOLE e' contradditorio)
+            _py = sys.executable
+            if _py.lower().endswith("pythonw.exe"):
+                _py = _py[:-len("pythonw.exe")] + "python.exe"
+            if not os.path.isfile(_py):
+                _py = sys.executable  # fallback
+            ret = ctypes.windll.shell32.ShellExecuteW(
+                None, "open", _py, f'"{script_path}"', None, 1)
+            if ret > 32:
+                launched = True
+            else:
+                raise RuntimeError(f"ShellExecuteW returned {ret}")
+        except Exception as _se:
+            print(f"[LAUNCH] ShellExecuteW failed ({_se}), fallback a Popen")
 
+    if not launched:
+        try:
+            kw = {}
+            if sys.platform == "win32":
+                kw["creationflags"] = subprocess.CREATE_NEW_CONSOLE
+            subprocess.Popen([sys.executable, script_path], **kw)
+            launched = True
+        except Exception as _e:
+            try: messagebox.showerror("Launch Error", f"Could not launch script:\n{_e}")
+            except Exception: print(f"[LAUNCH ERROR] {_e}")
+            return
+
+    # Chiudi l'app principale bypassando tkinter - evita race condition su root.after()
+    def _quit_after():
+        import time as _tq, os as _oq
+        _tq.sleep(0.8)
+        try: _oq._exit(0)
+        except Exception: pass
+    import threading as _tls
+    _tls.Thread(target=_quit_after, daemon=True).start()
 
 def _run_setup_ui():
     import tkinter as tk
@@ -22584,8 +22606,10 @@ _rptb_sc.pack(side=tk.RIGHT, fill=tk.Y); _rptb_out.pack(fill=tk.BOTH, expand=Tru
 
 
 _VORTEX_VERSION      = "0.9.7"
-_GITHUB_REPO_RAW     = "https://raw.githubusercontent.com/Vider-06/V0RTEX/main"
-_GITHUB_VERSION_URL  = f"{_GITHUB_REPO_RAW}/version.txt"
+_GITHUB_REPO_RAW     = "https://raw.githubusercontent.com/Vider06/V0RTEX/main"
+_GITHUB_PAGE_URL     = "https://github.com/Vider06/V0RTEX"
+_GITHUB_API_RELEASE  = "https://api.github.com/repos/Vider06/V0RTEX/releases/latest"
+_GITHUB_VERSION_URL  = f"{_GITHUB_REPO_RAW}/version.txt"  # fallback
 _GITHUB_SCRIPT_URL   = f"{_GITHUB_REPO_RAW}/v0rtex.py"
 _GITHUB_MANIFEST_URL = f"{_GITHUB_REPO_RAW}/update_manifest.json"
 _UPDATE_STATE        = {"available": False, "remote_version": None, "changelog": ""}
@@ -22614,28 +22638,39 @@ tk.Label(_upd_stat_col, textvariable=_upd_remote_sv, font=("Consolas",9),
 tk.Frame(_tab_updater, bg=C["surface2"], height=1).pack(fill=tk.X)
 
 _upd_cfg = tk.Frame(_tab_updater, bg=C["surface0"], padx=14, pady=8); _upd_cfg.pack(fill=tk.X)
-tk.Label(_upd_cfg, text="URL raw repo GitHub:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
+tk.Label(_upd_cfg, text="GitHub raw URL:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
 _upd_repo_v = tk.StringVar(value=_GITHUB_REPO_RAW)
-tk.Entry(_upd_cfg, textvariable=_upd_repo_v, width=46, font=("Consolas",9),
+tk.Entry(_upd_cfg, textvariable=_upd_repo_v, width=52, font=("Consolas",9),
          bg=C["mantle"], fg=C["text"], relief="flat", bd=4,
          insertbackground=C["text"]).pack(side=tk.LEFT, padx=6)
+def _upd_open_github():
+    import webbrowser; webbrowser.open(_GITHUB_PAGE_URL)
+tk.Button(_upd_cfg, text="🔗 GitHub", font=("Consolas",9), bg=C["surface1"], fg=C["blue"],
+          relief="flat", bd=0, padx=8, pady=3, cursor="hand2",
+          command=_upd_open_github).pack(side=tk.LEFT, padx=(2,0))
 
+_upd_optrow = tk.Frame(_tab_updater, bg=C["base"], padx=14, pady=4); _upd_optrow.pack(fill=tk.X)
 _upd_auto_v = tk.BooleanVar(value=CONFIG.get("auto_update_check", True))
-_upd_auto_chk = tk.Checkbutton(_tab_updater, text="Check for updates on startup",
+_upd_auto_chk = tk.Checkbutton(_upd_optrow, text="Check for updates on startup",
     variable=_upd_auto_v, font=FS, bg=C["base"], fg=C["text"],
     selectcolor=C["surface1"], activebackground=C["base"])
-_upd_auto_chk.pack(anchor="w", padx=16, pady=(6,0))
+_upd_auto_chk.pack(side=tk.LEFT)
 
-_upd_btnrow = tk.Frame(_tab_updater, bg=C["surface0"], padx=14, pady=8); _upd_btnrow.pack(side=tk.BOTTOM, fill=tk.X)
+_upd_btnrow = tk.Frame(_tab_updater, bg=C["surface0"], padx=14, pady=8); _upd_btnrow.pack(fill=tk.X)
 
-_upd_out_frame = tk.Frame(_tab_updater, bg=C["base"]); _upd_out_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
-_upd_out_sc = tk.Scrollbar(_upd_out_frame, orient="vertical", bg=C["surface1"],
-                             troughcolor=C["base"], relief="flat", width=7)
+_upd_out_frame = tk.Frame(_tab_updater, bg=C["base"]); _upd_out_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=(2,4))
+_upd_out_sc_y = tk.Scrollbar(_upd_out_frame, orient="vertical", bg=C["surface1"],
+                               troughcolor=C["base"], relief="flat", width=7)
+_upd_out_sc_x = tk.Scrollbar(_upd_out_frame, orient="horizontal", bg=C["surface1"],
+                               troughcolor=C["base"], relief="flat", width=7)
 _upd_out = tk.Text(_upd_out_frame, bg="#0a0a10", fg=C["text"], font=("Consolas",9),
                    relief="flat", bd=0, padx=10, pady=8, state="disabled", wrap="none",
-                   yscrollcommand=_upd_out_sc.set)
-_upd_out_sc.config(command=_upd_out.yview)
-_upd_out_sc.pack(side=tk.RIGHT, fill=tk.Y); _upd_out.pack(fill=tk.BOTH, expand=True)
+                   yscrollcommand=_upd_out_sc_y.set, xscrollcommand=_upd_out_sc_x.set)
+_upd_out_sc_y.config(command=_upd_out.yview)
+_upd_out_sc_x.config(command=_upd_out.xview)
+_upd_out_sc_y.pack(side=tk.RIGHT, fill=tk.Y)
+_upd_out_sc_x.pack(side=tk.BOTTOM, fill=tk.X)
+_upd_out.pack(fill=tk.BOTH, expand=True)
 _upd_out.tag_configure("HEAD",  foreground=C["blue"])
 _upd_out.tag_configure("OK",    foreground=C["green"])
 _upd_out.tag_configure("WARN",  foreground=C["yellow"])
@@ -22655,15 +22690,15 @@ def _upd_set_indicator(color):
     root.after(0, lambda: _upd_indicator_l.config(fg=color))
 
 def _upd_fetch_text(url, timeout=12):
-    """Fetch plain text from URL — uses requests if available, else urllib."""
-    if requests:
-        r = requests.get(url, timeout=timeout, headers={"User-Agent":"V0RTEX-Updater/1.0"})
-        r.raise_for_status(); return r.text
-    else:
-        import urllib.request as _ur
-        req = _ur.Request(url, headers={"User-Agent":"V0RTEX-Updater/1.0"})
-        with _ur.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8","replace")
+    """Fetch plain text from URL — always uses urllib to avoid requests rate-limit quirks."""
+    import urllib.request as _ur
+    _headers = {"User-Agent": "V0RTEX-Updater/1.0"}
+    if "api.github.com" in url:
+        _headers["Accept"] = "application/vnd.github+json"
+        _headers["X-GitHub-Api-Version"] = "2022-11-28"
+    req = _ur.Request(url, headers=_headers)
+    with _ur.urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8", "replace")
 
 def _upd_version_newer(remote, local):
     """Compare version strings like '1.2' or '1.2.3'."""
@@ -22674,48 +22709,105 @@ def _upd_version_newer(remote, local):
     except: return False
 
 def _upd_check(silent=False):
-    """Check GitHub for a newer version. Thread-safe."""
+    """Check GitHub for a newer version — tries Releases API first, falls back to version.txt."""
     if not _UPDATE_CHECK_LOCK.acquire(blocking=False): return
     _upd_set_indicator(C["yellow"])
     if not silent:
-        _upd_out.config(state="normal"); _upd_out.delete("1.0",tk.END); _upd_out.config(state="disabled")
-        _upd_log("Checking for updates…","HEAD")
-    root.after(0, lambda: _upd_status_sv.set(f"Checking..."))
+        _upd_out.config(state="normal"); _upd_out.delete("1.0", tk.END); _upd_out.config(state="disabled")
+        _upd_log("Checking for updates…", "HEAD")
+    root.after(0, lambda: _upd_status_sv.set("Checking..."))
+
+    def _fetch_version_api():
+        """Try GitHub Releases API — returns tag_name stripped of leading 'v'."""
+        import json as _j
+        txt = _upd_fetch_text(_GITHUB_API_RELEASE, timeout=12)
+        data = _j.loads(txt)
+        tag = data.get("tag_name", "").strip().lstrip("v")
+        body = data.get("body", "")  # release notes
+        if not tag:
+            raise ValueError("No tag_name in release payload")
+        return tag, body
+
+    def _fetch_version_txt(base_url):
+        """Fallback: raw version.txt in repo root."""
+        ver_url = f"{base_url}/version.txt"
+        _upd_log(f"  Fallback URL: {ver_url}", "DIM")
+        return _upd_fetch_text(ver_url).strip(), ""
+
     def _do():
         try:
             base_url = _upd_repo_v.get().strip().rstrip("/")
-            ver_url  = f"{base_url}/version.txt"
-            _upd_log(f"  URL: {ver_url}","DIM")
-            raw_ver = _upd_fetch_text(ver_url).strip()
+
+            # --- Try GitHub Releases API first, then version.txt fallback ---
+            result = [None, ""]   # [raw_ver, release_notes]
+            errors = []
+
+            try:
+                _upd_log(f"  API: {_GITHUB_API_RELEASE}", "DIM")
+                v, notes = _fetch_version_api()
+                result[0] = v
+                result[1] = notes
+                _upd_log(f"  ✓ API response — tag: v{v}", "DIM")
+            except Exception as _e:
+                errors.append(f"API: {_e}")
+                _upd_log(f"  ~ API failed ({_e}), trying version.txt…", "WARN")
+
+            if not result[0]:
+                try:
+                    v, _ = _fetch_version_txt(base_url)
+                    result[0] = v
+                except Exception as _e:
+                    errors.append(f"txt: {_e}")
+                    raise RuntimeError(
+                        "Both checks failed — " + " | ".join(errors) + "\n"
+                        "Make sure the repo has at least one GitHub Release "
+                        "or a version.txt file in the root."
+                    )
+
+            raw_ver      = result[0]
+            release_notes = result[1]
+
             _UPDATE_STATE["remote_version"] = raw_ver
             root.after(0, lambda: _upd_remote_sv.set(f"Remote version: v{raw_ver}"))
+
             if _upd_version_newer(raw_ver, _VORTEX_VERSION):
                 _UPDATE_STATE["available"] = True
                 _upd_set_indicator(C["red"])
                 root.after(0, lambda: _upd_status_sv.set(f"UPDATE AVAILABLE — v{raw_ver}"))
-                _upd_log(f"\n  ⚡ Update available: v{_VORTEX_VERSION} → v{raw_ver}","NEW")
-                try:
-                    cl_url = f"{base_url}/CHANGELOG.md"
-                    cl = _upd_fetch_text(cl_url)[:2000]
-                    _UPDATE_STATE["changelog"] = cl
-                    _upd_log("\n  ── CHANGELOG ────────────────────────────────","HEAD")
-                    for line in cl.split("\n")[:30]:
-                        _upd_log("  "+line,"DIM")
-                except: pass
+                _upd_log(f"\n  ⚡ Update available: v{_VORTEX_VERSION} → v{raw_ver}", "NEW")
+
+                # Show release notes from API, or try CHANGELOG.md
+                if release_notes.strip():
+                    _UPDATE_STATE["changelog"] = release_notes
+                    _upd_log("\n  ── RELEASE NOTES ────────────────────────────", "HEAD")
+                    for line in release_notes.split("\n")[:30]:
+                        _upd_log("  " + line, "DIM")
+                else:
+                    try:
+                        cl = _upd_fetch_text(f"{base_url}/CHANGELOG.md")[:2000]
+                        _UPDATE_STATE["changelog"] = cl
+                        _upd_log("\n  ── CHANGELOG ────────────────────────────────", "HEAD")
+                        for line in cl.split("\n")[:30]:
+                            _upd_log("  " + line, "DIM")
+                    except Exception:
+                        pass
+
                 if silent:
-                    root.after(500, lambda: _show_update_ui_if_needed())
+                    root.after(500, _show_update_ui_if_needed)
             else:
                 _UPDATE_STATE["available"] = False
                 _upd_set_indicator(C["green"])
                 root.after(0, lambda: _upd_status_sv.set(f"Up to date — v{_VORTEX_VERSION}"))
-                _upd_log(f"\n  ✓ V0RTEX is up to date (v{_VORTEX_VERSION})","OK")
+                _upd_log(f"\n  ✓ V0RTEX is up to date (v{_VORTEX_VERSION})", "OK")
+
         except Exception as e:
             _UPDATE_STATE["available"] = False
             _upd_set_indicator(C["overlay0"])
-            root.after(0, lambda: _upd_status_sv.set(f"Check failed"))
-            _upd_log(f"\n  ✗ Update check failed: {e}","ERR")
+            root.after(0, lambda: _upd_status_sv.set("Check failed"))
+            _upd_log(f"\n  ✗ Update check failed: {e}", "ERR")
         finally:
             _UPDATE_CHECK_LOCK.release()
+
     threading.Thread(target=_do, daemon=True).start()
 
 def _launch_update_ui(clear_install=False):
@@ -22963,6 +23055,14 @@ def _launch_update_ui(clear_install=False):
         _ulog("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━","HEAD")
         _UPDATE_STATE["available"] = False
         rr.after(0, lambda: _upd_restart_btn.config(state="normal"))
+        # Write sentinel so next startup shows "update applied" toast
+        try:
+            import json as _js
+            _sentinel = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_update_applied.json")
+            with open(_sentinel, "w", encoding="utf-8") as _sf:
+                _js.dump({"old": _VORTEX_VERSION, "new": _UPDATE_STATE.get("remote_version","?")}, _sf)
+        except Exception as _se:
+            print(f"[UPDATE] Could not write sentinel: {_se}")
 
     def _do_restart():
         try: rr.destroy()
@@ -22985,54 +23085,176 @@ def _launch_update_ui(clear_install=False):
 _mkbtn(_upd_btnrow,"🔍 Check for Update",lambda: _upd_check(silent=False),C["blue"])
 _mkbtn(_upd_btnrow,"⚡ Normal Update",lambda: _launch_update_ui(clear_install=False),C["green"])
 _mkbtn(_upd_btnrow,"🔥 Clear Install",lambda: _launch_update_ui(clear_install=True),C["red"])
+_mkbtn(_upd_btnrow,"🔗 Open on GitHub",lambda: __import__("webbrowser").open(_GITHUB_PAGE_URL),C["surface2"],C["blue"])
+
+def _check_update_sentinel():
+    """On startup: if a sentinel file exists, show post-update toast and delete it."""
+    try:
+        import json as _js
+        _sentinel = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_update_applied.json")
+        if not os.path.isfile(_sentinel):
+            return
+        with open(_sentinel, encoding="utf-8") as _sf:
+            data = _js.load(_sf)
+        try: os.remove(_sentinel)
+        except Exception: pass
+        old_ver = data.get("old", "?")
+        new_ver = data.get("new", "?")
+        _show_update_done_notif(old_ver, new_ver)
+    except Exception as _e:
+        print(f"[SENTINEL] {_e}")
+
+
+def _show_update_done_notif(old_ver, new_ver):
+    """Toast-style popup shown on first startup after a successful update."""
+    _BG  = "#0a0a14"
+    _PNL = "#0f0f22"
+    _BRD = "#1e1e38"
+    _GRN = "#a6e3a1"
+    _DIM = "#45475a"
+    _TXT = "#cdd6f4"
+    try:
+        _w = tk.Toplevel(root)
+        _w.title("V0RTEX — Update Applied")
+        _w.configure(bg=_BG)
+        _w.resizable(False, False)
+        W, H = 400, 180
+        sw, sh = _w.winfo_screenwidth(), _w.winfo_screenheight()
+        _w.geometry(f"{W}x{H}+{sw-W-24}+{sh-H-64}")
+        _w.attributes("-topmost", True)
+
+        tk.Frame(_w, bg=_GRN, height=3).pack(fill="x")
+
+        hdr = tk.Frame(_w, bg=_BG, padx=20, pady=14); hdr.pack(fill="x")
+        tk.Label(hdr, text="✓  Update applied successfully!",
+                 font=("Consolas", 12, "bold"), bg=_BG, fg=_GRN).pack(anchor="w")
+
+        tk.Frame(_w, bg=_BRD, height=1).pack(fill="x", padx=16)
+
+        info = tk.Frame(_w, bg=_PNL, padx=20, pady=10); info.pack(fill="x")
+        for label, val, col in [
+            ("Previous version:",  f"v{old_ver}", _DIM),
+            ("Installed version:", f"v{new_ver}", _GRN),
+        ]:
+            row = tk.Frame(info, bg=_PNL); row.pack(anchor="w", pady=1)
+            tk.Label(row, text=f"{label:<22}", font=("Consolas", 9),
+                     bg=_PNL, fg=_DIM).pack(side="left")
+            tk.Label(row, text=val, font=("Consolas", 9, "bold"),
+                     bg=_PNL, fg=col).pack(side="left")
+
+        tk.Frame(_w, bg=_BRD, height=1).pack(fill="x", padx=16)
+
+        bot = tk.Frame(_w, bg=_BG, padx=16, pady=10); bot.pack(fill="x")
+        tk.Button(bot, text="  OK  ",
+                  font=("Consolas", 10, "bold"), bg=_GRN, fg="#000",
+                  relief="flat", bd=0, padx=14, pady=6,
+                  cursor="hand2", activebackground="#7ecf9b",
+                  command=_w.destroy).pack(side="left")
+        tk.Label(bot, text="V0RTEX has been updated and is ready to use.",
+                 font=("Consolas", 8), bg=_BG, fg=_DIM).pack(side="left", padx=12)
+
+        _w.after(10000, lambda: _w.destroy() if _w.winfo_exists() else None)
+
+    except Exception as _e:
+        print(f"[UPDATE DONE NOTIF] {_e}")
+
+
+
 
 def _show_update_ui_if_needed():
-    """Show a non-intrusive banner in HOME if update is available."""
+    """Startup update notification — compact, actionable."""
     if not _UPDATE_STATE.get("available"): return
-    remote_v = _UPDATE_STATE.get("remote_version","?")
-    _BG2 = "#1a0a2a"; _TXT2 = "#cdd6f4"; _BLU2 = "#89b4fa"; _RED2 = "#f38ba8"
-    _GRN2 = "#a6e3a1"
+    remote_v = _UPDATE_STATE.get("remote_version", "?")
+
+    _BG   = "#0a0a14"
+    _PNL  = "#11111f"
+    _BRD  = "#1e1e38"
+    _BLU  = "#89b4fa"
+    _GRN  = "#a6e3a1"
+    _YEL  = "#f9e2af"
+    _DIM  = "#45475a"
+    _TXT  = "#cdd6f4"
+    _MAU  = "#cba6f7"
+
     try:
         notif = tk.Toplevel(root)
         notif.title("V0RTEX — Update Available")
-        notif.configure(bg=_BG2)
-        notif.resizable(False,False)
-        W,H = 540,230
-        sw,sh = notif.winfo_screenwidth(), notif.winfo_screenheight()
-        notif.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
+        notif.configure(bg=_BG)
+        notif.resizable(False, False)
+        W, H = 480, 270
+        sw, sh = notif.winfo_screenwidth(), notif.winfo_screenheight()
+        notif.geometry(f"{W}x{H}+{(sw-W)//2}+{max((sh-H)//3, 30)}")
         notif.attributes("-topmost", True)
         notif.grab_set()
-        tk.Frame(notif, bg=_BLU2, height=3).pack(fill="x")
-        hdr = tk.Frame(notif, bg=_BG2, padx=20, pady=14); hdr.pack(fill="x")
-        tk.Label(hdr, text="⚡  UPDATE AVAILABLE", font=("Consolas",14,"bold"),
-                 bg=_BG2, fg=_BLU2).pack(anchor="w")
-        tk.Label(hdr, text=f"V0RTEX v{_VORTEX_VERSION}  →  v{remote_v}",
-                 font=("Consolas",11), bg=_BG2, fg=_TXT2).pack(anchor="w", pady=(4,0))
-        tk.Frame(notif, bg="#2a1a3a", height=1).pack(fill="x")
-        body2 = tk.Frame(notif, bg=_BG2, padx=20, pady=10); body2.pack(fill="x")
-        tk.Label(body2, text="What do you want to do?",
-                 font=("Consolas",9), bg=_BG2, fg="#7f849c").pack(anchor="w", pady=(0,8))
-        btnrow2 = tk.Frame(body2, bg=_BG2); btnrow2.pack(anchor="w")
-        def _upd_normal():
-            notif.destroy(); _launch_update_ui(clear_install=False)
-        def _upd_clear():
-            notif.destroy(); _launch_update_ui(clear_install=True)
-        tk.Button(btnrow2, text="⚡ Normal Update", font=("Consolas",10,"bold"),
-                  bg=_GRN2, fg="#000", relief="flat", padx=16, pady=8,
-                  cursor="hand2", bd=0, command=_upd_normal).pack(side="left", padx=(0,8))
-        tk.Button(btnrow2, text="🔥 Clean Install", font=("Consolas",10,"bold"),
-                  bg=_RED2, fg="#000", relief="flat", padx=16, pady=8,
-                  cursor="hand2", bd=0, command=_upd_clear).pack(side="left", padx=(0,8))
-        tk.Button(btnrow2, text="Later", font=("Consolas",9),
-                  bg="#2a1a3a", fg=_TXT2, relief="flat", padx=12, pady=8,
-                  cursor="hand2", bd=0, command=notif.destroy).pack(side="left")
-    except Exception: pass
+
+        # Top accent bar
+        tk.Frame(notif, bg=_BLU, height=3).pack(fill="x")
+
+        # Header
+        hdr = tk.Frame(notif, bg=_BG, padx=22, pady=16); hdr.pack(fill="x")
+        tk.Label(hdr, text="⚡  Update Available!",
+                 font=("Consolas", 14, "bold"), bg=_BG, fg=_BLU).pack(anchor="w")
+
+        # Separator
+        tk.Frame(notif, bg=_BRD, height=1).pack(fill="x", padx=18)
+
+        # Version info
+        info = tk.Frame(notif, bg=_PNL, padx=22, pady=14); info.pack(fill="x")
+        for label, val, col in [
+            ("Your version:",       f"v{_VORTEX_VERSION}", _YEL),
+            ("Available version:",  f"v{remote_v}",         _GRN),
+        ]:
+            row = tk.Frame(info, bg=_PNL); row.pack(anchor="w", pady=1)
+            tk.Label(row, text=f"{label:<22}", font=("Consolas", 10),
+                     bg=_PNL, fg=_DIM).pack(side="left")
+            tk.Label(row, text=val, font=("Consolas", 10, "bold"),
+                     bg=_PNL, fg=col).pack(side="left")
+
+        tk.Label(info, text="Do you want to update?",
+                 font=("Consolas", 9), bg=_PNL, fg=_TXT).pack(anchor="w", pady=(10, 0))
+
+        # Separator
+        tk.Frame(notif, bg=_BRD, height=1).pack(fill="x", padx=18)
+
+        # Buttons
+        bot = tk.Frame(notif, bg=_BG, padx=18, pady=12); bot.pack(fill="x")
+
+        def _do_update():
+            notif.destroy()
+            _launch_update_ui(clear_install=False)
+
+        def _open_github():
+            import webbrowser
+            webbrowser.open(_GITHUB_PAGE_URL)
+
+        tk.Button(bot, text="⚡ Update Now",
+                  font=("Consolas", 10, "bold"), bg=_GRN, fg="#000",
+                  relief="flat", bd=0, padx=14, pady=7,
+                  cursor="hand2", activebackground="#7ecf9b",
+                  command=_do_update).pack(side="left", padx=(0, 6))
+
+        tk.Button(bot, text="🔗 Read more on GitHub",
+                  font=("Consolas", 9), bg=_BRD, fg=_BLU,
+                  relief="flat", bd=0, padx=12, pady=7,
+                  cursor="hand2", activebackground="#252545",
+                  command=_open_github).pack(side="left", padx=(0, 6))
+
+        tk.Button(bot, text="Later",
+                  font=("Consolas", 9), bg=_BG, fg=_DIM,
+                  relief="flat", bd=0, padx=10, pady=7,
+                  cursor="hand2", activebackground=_BRD,
+                  command=notif.destroy).pack(side="right")
+
+    except Exception as _e:
+        print(f"[UPDATE NOTIF] {_e}")
+
 
 def _startup_update_check():
     if CONFIG.get("auto_update_check", True) or _upd_auto_v.get():
         _upd_check(silent=True)
 
 root.after(8000, _startup_update_check)
+root.after(2000, _check_update_sentinel)
 
 def _upd_auto_changed(*_):
     CONFIG["auto_update_check"] = _upd_auto_v.get()
@@ -26735,17 +26957,28 @@ def _sbar_tick():
 root.after(1200, _sbar_tick)
 
 
-def _cleanup_stale_media_scripts():
+def _write_startup_scripts():
+    """Genera (o rigenera) uninstall e reinstall script all'avvio.
+    I file vengono sempre riscritti per restare aggiornati con la versione corrente.
+    Vengono eliminati SOLO dal processo di uninstall/reinstall stesso."""
     try:
-        _media_dir = os.path.join(os.path.dirname(BASE_DIR), "installation_media")
-        for _stale in ("v0rtex_reinstall.py", "v0rtex_uninstall.py"):
-            _p = os.path.join(_media_dir, _stale)
-            if os.path.isfile(_p):
-                os.remove(_p)
-    except Exception:
-        pass
+        _tram = _build_trampoline_script()
+        _media = os.path.join(os.path.dirname(BASE_DIR), "installation_media")
+        os.makedirs(_media, exist_ok=True)
+        for _name, _builder in [
+            ("v0rtex_uninstall.py", _build_uninstall_script),
+            ("v0rtex_reinstall.py", _build_reinstall_script),
+        ]:
+            _p = os.path.join(_media, _name)
+            try:
+                with open(_p, "w", encoding="utf-8") as _f:
+                    _f.write(_builder(BASE_DIR, sys.executable, _tram))
+            except Exception as _we:
+                print(f"[STARTUP] Could not write {_name}: {_we}")
+    except Exception as _e:
+        print(f"[STARTUP] _write_startup_scripts failed: {_e}")
 
-root.after(800, _cleanup_stale_media_scripts)
+root.after(1200, _write_startup_scripts)
 
 
 if _missing:
