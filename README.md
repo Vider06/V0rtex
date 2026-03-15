@@ -394,4 +394,5 @@ Redistribution, resale, and repackaging are strictly prohibited.
 See [LICENSE](./LICENSE) for full terms.
 
 If you are reading this... Why would you EVER read all of this dude
-Alr, try it and report me bugs or anything tbh - Vider_06
+Alr, try it and report me bugs or anything tbh 
+- Vider_06
