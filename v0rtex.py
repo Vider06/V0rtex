@@ -28,8 +28,8 @@ _T = "".join
 
 
 _ADM_BADGE   = _T(["⚠ ELEV", "ATED ·", " ADMIN"])
-_ADM_BADGE_W = _T(["⚠ ELEV", "ATED ·", " ADMIN  —  V0RTEX v0.9.7.X3  by Vider_06"])
-_ADM_BADGE_R = _T(["⚠ ELEV", "ATED ·", " ADMIN  —  V0RTEX RECOVERY TERMINAL  v0.9.7.X3"])
+_ADM_BADGE_W = _T(["⚠ ELEV", "ATED ·", " ADMIN  —  V0RTEX v0.9.8.X1  by Vider_06"])
+_ADM_BADGE_R = _T(["⚠ ELEV", "ATED ·", " ADMIN  —  V0RTEX RECOVERY TERMINAL  v0.9.8.X1"])
 _ADM_BADGE_S = _T(["⚡ ELEV", "ATED — ", "ADMIN"])   
 
 
@@ -1246,7 +1246,7 @@ def _do_uninstall():
 topbar = tk.Frame(root, bg=C['panel'], height=38); topbar.pack(fill='x'); topbar.pack_propagate(False)
 tk.Label(topbar, text='⬡', font=('Consolas',16,'bold'), bg=C['panel'], fg=C['accent']).pack(side='left', padx=(14,4), pady=6)
 tk.Label(topbar, text='V0RTEX', font=('Consolas',12,'bold'), bg=C['panel'], fg=C['text']).pack(side='left')
-tk.Label(topbar, text='v0.9.7.X3', font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
+tk.Label(topbar, text='v0.9.8.X1', font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
 tk.Label(topbar, text='UNINSTALL', font=('Consolas',8,'bold'), bg=C['panel'], fg=C['accent']).pack(side='right', padx=14)
 tk.Frame(root, bg=C['accent'], height=2).pack(fill='x')
 
@@ -1907,7 +1907,7 @@ def _do_reinstall():
 topbar = tk.Frame(root, bg=C['panel'], height=38); topbar.pack(fill='x'); topbar.pack_propagate(False)
 tk.Label(topbar, text='⬡', font=('Consolas',16,'bold'), bg=C['panel'], fg=C['accent']).pack(side='left', padx=(14,4), pady=6)
 tk.Label(topbar, text='V0RTEX', font=('Consolas',12,'bold'), bg=C['panel'], fg=C['text']).pack(side='left')
-tk.Label(topbar, text='v0.9.7.X3', font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
+tk.Label(topbar, text='v0.9.8.X1', font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
 tk.Label(topbar, text='REINSTALL', font=('Consolas',8,'bold'), bg=C['panel'], fg=C['accent']).pack(side='right', padx=14)
 tk.Frame(root, bg=C['accent'], height=2).pack(fill='x')
 
@@ -2145,7 +2145,7 @@ def _run_setup_ui():
     )
 
     root = tk.Tk()
-    root.title("V0RTEX v0.9.7.X3 — Setup")
+    root.title("V0RTEX v0.9.8.X1 — Setup")
     root.configure(bg=C["bg"])
     root.resizable(False, False)
     W, H = 720, 640
@@ -2173,7 +2173,7 @@ def _run_setup_ui():
     done_evt   = threading.Event()
 
     script_dir   = os.path.dirname(os.path.abspath(sys.argv[0]))
-    dir_var.set(os.path.join(script_dir, "V0rtex_System", "V0RTEX_v0.9.7.X3"))
+    dir_var.set(os.path.join(script_dir, "V0rtex_System", "V0RTEX_v0.9.8.X1"))
 
     log_widget           = [None]
     dbg_widget           = [None]
@@ -3802,7 +3802,7 @@ def _run_setup_ui():
                 _ilog_path  = os.path.join(_ilog_dir, f"install_{_ilog_ts}.txt")
                 _ilog_lines = [
                     "=" * 72,
-                    f"  V0RTEX v0.9.7.X3 — INSTALLATION LOG",
+                    f"  V0RTEX v0.9.8.X1 — INSTALLATION LOG",
                     f"  Timestamp  : {_dti.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
                     f"  Python     : {sys.version}",
                     f"  Platform   : {platform.system()} {platform.release()} ({sys.platform})",
@@ -3860,7 +3860,7 @@ def _run_setup_ui():
             _prog(100, "Setup complete!")
             _log("", "NORM")
             _log("━"*52, "HEAD")
-            _log("  ✓  V0RTEX v0.9.7.X3 is ready", "OK")
+            _log("  ✓  V0RTEX v0.9.8.X1 is ready", "OK")
             _log(f"  ✓  Installed to: {base}", "OK")
             _log("  →  Click  LAUNCH  to start", "INFO")
             _log("━"*52, "HEAD")
@@ -3891,7 +3891,7 @@ def _run_setup_ui():
              bg=C["panel"], fg=C["accent"]).pack(side="left", padx=(14,4), pady=6)
     tk.Label(topbar, text="V0RTEX", font=("Consolas", 12, "bold"),
              bg=C["panel"], fg=C["text"]).pack(side="left")
-    tk.Label(topbar, text="v0.9.7.X3", font=("Consolas", 8),
+    tk.Label(topbar, text="v0.9.8.X1", font=("Consolas", 8),
              bg=C["panel"], fg=C["muted"]).pack(side="left", padx=(4,0), pady=(10,0))
     tk.Label(topbar, text="FIRST-RUN SETUP", font=("Consolas", 8),
              bg=C["panel"], fg=C["muted"]).pack(side="right", padx=14)
@@ -3918,14 +3918,14 @@ def _run_setup_ui():
         p = tfd.askdirectory(title="Choose parent folder",
                               initialdir=os.path.dirname(dir_var.get()))
         if p:
-            dir_var.set(os.path.join(p, "V0rtex_System", "V0RTEX_v0.9.7.X3"))
+            dir_var.set(os.path.join(p, "V0rtex_System", "V0RTEX_v0.9.8.X1"))
     tk.Button(dir_row, text="Browse", font=("Consolas", 8),
               bg=C["border"], fg="black", relief="flat", bd=0,
               activebackground=C["muted"], cursor="hand2",
               command=_browse, padx=10, pady=6).pack(side="left")
 
     tk.Label(card1,
-             text="Structure: V0rtex_System / V0RTEX_v0.9.7.X3 (app)  ·  installation_media  ·  debug_log  ·  backups",
+             text="Structure: V0rtex_System / V0RTEX_v0.9.8.X1 (app)  ·  installation_media  ·  debug_log  ·  backups",
              font=("Consolas", 7), bg=C["card"], fg=C["muted"]).pack(anchor="w", pady=(3,0))
 
     card2 = tk.Frame(root, bg=C["card"], padx=16, pady=7)
@@ -4174,7 +4174,7 @@ def _run_setup_ui():
             _log("  \u2717 No directory chosen.", "ERR"); return
         install_path[0] = chosen
         btn_install[0].config(state="disabled", text="  Installing\u2026  ")
-        _log(f">_ V0RTEX v0.9.7.X3 setup \u2014 Python {sys.version.split()[0]} / {platform.system()}", "DIM")
+        _log(f">_ V0RTEX v0.9.8.X1 setup \u2014 Python {sys.version.split()[0]} / {platform.system()}", "DIM")
         threading.Thread(target=lambda: _install(chosen), daemon=True).start()
         _anim_start_fn()
         _collapse_selection(chosen)
@@ -4624,8 +4624,8 @@ def _check_first_run():
         return
 
     for _sib_rel in (
-        _o.path.join("V0rtex_System", "V0RTEX_v0.9.7.X3"),
-        "V0RTEX_v0.9.7.X3",
+        _o.path.join("V0rtex_System", "V0RTEX_v0.9.8.X1"),
+        "V0RTEX_v0.9.8.X1",
     ):
         _sib = _o.path.join(script_dir, _sib_rel)
         if _o.path.exists(_o.path.join(_sib, "_setup_complete")):
@@ -4840,11 +4840,11 @@ def _install_crash_handler():
                             win.after(800 + idx * 120, lambda: _type_cmd(0))
                         return
                     line, delay = cmds[ci]
-                    tag = "RED" if any(w in line.lower() for w in
-                          ["error","fail","bug","oops","critical","segfault",
-                           "sigsegv","not permit","dropped","malform","abort"])\
-                          else ("CMD" if line.startswith("$") else
-                          ("GRN" if "ok" in line.lower() or "captured" in line else "DIM"))
+                    tag = ("RED" if any(w in line.lower() for w in
+                           ["error","fail","bug","oops","critical","segfault",
+                            "sigsegv","not permit","dropped","malform","abort"])
+                           else ("CMD" if line.startswith("$") else
+                           ("GRN" if "ok" in line.lower() or "captured" in line else "DIM")))
                     txt.config(state="normal")
                     txt.insert(_tk.END, line + "\n", tag)
                     txt.see(_tk.END)
@@ -4879,7 +4879,7 @@ def _install_crash_handler():
 
 
                 tbar = _tk.Frame(pop, bg="#11111b", pady=6, padx=12); tbar.pack(fill=_tk.X)
-                _tk.Label(tbar, text="  ● ● ●   CRASH REPORT — V0RTEX v0.9.7.X3",
+                _tk.Label(tbar, text="  ● ● ●   CRASH REPORT — V0RTEX v0.9.8.X1",
                           font=("Consolas",10), bg="#11111b", fg=_DIM).pack(side=_tk.LEFT)
 
 
@@ -5014,7 +5014,7 @@ def _install_crash_handler():
                 def _view_session_log():
 
                     log_win = _tk.Toplevel(_crash_root)
-                    log_win.title("SESSION LOG — V0RTEX v0.9.7.X3")
+                    log_win.title("SESSION LOG — V0RTEX v0.9.8.X1")
                     log_win.geometry("900x580")
                     log_win.configure(bg=_BG)
                     log_win.attributes("-topmost", True)
@@ -5232,7 +5232,7 @@ def _install_crash_handler():
             tb_str_local = "".join(traceback.format_exception(exc_type, exc_val, exc_tb))
             with open(os.path.join(crash_dir, crash_fname), "w", encoding="utf-8") as f:
                 f.write("=" * 78 + "\n")
-                f.write(f"  V0RTEX v0.9.7.X3 — CRASH REPORT\n")
+                f.write(f"  V0RTEX v0.9.8.X1 — CRASH REPORT\n")
                 f.write(f"  Session #:  {sess_n}\n")
                 f.write(f"  Timestamp:  {_time_crash.strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"  Python:     {sys.version}\n")
@@ -5645,7 +5645,7 @@ def _checkpoint(phase: str, detail: str = ""):
 try:
     with open(_SESSION_LOG_PATH, "w", encoding="utf-8") as _slf:
         _slf.write("=" * 78 + "\n")
-        _slf.write(f"  V0RTEX v0.9.7.X3  —  SESSION LOG\n")
+        _slf.write(f"  V0RTEX v0.9.8.X1  —  SESSION LOG\n")
         _slf.write(f"  Session #:  {_SESSION_NUMBER}\n")
         _slf.write(f"  Started:    {_dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         _slf.write(f"  Python:     {sys.version.split()[0]}\n")
@@ -6657,7 +6657,7 @@ footer{{margin-top:20px;font-size:.7rem;color:#45475a;text-align:right}}
     </div>
   </div>
 </div>
-<footer>Generated {time.strftime("%Y-%m-%d %H:%M:%S")} · V0RTEX v0.9.7.X3 by Vider_06</footer>
+<footer>Generated {time.strftime("%Y-%m-%d %H:%M:%S")} · V0RTEX v0.9.8.X1 by Vider_06</footer>
 </body></html>"""
     with open(html_path,"w",encoding="utf-8") as f:
         f.write(html)
@@ -6992,7 +6992,7 @@ try:
 except Exception:
     root = tk.Tk(); _DND = False
 
-root.title("V0RTEX v0.9.7.X3 by Vider_06")
+root.title("V0RTEX v0.9.8.X1 by Vider_06")
 root.configure(bg=C["base"])
 root.withdraw()
 root.update()
@@ -7098,7 +7098,7 @@ _SPLASH_LINES = [
     ("[GUI]   Chart renderer: matplotlib Agg backend  ✓",    "#a6e3a1",    28),
     ("",                                                     "#cdd6f4",    10),
     ("╔══════════════════════════════════════════════╗",      "#cba6f7",    20),
-    ("║     V0RTEX  v0.9.7.X3  —  READY  ✓       ║",     "#cba6f7",    20),
+    ("║     V0RTEX  v0.9.8.X1  —  READY  ✓       ║",     "#cba6f7",    20),
     ("╚══════════════════════════════════════════════╝",      "#cba6f7",    20),
     ("",                                                     "#cdd6f4",    10),
     ("$ _",                                                   "#89b4fa",    30),
@@ -7124,7 +7124,7 @@ def _run_splash():
     logo_f = tk.Frame(sp, bg="#11111b", pady=10); logo_f.pack(fill=tk.X)
     tk.Label(logo_f, text="V0RTEX",       font=("Consolas",18,"bold"),
              bg="#11111b", fg="#cba6f7").pack(side=tk.LEFT, padx=(20,0))
-    tk.Label(logo_f, text="  v0.9.7.X3",       font=("Consolas",11),
+    tk.Label(logo_f, text="  v0.9.8.X1",       font=("Consolas",11),
              bg="#11111b", fg="#6c7086").pack(side=tk.LEFT, pady=4)
     tk.Label(logo_f, text="by Vider_06",  font=("Consolas",10),
              bg="#11111b", fg="#45475a").pack(side=tk.RIGHT, padx=20)
@@ -7243,7 +7243,7 @@ _tb.pack(fill=tk.X)
 _tbl = tk.Frame(_tb, bg=C["mantle"], padx=16, pady=10); _tbl.pack(side=tk.LEFT)
 tk.Label(_tbl, text="V0RTEX",     font=("Consolas",22,"bold"), bg=C["mantle"], fg=C["mauve"]).pack(side=tk.LEFT)
 tk.Label(_tbl, text="  ", font=("Consolas",22,"bold"), bg=C["mantle"], fg=C["text"]).pack(side=tk.LEFT)
-tk.Label(_tbl, text="  SCANNER v0.9.7.X3", font=FS, bg=C["mantle"], fg=C["overlay0"]).pack(side=tk.LEFT, pady=8)
+tk.Label(_tbl, text="  SCANNER v0.9.8.X1", font=FS, bg=C["mantle"], fg=C["overlay0"]).pack(side=tk.LEFT, pady=8)
 _tbr = tk.Frame(_tb, bg=C["mantle"], padx=16); _tbr.pack(side=tk.RIGHT, fill=tk.Y)
 tk.Label(_tbr, text="YARA · VirusTotal · PE · IOC · Entropy · tshark",
          font=FS, bg=C["mantle"], fg=C["overlay0"]).pack(side=tk.RIGHT, pady=14)
@@ -7751,7 +7751,7 @@ _dash_nb.add(_dash_sub_readme, text="  README  ")
                                                                            
 
 _dash_hdr = tk.Frame(_dash_sub_dash, bg=C["crust"], pady=10, padx=18); _dash_hdr.pack(fill=tk.X)
-tk.Label(_dash_hdr, text="⬡  V0RTEX  v0.9.7.X3",
+tk.Label(_dash_hdr, text="⬡  V0RTEX  v0.9.8.X1",
          font=("Consolas",14,"bold"), bg=C["crust"], fg=C["blue"]).pack(side=tk.LEFT)
 _dash_session_sv = tk.StringVar(value="")
 tk.Label(_dash_hdr, textvariable=_dash_session_sv, font=("Consolas",9),
@@ -7947,7 +7947,7 @@ try:
         os.path.getmtime(os.path.abspath(sys.argv[0]))).strftime("%Y-%m-%d  %H:%M:%S")
 except Exception:
     _info_build_date = "—"
-_info_row(_info_inner, "Version",       value_str="V0RTEX v0.9.7.X3  by Vider_06", color=C["mauve"])
+_info_row(_info_inner, "Version",       value_str="V0RTEX v0.9.8.X1  by Vider_06", color=C["mauve"])
 _info_row(_info_inner, "Script",        value_str=os.path.abspath(sys.argv[0]), color=C["overlay0"])
 _info_row(_info_inner, "Script mtime",  value_str=_info_build_date, color=C["overlay0"])
 _info_row(_info_inner, "BASE_DIR",      value_str=BASE_DIR, color=C["overlay0"])
@@ -8024,7 +8024,7 @@ _readme_txt = tk.Text(_readme_txt_frame, bg=C["mantle"], fg=C["text"],
                       padx=6, pady=4, wrap="word", cursor="arrow",
                       state="disabled")
 _readme_txt.pack(fill=tk.BOTH, expand=True)
-_README_CONTENT = """V0RTEX v0.9.7.X3  —  Quick Reference
+_README_CONTENT = """V0RTEX v0.9.8.X1  —  Quick Reference
 ===================================
 by Vider_06  |  github.com/Vider06/V0rtex
 
@@ -8269,7 +8269,7 @@ for _nt, _nref in _dash_nav_items:
 
 _dash_info_panel = _dash_rpanel("● ● ●  V0RTEX INFO", C["mauve"])
 _V0RTEX_INFO = [
-    ("Name",    "V0RTEX v0.9.7.X3"),
+    ("Name",    "V0RTEX v0.9.8.X1"),
     ("Author",  "Vider_06"),
     ("Meaning", "V = Vider / 0 = zero-day / R = Reconnaissance / T = Threat / E = Engine / X = eXtract"),
     ("Build",   "Python 3.10+  ·  Tkinter  ·  pefile  ·  yara-python"),
@@ -9265,7 +9265,7 @@ def _generate_folder_report(folder_path, results):
             "</tr></thead>",
             "<tbody>" + rows_html + "</tbody>",
             "</table>",
-            "<footer>Generated " + ts + " \u00b7 V0RTEX v0.9.7.X3 by Vider_06</footer>",
+            "<footer>Generated " + ts + " \u00b7 V0RTEX v0.9.8.X1 by Vider_06</footer>",
             "</body></html>",
         ]
         with open(html_path, "w", encoding="utf-8") as f:
@@ -10661,7 +10661,7 @@ def _worker():
                     "  <div class='card'><h2>Redirects</h2><table>" + rd_rows + "</table></div>",
                     "  <div class='card'><h2>IOCs</h2><table>" + (ioc_rows or "<tr><td style='color:#45475a'>None</td></tr>") + "</table></div>",
                     "</div>",
-                    "<footer>Generated " + ts_str + " · V0RTEX v0.9.7.X3 by Vider_06</footer>",
+                    "<footer>Generated " + ts_str + " · V0RTEX v0.9.8.X1 by Vider_06</footer>",
                     "</body></html>",
                 ]
                 with open(html_path, "w", encoding="utf-8") as hf:
@@ -11698,7 +11698,7 @@ def _start_tray():
             _pystray.Menu.SEPARATOR,
             _pystray.MenuItem("Quit",  _quit),
         )
-        _tray_icon = _pystray.Icon("V0RTEX", img, "V0RTEX v0.9.7.X3 by Vider_06", menu)
+        _tray_icon = _pystray.Icon("V0RTEX", img, "V0RTEX v0.9.8.X1 by Vider_06", menu)
         threading.Thread(target=_tray_icon.run, daemon=True).start()
         _log_debug("Tray icon started", "DEBUG")
     except Exception as e:
@@ -12549,7 +12549,7 @@ def _sandbox_build():
     try:
         os.makedirs(drop, exist_ok=True)
         readme_text = (
-            "V0RTEX v0.9.7.X3 — Sandbox Environment\n"
+            "V0RTEX v0.9.8.X1 — Sandbox Environment\n"
             "=" * 50 + "\n"
             f"Built: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
             "Drop folder:  sandbox_env/drop/\n"
@@ -13711,7 +13711,7 @@ def _ckpt_export():
         path = _fd.asksaveasfilename(defaultextension=".txt",
                filetypes=[("Text","*.txt"),("All","*.*")], title="Export Checkpoints")
         if not path: return
-        lines = [f"V0RTEX v0.9.7.X3 — CHECKPOINT EXPORT\n{'='*70}\n"]
+        lines = [f"V0RTEX v0.9.8.X1 — CHECKPOINT EXPORT\n{'='*70}\n"]
         for ts, n, ph, det in _ckpt_buffer:
             lines.append(f"[{ts}] #{n:04d} [{ph:<8}] {det}")
         with open(path, "w", encoding="utf-8") as f:
@@ -14680,8 +14680,8 @@ def _nc_refresh():
             if rport in (80,443,8080,8443): flags.append("WEB")
             if rport in (21,22,23,25,53,110,143): flags.append("STD")
             flag_str = ",".join(flags) or "-"
-            tag = "BAD" if rport in _SUSPICIOUS_PORTS else\
-                  ("WARN" if any(rip.startswith(p) for p in ["0.","169.254."]) else "OK")
+            tag = ("BAD" if rport in _SUSPICIOUS_PORTS else
+                   ("WARN" if any(rip.startswith(p) for p in ["0.","169.254."]) else "OK"))
             line = f"{proto:<6}  {local:<24}  {remote:<24}  {state:<13}  {flag_str:<16}  {pname}"
             if not _APP_DYING[0]:
                 try:
@@ -16434,7 +16434,7 @@ def _write_crash_log(code, reason, tb=""):
         desc = SOC_ERROR_CODES.get(code, SOC_ERROR_CODES[0])
         with open(_crash_log_path, "a", encoding="utf-8") as _f:
             _f.write("=" * 72 + "\n")
-            _f.write(f"  V0RTEX v0.9.7.X3 — CRASH REPORT\n")
+            _f.write(f"  V0RTEX v0.9.8.X1 — CRASH REPORT\n")
             _f.write(f"  Timestamp  : {ts}\n")
             _f.write(f"  Error Code : {code}\n")
             _f.write(f"  Code Name  : {desc}\n")
@@ -23814,7 +23814,7 @@ _bpan_pat_e.bind("<Return>", lambda e: _bpan_run())
 
 
 
-_VORTEX_VERSION      = "0.9.7.X3"
+_VORTEX_VERSION      = "0.9.8.X1"
 _GITHUB_REPO_RAW     = "https://raw.githubusercontent.com/Vider06/V0RTEX/main"
 _GITHUB_PAGE_URL     = "https://github.com/Vider06/V0RTEX"
 _GITHUB_API_RELEASE  = "https://api.github.com/repos/Vider06/V0RTEX/releases/latest"
@@ -24247,19 +24247,38 @@ def _launch_update_ui(clear_install=False):
                 bk_path = os.path.join(bk_dir, f"pre_update_{ts}.zip")
                 _JSON_RESTORE = []
                 with _zf.ZipFile(bk_path, "w", _zf.ZIP_DEFLATED) as zf:
-                    for fn in ["v0rtex.py","config.json","whitelist.txt","notes.txt",
-                               "scan_results.db","scan_history.db","todo_list.json","snippets.json"]:
+                    # core data files
+                    for fn in ["config.json","whitelist.txt","notes.txt",
+                               "scan_results.db","scan_history.db",
+                               "todo_list.json","snippets.json","rules_state.json"]:
                         fp = os.path.join(script_dir, fn)
                         if os.path.isfile(fp):
                             zf.write(fp, fn); _JSON_RESTORE.append(fn)
+                    # rules
                     rules_dir = os.path.join(script_dir,"rules")
                     if os.path.isdir(rules_dir):
-                        for rf in os.listdir(rules_dir):
-                            rfp = os.path.join(rules_dir,rf)
-                            if os.path.isfile(rfp): zf.write(rfp, f"rules/{rf}")
+                        for root_r, dirs_r, files_r in os.walk(rules_dir):
+                            for rf in files_r:
+                                rfp = os.path.join(root_r, rf)
+                                arc = os.path.relpath(rfp, script_dir)
+                                zf.write(rfp, arc)
+                    # reports (html/json/txt only — skip large PDFs unless small)
+                    for rep_sub in ["reports","reports_pdf"]:
+                        rep_dir = os.path.join(script_dir, rep_sub)
+                        if os.path.isdir(rep_dir):
+                            for rf in os.listdir(rep_dir):
+                                rfp = os.path.join(rep_dir, rf)
+                                if os.path.isfile(rfp):
+                                    try:
+                                        if os.path.getsize(rfp) < 5 * 1024 * 1024:
+                                            zf.write(rfp, f"{rep_sub}/{rf}")
+                                    except Exception:
+                                        pass
                 _ulog(f"  ✓ Backup → {os.path.basename(bk_path)}","OK")
+                # also read content into memory for instant restore
                 _saved_json = {}
-                for fn in ["config.json","whitelist.txt","notes.txt","todo_list.json","snippets.json"]:
+                for fn in ["config.json","whitelist.txt","notes.txt",
+                           "todo_list.json","snippets.json","rules_state.json"]:
                     fp = os.path.join(script_dir, fn)
                     if os.path.isfile(fp):
                         try:
@@ -24293,14 +24312,77 @@ def _launch_update_ui(clear_install=False):
 
         _do_fresh = _upd_opt_fresh.get() if "_upd_opt_fresh" in dir() else clear_install
         if _do_fresh:
-            _ulog("\n[ 4/7 ]  Fresh install — removing user data…","HEAD"); _uprog(45,"clear")
-            _CLEAR_FILES = ["config.json","scan_results.db","scan_history.db",
-                            "todo_list.json","snippets.json"]
-            for fn in _CLEAR_FILES:
-                fp = os.path.join(script_dir,fn)
+            _ulog("\n[ 4/7 ]  Fresh install — wiping and rebuilding directory…","HEAD"); _uprog(45,"clear")
+            import shutil as _shu_clr
+
+            # 1 — nuke everything except backups/, v0rtex.py (being replaced) and the ZIP we just made
+            _keep_dirs  = {"backups", "_recovery", "installation_media"}
+            _keep_files = {os.path.basename(bk_path)} if bk_path else set()
+            try:
+                for _item in os.listdir(script_dir):
+                    _fp = os.path.join(script_dir, _item)
+                    if _item in _keep_dirs:
+                        continue
+                    if os.path.isfile(_fp) and _item in _keep_files:
+                        continue
+                    if os.path.isfile(_fp) and _item == os.path.basename(script_path):
+                        continue  # don't delete the script we're about to overwrite
+                    try:
+                        if os.path.isdir(_fp):
+                            _shu_clr.rmtree(_fp, ignore_errors=True)
+                            _ulog(f"  ~ removed dir: {_item}", "WARN")
+                        else:
+                            os.remove(_fp)
+                            _ulog(f"  ~ removed: {_item}", "WARN")
+                    except Exception as _re:
+                        _ulog(f"  ~ could not remove {_item}: {_re}", "WARN")
+            except Exception as _ne:
+                _ulog(f"  ✗ Wipe error: {_ne}", "ERR")
+
+            # 2 — recreate standard directory tree
+            _std_dirs = [
+                "rules", os.path.join("rules","external"),
+                "reports", "reports_pdf", "modules",
+                "debug_log", "quarantine", "backups",
+                "sandbox_env", os.path.join("sandbox_env","drop"),
+                "threat_feeds", "pcap_dumps", "diff_workspace",
+                "_recovery",
+            ]
+            for _d in _std_dirs:
                 try:
-                    if os.path.isfile(fp): os.remove(fp); _ulog(f"  ~ removed: {fn}","WARN")
-                except Exception as e2: _ulog(f"  ✗ {fn}: {e2}","ERR")
+                    os.makedirs(os.path.join(script_dir, _d), exist_ok=True)
+                except Exception:
+                    pass
+            _ulog("  ✓ Directory tree recreated", "OK")
+
+            # 3 — recreate default config.json if not preserving data
+            if not _upd_opt_cfg.get() or not _saved_json.get("config.json"):
+                try:
+                    import json as _jfc
+                    _default_cfg = {
+                        "api_keys": [], "request_delay": 15,
+                        "tshark_path": TSHARK_PATH or "tshark",
+                        "proxy": "", "proxy_user": "", "proxy_pass": "",
+                        "auto_update_check": True,
+                    }
+                    with open(os.path.join(script_dir,"config.json"),"w",encoding="utf-8") as _cf:
+                        _jfc.dump(_default_cfg, _cf, indent=2)
+                    _ulog("  ✓ config.json reset to defaults", "OK")
+                except Exception as _cfe:
+                    _ulog(f"  ~ config.json reset failed: {_cfe}", "WARN")
+
+            # 4 — recreate whitelist.txt and notes.txt stubs if not preserving
+            if not _upd_opt_cfg.get():
+                for _stub, _content in [
+                    ("whitelist.txt", "# V0RTEX whitelist — one SHA-256 hash per line\n"),
+                    ("notes.txt",     ""),
+                ]:
+                    _sp = os.path.join(script_dir, _stub)
+                    if not os.path.isfile(_sp):
+                        try:
+                            with open(_sp,"w",encoding="utf-8") as _sf: _sf.write(_content)
+                        except Exception:
+                            pass
         else:
             _ulog("\n[ 4/7 ]  Normal install — keeping user data","HEAD"); _uprog(45,"")
 
@@ -24398,19 +24480,70 @@ def _launch_update_ui(clear_install=False):
 
         _ulog("\n[ 6/7 ]  Restoring user data…","HEAD"); _uprog(80,"restore")
 
-        if _upd_opt_cfg.get() and _saved_json:
+        if _upd_opt_cfg.get():
+            # Restore from in-memory snapshot first (fastest, already read in step 1)
+            _restored = []
+            _skipped  = []
             for fn, content in _saved_json.items():
                 fp = os.path.join(script_dir, fn)
-                if not os.path.isfile(fp):
-                    try:
-                        with open(fp,"w",encoding="utf-8") as f: f.write(content)
-                        _ulog(f"  ✓ restored: {fn}","OK")
-                    except Exception as e3:
-                        _ulog(f"  ~ {fn}: {e3}","WARN")
-                else:
-                    _ulog(f"  ~ kept existing: {fn}","DIM")
-        elif not _upd_opt_cfg.get():
-            _ulog("  ~ config preservation disabled","DIM")
+                try:
+                    os.makedirs(os.path.dirname(fp), exist_ok=True)
+                    with open(fp,"w",encoding="utf-8") as f: f.write(content)
+                    _restored.append(fn)
+                except Exception as e3:
+                    _ulog(f"  ~ {fn}: {e3}","WARN")
+            if _restored:
+                _ulog(f"  ✓ Restored from memory: {', '.join(_restored)}","OK")
+
+            # Restore binary files (DB, reports) from the backup ZIP
+            if bk_path and os.path.isfile(bk_path):
+                try:
+                    with _zf.ZipFile(bk_path,"r") as _zr:
+                        _zip_names = _zr.namelist()
+                        # DBs
+                        for _db in ["scan_history.db","scan_results.db"]:
+                            if _db in _zip_names:
+                                try:
+                                    _zr.extract(_db, script_dir)
+                                    _ulog(f"  ✓ restored DB: {_db}","OK")
+                                except Exception as _dbe:
+                                    _ulog(f"  ~ DB restore {_db}: {_dbe}","WARN")
+                        # reports
+                        _rep_restored = 0
+                        for _zn in _zip_names:
+                            if _zn.startswith(("reports/","reports_pdf/")):
+                                try:
+                                    _zr.extract(_zn, script_dir)
+                                    _rep_restored += 1
+                                except Exception:
+                                    pass
+                        if _rep_restored:
+                            _ulog(f"  ✓ restored {_rep_restored} report file(s)","OK")
+                        # rules state
+                        if "rules_state.json" in _zip_names:
+                            try:
+                                _zr.extract("rules_state.json", script_dir)
+                                _ulog("  ✓ restored rules_state.json","OK")
+                            except Exception:
+                                pass
+                        # rules themselves (if fresh install wiped them)
+                        if _do_fresh:
+                            _rules_restored = 0
+                            for _zn in _zip_names:
+                                if _zn.startswith("rules/"):
+                                    try:
+                                        _zr.extract(_zn, script_dir)
+                                        _rules_restored += 1
+                                    except Exception:
+                                        pass
+                            if _rules_restored:
+                                _ulog(f"  ✓ restored {_rules_restored} YARA rule file(s)","OK")
+                except Exception as _ze:
+                    _ulog(f"  ~ ZIP restore error: {_ze}","WARN")
+            elif _do_fresh and not bk_path:
+                _ulog("  ~ No backup available — reports and DB not restored (backup was skipped)","WARN")
+        else:
+            _ulog("  ~ Data preservation disabled — starting fresh","DIM")
 
         _uprog(90, "deps")
         _ulog("\n[ 7/7 ]  Installing / updating dependencies…", "HEAD")
@@ -25084,7 +25217,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
 
     _rt.sleep(0.15)
     rr = _rtk.Tk()
-    rr.title("V0RTEX — RECOVERY TERMINAL  v0.9.7.X3")
+    rr.title("V0RTEX — RECOVERY TERMINAL  v0.9.8.X1")
     rr.configure(bg=_BG)
     rr.geometry("1120x740")
     rr.minsize(400, 300)
@@ -25115,7 +25248,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
         text=f"{_icon}V0RTEX  ›  RECOVERY TERMINAL",
         font=("Consolas",11,"bold"), bg="#080816",
         fg=_RED if _IS_CRASH else _TEA).pack(side=_rtk.LEFT)
-    _rtk.Label(_title_f, text="  v0.9.7.X3",
+    _rtk.Label(_title_f, text="  v0.9.8.X1",
         font=("Consolas",9), bg="#080816", fg=_DIM2).pack(side=_rtk.LEFT)
 
 
@@ -25166,7 +25299,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                 _admin_sv.set("● user mode")
                 _admin_lbl.config(bg="#0f0f20")
                 _sep_f.config(bg="#0f0f20")
-                try: rr.title("V0RTEX — RECOVERY TERMINAL  v0.9.7.X3")
+                try: rr.title("V0RTEX — RECOVERY TERMINAL  v0.9.8.X1")
                 except Exception: pass
         except Exception:
             pass
@@ -25543,7 +25676,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
 
 
     _term_write("╔══════════════════════════════════════════════════╗\n", "PROMPT")
-    _term_write("║   V0RTEX — Recovery Terminal  v0.9.7.X3    ║\n", "PROMPT")
+    _term_write("║   V0RTEX — Recovery Terminal  v0.9.8.X1    ║\n", "PROMPT")
     _term_write("╚══════════════════════════════════════════════════╝\n", "PROMPT")
     _term_write(f"Python {_rsys.version.split()[0]}  |  cwd: {_tcwd[0]}\n", "DIM")
     if exc_type:
@@ -25582,8 +25715,8 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                 _clog(f">_ {_ros.path.basename(logs[0])}", "PROMPT")
                 with open(logs[0], encoding="utf-8", errors="replace") as _f:
                     for line in _f.readlines()[-80:]:
-                        tag = "ERR" if ("Error" in line or "Traceback" in line) else\
-                              "WARN" if "Warning" in line else "DIM"
+                        tag = ("ERR" if ("Error" in line or "Traceback" in line) else
+                               ("WARN" if "Warning" in line else "DIM"))
                         _clog(f"  {line.rstrip()}", tag)
                 _sts(f"loaded {_ros.path.basename(logs[0])}")
             else:
@@ -26289,7 +26422,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             bd = _tcwd[0]
             wp = _ros.path.join(bd, "whitelist.txt")
             with open(wp, "w", encoding="utf-8") as _f:
-                _f.write("# V0RTEX v0.9.7.X3 — Whitelist\n# One SHA-256 hash per line\n")
+                _f.write("# V0RTEX v0.9.8.X1 — Whitelist\n# One SHA-256 hash per line\n")
             _replog(">_ whitelist.txt reset.", "OK")
             _sts("whitelist reset")
         except Exception as e: _replog(f">_ Error: {e}", "ERR")
@@ -26300,8 +26433,8 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
 
             ext_dir = _ros.path.join(bd, "rules", "external")
             if _ros.path.isdir(ext_dir):
-                for f in _gl.glob(_ros.path.join(ext_dir, "*.yar")) +\
-                         _gl.glob(_ros.path.join(ext_dir, "*.yara")):
+                for f in (_gl.glob(_ros.path.join(ext_dir, "*.yar")) +
+                          _gl.glob(_ros.path.join(ext_dir, "*.yara"))):
                     try: _ros.remove(f); removed += 1
                     except Exception: pass
 
@@ -27599,9 +27732,9 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                             code = getattr(getattr(_ve, 'code', None), '__str__', lambda: str(_ve))()
                             tag = "WARN" if "404" in str(code) or "401" in str(code) else "ERR"
 
-                            status = "reachable (hash not found = API alive)" if "404" in str(code)\
-                                     else "invalid key (401)" if "401" in str(code)\
-                                     else f"error: {_ve}"
+                            status = ("reachable (hash not found = API alive)" if "404" in str(code)
+                                      else ("invalid key (401)" if "401" in str(code)
+                                      else f"error: {_ve}"))
                             rr.after(0, lambda k=i+1, s=status, t=tag:
                                 _ntlog(f"  {'✓' if t=='WARN' else '✗'}  Key [{k}]: {s}", t))
                 except ImportError:
@@ -28634,8 +28767,8 @@ _wd_thread = threading.Thread(target=_watchdog_thread, daemon=True)
 _wd_thread.start()
 root.after(3000, _schedule_ping)
 
-_log_debug("V0RTEX v0.9.7.X3 ready", "INFO")
-_log_ops("V0RTEX  v0.9.7.X3  by Vider_06", "HEAD")
+_log_debug("V0RTEX v0.9.8.X1 ready", "INFO")
+_log_ops("V0RTEX  v0.9.8.X1  by Vider_06", "HEAD")
 _start_tray()
 root.after(500,   _refresh_stats)
 root.after(5000,  _perf_hist_tick)
@@ -28894,7 +29027,7 @@ _sb_admin_lbl = tk.Label(_sbar, textvariable=_sb_admin_sv, font=("Consolas",8,"b
 _sb_admin_lbl.pack(side=tk.LEFT, padx=12)
 tk.Label(_sbar, textvariable=_sb_time_sv, font=("Consolas",8),
          bg=C["crust"], fg=C["overlay0"]).pack(side=tk.RIGHT, padx=4)
-tk.Label(_sbar, text="V0RTEX v0.9.7.X3  by Vider_06",
+tk.Label(_sbar, text="V0RTEX v0.9.8.X1  by Vider_06",
          font=("Consolas",7), bg=C["crust"], fg=C["surface2"]).pack(side=tk.RIGHT, padx=12)
 
 def _sbar_tick():
@@ -28926,7 +29059,7 @@ def _sbar_tick():
         else:
             _sb_admin_sv.set("")
             _sb_admin_lbl.config(bg=C["crust"])
-            try: root.title("V0RTEX  v0.9.7.X3  by Vider_06")
+            try: root.title("V0RTEX  v0.9.8.X1  by Vider_06")
             except Exception: pass
     except Exception:
         pass
