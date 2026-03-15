@@ -1,4 +1,4 @@
-# V0RTEX v0.9.8.X1
+# V0RTEX v0.9.8.X2
 
 **V0RTEX** is a self-contained Windows malware analysis platform built in Python + Tkinter.  
 `V = Vider · 0 = zero-day · R = Reverse · T = Threat · E = Engine · X = eXamine`
@@ -33,7 +33,7 @@
 
 ---
 
-## What's new in v0.9.8.X1
+## What's new in v0.9.8.X2
 
 See [CHANGELOG.md](./CHANGELOG.md) for the full list of changes.
 
@@ -89,7 +89,7 @@ python v0rtex.py
 ## Folder Structure
 ```
 V0rtex_System/
-├── V0RTEX_v0.9.8.X1/               ← main install directory (BASE_DIR)
+├── V0RTEX_v0.9.8.X2/               ← main install directory (BASE_DIR)
 │   ├── v0rtex.py                   ← the entire application
 │   ├── config.json                 ← all user settings
 │   ├── scan_history.db             ← SQLite database
@@ -248,7 +248,7 @@ V0RTEX has a built-in **Recovery Terminal** that activates automatically when cr
 | **High memory on startup** | Background YARA compile is running — wait 30–60 seconds |
 | **Recovery Terminal appears every launch** | Antivirus deleted module files — add install folder to Defender exclusions (done automatically by setup) |
 | **Crash report on every launch** | Check `debug_log/crash_log.txt` and open a GitHub Issue |
-| **Updater says "up to date" on old version** | Update to v0.9.8.X1 — earlier versions had a version comparison bug with alphanumeric tags |
+| **Updater says "up to date" on old version** | Update to v0.9.8.X2 — earlier versions had a version comparison bug with alphanumeric tags |
 
 ---
 
