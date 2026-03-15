@@ -1,70 +1,9 @@
 {
-  "version": "0.9.7.X3",
-  "release_date": "2026-03-14",
-  "author": "Vider_06",
-  "repo": "https://github.com/Vider06/V0RTEX",
+  "version": "0.9.8.X0",
+  "release_date": "2026-03-15",
   "files": [
-    {
-      "path": "v0rtex.py",
-      "type": "script",
-      "required": true,
-      "description": "Main application script"
-    },
-    {
-      "path": "version.txt",
-      "type": "meta",
-      "required": true,
-      "description": "Version tag file"
-    },
-    {
-      "path": "README.md",
-      "type": "meta",
-      "required": false,
-      "description": "Documentation"
-    },
-    {
-      "path": "LICENSE",
-      "type": "meta",
-      "required": false,
-      "description": "License file"
-    },
-    {
-      "path": "update_manifest.json",
-      "type": "meta",
-      "required": false,
-      "description": "This manifest"
-    }
+    "v0rtex.py"
   ],
-  "install_dirs": [
-    "rules",
-    "rules/external",
-    "quarantine",
-    "reports",
-    "reports_pdf",
-    "debug_log",
-    "backups",
-    "_recovery",
-    "sandbox_env",
-    "sandbox_env/drop",
-    "threat_feeds",
-    "pcap_dumps",
-    "diff_workspace",
-    "modules"
-  ],
-  "changelog": {
-    "0.9.7.X3": [
-      "Fix: version comparator now handles alphanumeric tags (X1, X2, X3...)",
-      "Fix: updater now patches external launcher v0rtex.py if detected outside V0rtex_System",
-      "Fix: reinstall uses local copy by default, optional GitHub download checkbox",
-      "Fix: temp file deleted automatically after reinstall launch",
-      "New: Recovery REPAIR tab — Clean TEMP button removes V0RTEX installer temp files",
-      "Fix: ASCII X crash UI art corrected (stray box character on line 4)"
-    ],
-    "0.9.7.X2": [
-      "Internal build — superseded by X3"
-    ],
-    "0.9.7.X1": [
-      "Initial public versioned release"
-    ]
-  }
+  "min_python": "3.10",
+  "changelog": "v0.9.8.X0 \u2014 2026-03-15\n\nADDED\n- System Verifier (PROT \u2192 System Check): 6-step Windows health check \u2014 Defender status, quick malware scan, SFC integrity, DISM image health, disk SMART, startup persistence. Split-pane with raw PS commands shown as [ADMIN]/[no admin] before each step. Auto-prompts System Fixer on issues found.\n- System Fixer: Full Repair (threat removal \u2192 SFC \u2192 DISM), SFC Only, DISM Only. Step bar uses indeterminate animation during long operations. SFC output correctly decoded from UTF-16 LE.\n- YARA multi-engine chain: yara-python-wheel \u2192 yara-x (Rust, no compiler) \u2192 VS Build Tools with confirmation popup\n- yara-x compatibility shim: exposes identical API to yara-python (yara.compile, rules.match, yara.SyntaxError)\n- tshark auto-resolve: registry \u2192 shutil.which \u2192 known paths\n- Update UI step 7/7: mandatory dep reinstall\n\nCHANGED\n- Watchdog moved inside PROT \u2192 System Check as sub-tab\n- Report Builder removed\n- Update steps renumbered 1/7 through 7/7\n- All source comments removed, all strings in English\n\nFIXED\n- System Fixer progress bar (indeterminate during SFC/DISM, UTF-16 LE decode)\n- System Verification SFC stall (direct call instead of PS pipe)\n- YARA popup thread crash (ctypes MessageBoxW instead of Tk())\n- YARA pip error output truncated\n- YARA missing from final install check\n- tshark path not saved to config.json\n\nSECURITY\n- DANGER_ADMIN_PERMISSION_GRANTED, Remove-MpThreat, Get-MpComputerStatus, sfc /scannow, dism /RestoreHealth and 6 other AV trigger strings assembled at runtime"
 }
