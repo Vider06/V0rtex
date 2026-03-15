@@ -5,7 +5,7 @@ Format: `[version] — date — summary`
 
 ---
 
-## [0.9.8.X0] — 2026-03-15
+## [0.9.8.X1] — 2026-03-15
 
 ### Added
 - **System Verifier** — new PROT → System Check → SCAN tab runs a full 6-step Windows health check without leaving V0RTEX:
