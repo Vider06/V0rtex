@@ -7,13 +7,13 @@ Example: `0.9.8.X2` → major 0, big update 9, small update 8, bugfix patch 2.
 
 ## Index
 
-- [0.9.8.X2 — 2026-03-15 — Bugfix release](#0982x2----2026-03-15----bugfix-release)
-- [0.9.8.X1 — 2026-03-14 — Bugfix release](#0981x1----2026-03-14----bugfix-release)
-- [0.9.8 — 2026-03-13 — Small update](#098----2026-03-13----small-update)
-- [0.9.7.X3 — 2026-03-14 — Bugfix release](#097x3----2026-03-14----bugfix-release)
-- [0.9.7.X2 — 2026-03 — Bugfix release](#097x2----2026-03----bugfix-release)
-- [0.9.7.X1 — 2026-03 — Bugfix release](#097x1----2026-03----bugfix-release)
-- [0.9.7 — 2026-03 — Initial public release](#097----2026-03----initial-public-release)
+- [0.9.8.X2 — 2026-03-15 — Bugfix release](#098x2--2026-03-15--bugfix-release)
+- [0.9.8.X1 — 2026-03-14 — Bugfix release](#098x1--2026-03-14--bugfix-release)
+- [0.9.8 — 2026-03-13 — Small update](#098--2026-03-13--small-update)
+- [0.9.7.X3 — 2026-03-14 — Bugfix release](#097x3--2026-03-14--bugfix-release)
+- [0.9.7.X2 — 2026-03 — Bugfix release](#097x2--2026-03--bugfix-release)
+- [0.9.7.X1 — 2026-03 — Bugfix release](#097x1--2026-03--bugfix-release)
+- [0.9.7 — 2026-03 — Initial public release](#097--2026-03--initial-public-release)
 
 ---
 
