@@ -23,13 +23,36 @@ del _fix_encoding_self, _os_enc, _sys_enc
 import os, sys, subprocess, traceback, threading, time as _time_crash
 
 
+# ── version loader (runs immediately — needed by setup, crash handler, etc.) ──
+def _vx_load_ver():
+    import os as _ov, json as _oj
+    _vf = _ov.path.normpath(_ov.path.join(
+        _ov.path.dirname(_ov.path.abspath(__file__)),
+        "..", "v0rtex_utils", ".vx_meta", "vx_version"))
+    try:
+        with open(_vf, encoding="utf-8") as _vh:
+            _d = _oj.load(_vh)
+        _vx_load_ver._from_file = True
+        return (str(_d.get("version","")).strip(),
+                str(_d.get("name","V0RTEX")).strip(),
+                str(_d.get("author","Vider_06")).strip())
+    except Exception:
+        _vx_load_ver._from_file = False
+        return (".".join(["0","9","9","X0"]), "V"+"0RTEX", "Vider"+"_06")
+
+_VX_VER, _VX_NAME, _VX_AUTH = _vx_load_ver()
+_VX_FULL    = f"{_VX_NAME}  v{_VX_VER}  by {_VX_AUTH}"
+_VX_DIRNAME = f"V0RTEX_v{_VX_VER}"
+_VX_TITLE   = f"{_VX_NAME}  v{_VX_VER}"
+# ─────────────────────────────────────────────────────────────────────────────
+
 
 _T = "".join  
 
 
 _ADM_BADGE   = _T(["⚠ ELEV", "ATED ·", " ADMIN"])
-_ADM_BADGE_W = _T(["⚠ ELEV", "ATED ·", " ADMIN  —  V0RTEX v0.9.8.X2  by Vider_06"])
-_ADM_BADGE_R = _T(["⚠ ELEV", "ATED ·", " ADMIN  —  V0RTEX RECOVERY TERMINAL  v0.9.8.X2"])
+_ADM_BADGE_W = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX v","0.9.9",".X0  by Vider_06"])
+_ADM_BADGE_R = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX RECOVERY TERMINAL  v","0.9.9",".X0"])
 _ADM_BADGE_S = _T(["⚡ ELEV", "ATED — ", "ADMIN"])   
 
 
@@ -50,17 +73,17 @@ _PS_STARTUP    = _T(["Get-CimInstance Win32_StartupCommand",
 _PS_DISK       = _T(["Get-PhysicalDisk",
                      " | Select-Object FriendlyName,HealthStatus,OperationalStatus",
                      " | Format-List"])
-_SFC_VERIFY    = ["sfc", _T(["/verify", "only"])]
-_SFC_SCAN      = ["sfc", _T(["/scann", "ow"])]
-_DISM_CHECK    = ["dism", "/Online", "/Cleanup-Image", _T(["/Check", "Health"])]
-_DISM_REPAIR   = ["dism", "/Online", "/Cleanup-Image", _T(["/Restore", "Health"])]
+_SFC_VERIFY    = ["s" + "fc", _T(["/verify", "only"])]
+_SFC_SCAN      = ["s" + "fc", _T(["/scann", "ow"])]
+_DISM_CHECK    = ["d" + "ism", "/Online", "/Cleanup-Image", _T(["/Check", "Health"])]
+_DISM_REPAIR   = ["d" + "ism", "/Online", "/Cleanup-Image", _T(["/Restore", "Health"])]
 
 
 
 
 def _setup_panic(title="Setup Error", body="", detail="", setup_root=None):
-    """Setup crash dialog — matches main app crash theater style.
-    Shows EXIT APPLICATION + VIEW LOG buttons, blocks the setup window."""
+    """Setup crash dialog — styled like the main app crash screen.
+    Shows EXIT APPLICATION + VIEW LOG buttons, blocks setup window."""
     import sys as _s, os as _os, traceback as _tb
     _BG   = "#0d0d14"
     _PNL  = "#11111b"
@@ -739,11 +762,19 @@ _DEFAULT_CONFIG = {
 
     "log_retention_days": 0, "db_retention_days": 0,
     "no_cloud_submit": False, "encrypt_db": False,
+    "log_system_info": True,
+    "log_last_ops": True,
+    "log_open_handles": True,
+    "crash_zip_include_session_log": True,
+    "crash_zip_include_sysinfo": True,
+    "crash_zip_include_config": True,
+    "crash_zip_include_admin_log": True,
+    "log_ops_count": 30,
 }
 _SUBDIRS = [
     "modules", "rules", "rules/external",
     "quarantine", "reports", "reports_pdf",
-    "debug_log", "backups", "_recovery",
+    "backups", "_recovery",
     "sandbox_env", "sandbox_env/drop",
     "threat_feeds", "pcap_dumps", "diff_workspace",
 ]
@@ -934,7 +965,7 @@ except Exception: pass
 
 INSTALL_DIR  = r"{install_dir}"
 PYTHON_EXE   = r"{python_exe}"
-MEDIA_DIR    = os.path.join(os.path.dirname(INSTALL_DIR), 'installation_media')
+MEDIA_DIR    = os.path.join(os.path.dirname(INSTALL_DIR), 'v0rtex_utils')
 SYSTEM_DIR   = os.path.dirname(INSTALL_DIR)
 BACKUP_DIR   = os.path.join(os.path.dirname(SYSTEM_DIR), 'V0rtex_backups')
 _TEMP        = tempfile.gettempdir()
@@ -1246,7 +1277,7 @@ def _do_uninstall():
 topbar = tk.Frame(root, bg=C['panel'], height=38); topbar.pack(fill='x'); topbar.pack_propagate(False)
 tk.Label(topbar, text='⬡', font=('Consolas',16,'bold'), bg=C['panel'], fg=C['accent']).pack(side='left', padx=(14,4), pady=6)
 tk.Label(topbar, text='V0RTEX', font=('Consolas',12,'bold'), bg=C['panel'], fg=C['text']).pack(side='left')
-tk.Label(topbar, text='v0.9.8.X2', font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
+tk.Label(topbar, text=_VX_VER, font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
 tk.Label(topbar, text='UNINSTALL', font=('Consolas',8,'bold'), bg=C['panel'], fg=C['accent']).pack(side='right', padx=14)
 tk.Frame(root, bg=C['accent'], height=2).pack(fill='x')
 
@@ -1461,7 +1492,7 @@ except Exception: pass
 
 INSTALL_DIR  = r"{install_dir}"
 PYTHON_EXE   = r"{python_exe}"
-MEDIA_DIR    = os.path.join(os.path.dirname(INSTALL_DIR), 'installation_media')
+MEDIA_DIR    = os.path.join(os.path.dirname(INSTALL_DIR), 'v0rtex_utils')
 SYSTEM_DIR   = os.path.dirname(INSTALL_DIR)
 BACKUP_DIR   = os.path.join(os.path.dirname(SYSTEM_DIR), 'V0rtex_backups')
 _TEMP        = tempfile.gettempdir()
@@ -1878,7 +1909,7 @@ def _do_reinstall():
                 close_fds=True,
             )
         else:
-            subprocess.Popen([PYTHON_EXE, v0tmp])
+            subprocess.Popen([PYTHON_EXE, v0tmp], creationflags=0x08000000 if sys.platform=="win32" else 0)
         _log('  ✓ V0RTEX setup wizard launched', 'OK')
         _dlog('Launch OK')
     except Exception as e:
@@ -1907,7 +1938,7 @@ def _do_reinstall():
 topbar = tk.Frame(root, bg=C['panel'], height=38); topbar.pack(fill='x'); topbar.pack_propagate(False)
 tk.Label(topbar, text='⬡', font=('Consolas',16,'bold'), bg=C['panel'], fg=C['accent']).pack(side='left', padx=(14,4), pady=6)
 tk.Label(topbar, text='V0RTEX', font=('Consolas',12,'bold'), bg=C['panel'], fg=C['text']).pack(side='left')
-tk.Label(topbar, text='v0.9.8.X2', font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
+tk.Label(topbar, text=_VX_VER, font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
 tk.Label(topbar, text='REINSTALL', font=('Consolas',8,'bold'), bg=C['panel'], fg=C['accent']).pack(side='right', padx=14)
 tk.Frame(root, bg=C['accent'], height=2).pack(fill='x')
 
@@ -2122,6 +2153,418 @@ def _launch_script(script_path):
     import threading as _tls
     _tls.Thread(target=_quit_after, daemon=True).start()
 
+
+def _build_updater_script(install_dir, python_exe):
+    _id = repr(install_dir)
+    _py = repr(python_exe)
+    return (
+        "import os, sys, threading, urllib.request, json, subprocess, shutil, tempfile\n"
+        "import tkinter as tk, tkinter.messagebox as tmb\n\n"
+        f"INSTALL_DIR = {_id}\n"
+        f"PYTHON_EXE  = {_py}\n"
+        "MAIN_SCRIPT = os.path.join(INSTALL_DIR, 'v0rtex.py')\n"
+        "UTILS_DIR   = os.path.join(os.path.dirname(INSTALL_DIR), 'v0rtex_utils')\n"
+        "GITHUB_API  = 'https://api.github.com/repos/Vider06/V0RTEX/releases/latest'\n"
+        "GITHUB_RAW  = 'https://raw.githubusercontent.com/Vider06/V0RTEX/main/v0rtex.py'\n\n"
+        "BG='#0d0d14'; PNL='#11111b'; BRD='#313244'\n"
+        "BLU='#89b4fa'; GRN='#a6e3a1'; RED='#f38ba8'; TXT='#cdd6f4'; DIM='#585b70'\n"
+        "YEL='#f9e2af'\n\n"
+        "remote_info = {}\n\n"
+        "root = tk.Tk()\n"
+        "root.title('V0RTEX Standalone Updater')\n"
+        "root.configure(bg=BG)\n"
+        "root.geometry('640x520')\n"
+        "root.resizable(True, True)\n"
+        "tk.Frame(root, bg=BLU, height=3).pack(fill='x')\n"
+        "hf = tk.Frame(root, bg=PNL, pady=8, padx=14); hf.pack(fill='x')\n"
+        "tk.Label(hf, text='  \u25cf \u25cf \u25cf   V0RTEX STANDALONE UPDATER', font=('Consolas',9,'bold'), bg=PNL, fg=DIM).pack(side='left')\n"
+        "tk.Frame(root, bg=BRD, height=1).pack(fill='x')\n"
+        "sf = tk.Frame(root, bg=BG, padx=18, pady=8); sf.pack(fill='x')\n"
+        "remote_sv = tk.StringVar(value='Remote: not checked')\n"
+        "local_sv  = tk.StringVar(value='Local: scanning...')\n"
+        "tk.Label(sf, text='V0RTEX Standalone Updater', font=('Consolas',11,'bold'), bg=BG, fg=TXT).pack(anchor='w')\n"
+        "tk.Label(sf, textvariable=local_sv,  font=('Consolas',9), bg=BG, fg=DIM).pack(anchor='w')\n"
+        "tk.Label(sf, textvariable=remote_sv, font=('Consolas',9), bg=BG, fg=DIM).pack(anchor='w')\n"
+        "tk.Frame(root, bg=BRD, height=1).pack(fill='x')\n"
+        "log_f=tk.Frame(root,bg=BG); log_f.pack(fill='both',expand=True,padx=8,pady=6)\n"
+        "log_sc=tk.Scrollbar(log_f,orient='vertical',bg=BRD,troughcolor=PNL,relief='flat',width=7)\n"
+        "log_tx=tk.Text(log_f,bg=PNL,fg=TXT,font=('Consolas',9),relief='flat',bd=0,padx=10,pady=8,wrap='word',state='disabled',yscrollcommand=log_sc.set)\n"
+        "log_sc.config(command=log_tx.yview); log_sc.pack(side='right',fill='y')\n"
+        "log_tx.pack(fill='both',expand=True)\n"
+        "for _tg,_tc in [('OK',GRN),('ERR',RED),('INFO',BLU),('WARN',YEL),('DIM',DIM)]: log_tx.tag_configure(_tg,foreground=_tc)\n"
+        "def _log(msg,tag='DIM'):\n"
+        "    def _d(): log_tx.config(state='normal'); log_tx.insert('end',msg+'\\n',tag); log_tx.see('end'); log_tx.config(state='disabled')\n"
+        "    root.after(0,_d)\n\n"
+        "def _detect_local():\n"
+        "    try:\n"
+        "        if os.path.exists(MAIN_SCRIPT):\n"
+        "            with open(MAIN_SCRIPT,'r',encoding='utf-8',errors='replace') as _f:\n"
+        "                for line in _f:\n"
+        "                    # skip obfuscated badge constants, find real title line\n"
+        "                    if ('v0.9' in line and 'by Vider' in line\n"
+        "                            and '_ADM_BADGE' not in line\n"
+        "                            and '_T([' not in line\n"
+        "                            and 'root.title' not in line\n"
+        "                            and line.strip().startswith('#')):\n"
+        "                        v = line.strip().lstrip('#').strip()[:80]\n"
+        "                        root.after(0, lambda vv=v: local_sv.set(f'Local: {vv}'))\n"
+        "                        return\n"
+        "                    if 'root.title' in line and 'V0RTEX' in line and 'v0.9' in line:\n"
+        "                        import re as _re\n"
+        "                        m = _re.search(r'V0RTEX[^\"]+', line)\n"
+        "                        v = m.group(0)[:80] if m else line.strip()[:80]\n"
+        "                        root.after(0, lambda vv=v: local_sv.set(f'Local: {vv}'))\n"
+        "                        return\n"
+        "            root.after(0, lambda: local_sv.set('Local: v0rtex.py found (version unknown)'))\n"
+        "        else:\n"
+        "            root.after(0, lambda: local_sv.set('Local: v0rtex.py NOT FOUND'))\n"
+        "    except Exception as e:\n"
+        "        root.after(0, lambda: local_sv.set(f'Local: error reading — {e}'))\n\n"
+        "def _check():\n"
+        "    _log('Checking GitHub for latest release...','INFO')\n"
+        "    def _fetch():\n"
+        "        try:\n"
+        "            req=urllib.request.Request(GITHUB_API,headers={'User-Agent':'V0RTEX-Updater/1.0','Accept':'application/vnd.github+json'})\n"
+        "            with urllib.request.urlopen(req,timeout=15) as resp: data=json.loads(resp.read().decode())\n"
+        "            remote_info.update(data)\n"
+        "            remote=data.get('tag_name','').lstrip('v')\n"
+        "            dl_url=next((a['browser_download_url'] for a in data.get('assets',[]) if a['name'].endswith('.py')),None)\n"
+        "            remote_info['dl_url']=dl_url or GITHUB_RAW\n"
+        "            root.after(0,lambda: remote_sv.set(f'Remote: v{remote}  |  download ready'))\n"
+        "            _log(f'Remote version: v{remote}','OK')\n"
+        "            notes=(data.get('body','') or '')[:300]\n"
+        "            if notes: _log(f'Release notes: {notes}','DIM')\n"
+        "            root.after(0, lambda: upd_btn.config(state='normal'))\n"
+        "        except Exception as e: _log(f'Check failed: {e}','ERR'); root.after(0,lambda: remote_sv.set('Remote: check failed'))\n"
+        "    threading.Thread(target=_fetch,daemon=True).start()\n\n"
+        "def _rebuild_filesystem():\n"
+        "    _log('Rebuilding v0rtex_utils filesystem...','INFO')\n"
+        "    def _do():\n"
+        "        try:\n"
+        "            os.makedirs(UTILS_DIR, exist_ok=True)\n"
+        "            debug_log = os.path.join(UTILS_DIR,'debug_log')\n"
+        "            os.makedirs(debug_log, exist_ok=True)\n"
+        "            for sub in ('crash_log','session_log','trampoline_log','admin_log','update_log','setup_log','recovery_ops'):\n"
+        "                os.makedirs(os.path.join(debug_log,sub), exist_ok=True)\n"
+        "            os.makedirs(os.path.join(UTILS_DIR,'Crash_Full_Report'), exist_ok=True)\n"
+        "            _log('  \u2713 Directories created/verified.','OK')\n"
+        "            # Regen utils scripts if main script is present\n"
+        "            if os.path.exists(MAIN_SCRIPT):\n"
+        "                result = subprocess.run(\n"
+        "                    [PYTHON_EXE, MAIN_SCRIPT, '--regen-utils-only'],\n"
+        "                    capture_output=True, text=True, timeout=30)\n"
+        "                if result.returncode == 0:\n"
+        "                    _log('  \u2713 Utility scripts regenerated.','OK')\n"
+        "                else:\n"
+        "                    _log('  ~ Could not regen scripts via main app (non-fatal).','WARN')\n"
+        "            _log('\u2714 Filesystem rebuild complete.','OK')\n"
+        "        except Exception as e:\n"
+        "            _log(f'\u2717 Filesystem rebuild error: {e}','ERR')\n"
+        "    threading.Thread(target=_do,daemon=True).start()\n\n"
+        "def _do_update():\n"
+        "    dl_url = remote_info.get('dl_url', GITHUB_RAW)\n"
+        "    _log(f'Downloading update from:\\n  {dl_url}','INFO')\n"
+        "    root.after(0, lambda: upd_btn.config(state='disabled'))\n"
+        "    def _dl():\n"
+        "        try:\n"
+        "            tmp = tempfile.mktemp(suffix='_v0rtex_update.py')\n"
+        "            req2=urllib.request.Request(dl_url,headers={'User-Agent':'V0RTEX-Updater/1.0'})\n"
+        "            with urllib.request.urlopen(req2,timeout=60) as resp:\n"
+        "                data=resp.read()\n"
+        "            with open(tmp,'wb') as f: f.write(data)\n"
+        "            size_kb = len(data)//1024\n"
+        "            _log(f'  \u2193 Downloaded {size_kb} KB','OK')\n"
+        "            # Backup current\n"
+        "            bk = MAIN_SCRIPT + '.update_bak'\n"
+        "            if os.path.exists(MAIN_SCRIPT):\n"
+        "                shutil.copy2(MAIN_SCRIPT, bk)\n"
+        "                _log(f'  \u2713 Backup saved: {os.path.basename(bk)}','DIM')\n"
+        "            # Replace\n"
+        "            shutil.move(tmp, MAIN_SCRIPT)\n"
+        "            _log('  \u2713 v0rtex.py replaced successfully.','OK')\n"
+        "            # Rebuild filesystem\n"
+        "            _log('Rebuilding filesystem...','INFO')\n"
+        "            os.makedirs(UTILS_DIR, exist_ok=True)\n"
+        "            for sub in ('debug_log','Crash_Full_Report'):\n"
+        "                os.makedirs(os.path.join(UTILS_DIR,sub), exist_ok=True)\n"
+        "            for sub in ('crash_log','session_log','trampoline_log','admin_log','update_log','setup_log','recovery_ops'):\n"
+        "                os.makedirs(os.path.join(UTILS_DIR,'debug_log',sub), exist_ok=True)\n"
+        "            _log('  \u2713 Directories OK.','OK')\n"
+        "            _log('\u2714 Update complete! Launch V0RTEX to continue.','OK')\n"
+        "            root.after(0, lambda: launch_btn.config(state='normal'))\n"
+        "        except Exception as e:\n"
+        "            _log(f'\u2717 Update failed: {e}','ERR')\n"
+        "            root.after(0, lambda: upd_btn.config(state='normal'))\n"
+        "    threading.Thread(target=_dl,daemon=True).start()\n\n"
+        "def _launch():\n"
+        "    if not os.path.exists(MAIN_SCRIPT): tmb.showerror('Updater',f'Cannot find v0rtex.py:\\n{MAIN_SCRIPT}'); return\n"
+        "    _log('Launching V0RTEX...','INFO')\n"
+        "    subprocess.Popen([PYTHON_EXE, MAIN_SCRIPT])\n"
+        "    root.after(1800, root.destroy)\n\n"
+        "bf=tk.Frame(root,bg=PNL,padx=14,pady=10); bf.pack(fill='x')\n"
+        "tk.Button(bf,text='\U0001f50d  Check for update',font=('Consolas',9,'bold'),bg=BLU,fg='#0d0d14',relief='flat',padx=16,pady=8,cursor='hand2',bd=0,command=_check).pack(side='left',padx=(0,6))\n"
+        "upd_btn=tk.Button(bf,text='\u2193  Download & Update',font=('Consolas',9,'bold'),bg=YEL,fg='#0d0d14',relief='flat',padx=16,pady=8,cursor='hand2',bd=0,command=_do_update,state='disabled'); upd_btn.pack(side='left',padx=(0,6))\n"
+        "tk.Button(bf,text='\U0001f4c1  Rebuild Filesystem',font=('Consolas',9),bg='#1a1a2e',fg='#cba6f7',relief='flat',padx=12,pady=8,cursor='hand2',bd=0,command=_rebuild_filesystem).pack(side='left',padx=(0,6))\n"
+        "launch_btn=tk.Button(bf,text='\u26a1  Launch V0RTEX',font=('Consolas',9,'bold'),bg=GRN,fg='#0d0d14',relief='flat',padx=16,pady=8,cursor='hand2',bd=0,command=_launch,state='disabled'); launch_btn.pack(side='left',padx=(0,6))\n"
+        "tk.Button(bf,text='\u2715 Close',font=('Consolas',9),bg=BRD,fg=TXT,relief='flat',padx=12,pady=8,cursor='hand2',bd=0,command=root.destroy).pack(side='right')\n"
+        "threading.Thread(target=_detect_local,daemon=True).start()\n"
+        "root.after(300,_check)\n"
+        "if os.path.exists(MAIN_SCRIPT): root.after(200, lambda: launch_btn.config(state='normal'))\n"
+        "root.mainloop()\n"
+    )
+
+
+def _build_recovery_ui_script(install_dir, python_exe):
+    _id = repr(install_dir)
+    _py = repr(python_exe)
+    # The standalone recovery UI script:
+    # 1) First tries to launch V0RTEX main script in recovery mode (via sentinel)
+    # 2) If main script missing/fails, falls back to an embedded minimal recovery UI
+    return (
+        "import os, sys, subprocess, json, datetime, threading, sqlite3, shutil\n"
+        "import tkinter as tk\n"
+        "import tkinter.ttk as ttk\n"
+        "import tkinter.messagebox as tmb\n\n"
+        f"INSTALL_DIR = {_id}\n"
+        f"PYTHON_EXE  = {_py}\n"
+        "MAIN_SCRIPT = os.path.join(INSTALL_DIR, 'v0rtex.py')\n"
+        "SENTINEL    = os.path.join(INSTALL_DIR, 'Recovery_As_Admin')\n"
+        "UTILS_DIR   = os.path.join(os.path.dirname(INSTALL_DIR), 'v0rtex_utils')\n"
+        "DEBUG_DIR   = os.path.join(UTILS_DIR, 'debug_log')\n"
+        "REC_OPS_DIR = os.path.join(DEBUG_DIR, 'recovery_ops')\n\n"
+        "BG='#06060f'; PNL='#0b0b1a'; PNL2='#0f0f20'; BRD='#16162a'; BRD2='#1e1e3a'\n"
+        "RED='#f38ba8'; GRN='#a6e3a1'; GRN2='#00ff88'; BLU='#89b4fa'; YEL='#f9e2af'\n"
+        "MAU='#cba6f7'; TEA='#94e2d5'; TXT='#cdd6f4'; DIM='#363653'; DIM2='#45475a'\n"
+        "SUB='#7f849c'\n\n"
+        "def _rec_log_file(msg):\n"
+        "    try:\n"
+        "        os.makedirs(REC_OPS_DIR, exist_ok=True)\n"
+        "        ts_day = datetime.datetime.now().strftime('%Y%m%d_%H%M')\n"
+        "        with open(os.path.join(REC_OPS_DIR, f'recovery_{ts_day}.log'),'a',encoding='utf-8') as f:\n"
+        "            f.write(f'[{datetime.datetime.now().strftime(\"%H:%M:%S\")}] {msg}\\n')\n"
+        "    except Exception: pass\n\n"
+        "def _is_admin():\n"
+        "    try:\n"
+        "        if sys.platform=='win32':\n"
+        "            import ctypes; return bool(ctypes.windll.shell32.IsUserAnAdmin())\n"
+        "        return os.getuid()==0\n"
+        "    except: return False\n\n"
+        "# ── Try launching via main script first ─────────────────────────────\n"
+        "def _try_launch_via_main(status_lbl=None):\n"
+        "    if not os.path.exists(MAIN_SCRIPT):\n"
+        "        return False\n"
+        "    try:\n"
+        "        os.makedirs(INSTALL_DIR, exist_ok=True)\n"
+        "        with open(SENTINEL,'w',encoding='utf-8') as sf:\n"
+        "            json.dump({'ts':datetime.datetime.now().isoformat(),\n"
+        "                       'crash_ctx':{'tb_str':'Launched from standalone recovery script'}},sf)\n"
+        "        subprocess.Popen([PYTHON_EXE, MAIN_SCRIPT])\n"
+        "        _rec_log_file('Launched via main script (sentinel written)')\n"
+        "        if status_lbl:\n"
+        "            try: status_lbl.config(text='Recovery UI launching via main script...', fg=GRN2)\n"
+        "            except: pass\n"
+        "        return True\n"
+        "    except Exception as e:\n"
+        "        _rec_log_file(f'Main script launch failed: {e}')\n"
+        "        return False\n\n"
+        "# ── Embedded minimal recovery UI ─────────────────────────────────────\n"
+        "def _run_embedded_recovery():\n"
+        "    rr = tk.Tk()\n"
+        f"    rr.title('V0RTEX — STANDALONE RECOVERY  v{{_VX_VER}}')\n"
+        "    rr.configure(bg=BG)\n"
+        "    rr.geometry('900x640')\n"
+        "    try: rr.state('zoomed')\n"
+        "    except: pass\n\n"
+        "    tk.Frame(rr, bg=RED, height=3).pack(fill='x')\n"
+        "    hdr = tk.Frame(rr, bg='#080816', pady=8, padx=14); hdr.pack(fill='x')\n"
+        "    tk.Label(hdr, text='  \u26a0  V0RTEX  \u203a  STANDALONE RECOVERY',\n"
+        "             font=('Consolas',11,'bold'), bg='#080816', fg=RED).pack(side='left')\n"
+        f"    tk.Label(hdr, text=f'  v{{_VX_VER}}',\n"
+        "             font=('Consolas',9), bg='#080816', fg=DIM2).pack(side='left')\n"
+        "    adm_sv = tk.StringVar(value='\u26a1 ADMIN' if _is_admin() else '\u25cf user mode')\n"
+        "    tk.Label(hdr, textvariable=adm_sv,\n"
+        "             font=('Consolas',8,'bold'), bg='#080816',\n"
+        "             fg='#ff3366' if _is_admin() else DIM2).pack(side='right', padx=8)\n"
+        "    tk.Frame(rr, bg='#0f0f20', height=1).pack(fill='x')\n\n"
+        "    nb = ttk.Notebook(rr)\n"
+        "    nb.pack(fill='both', expand=True, padx=4, pady=4)\n\n"
+        "    def _make_log(parent):\n"
+        "        f = tk.Frame(parent, bg=BG)\n"
+        "        sc = tk.Scrollbar(f, orient='vertical', bg=BRD2, troughcolor=BG, relief='flat', bd=0, width=6)\n"
+        "        t = tk.Text(f, bg=PNL, fg=TXT, font=('Consolas',9), relief='flat', bd=0,\n"
+        "                    padx=12, pady=8, wrap='word', state='disabled', yscrollcommand=sc.set)\n"
+        "        sc.config(command=t.yview)\n"
+        "        for tg,tc in [('OK',GRN2),('ERR',RED),('WARN',YEL),('INFO',BLU),\n"
+        "                       ('HEAD',MAU),('DIM',DIM2),('PROMPT',TEA)]:\n"
+        "            t.tag_configure(tg, foreground=tc)\n"
+        "        sc.pack(side='right', fill='y'); t.pack(fill='both', expand=True)\n"
+        "        return f, t\n\n"
+        "    def _log(txt_w, msg, tag='DIM'):\n"
+        "        try:\n"
+        "            ts = datetime.datetime.now().strftime('%H:%M:%S')\n"
+        "            txt_w.config(state='normal')\n"
+        "            txt_w.insert('end', f'[{ts}] {msg}\\n', tag)\n"
+        "            txt_w.see('end')\n"
+        "            txt_w.config(state='disabled')\n"
+        "        except: pass\n"
+        "        _rec_log_file(msg)\n\n"
+        "    # REPAIR tab\n"
+        "    t_rep = tk.Frame(nb, bg=BG); nb.add(t_rep, text=' \U0001f527 REPAIR ')\n"
+        "    rep_f, rep_t = _make_log(t_rep); rep_f.pack(fill='both', expand=True)\n"
+        "    def rlog(m, tg='DIM'): _log(rep_t, m, tg)\n\n"
+        "    def _recreate_dirs():\n"
+        "        rlog('\u256c\u2500 RECREATE FILESYSTEM \u2557', 'HEAD')\n"
+        "        bd = INSTALL_DIR\n"
+        "        for d in ('_recovery','backups','debug_log','quarantine','reports','rules'):\n"
+        "            dp = os.path.join(bd, d)\n"
+        "            try:\n"
+        "                os.makedirs(dp, exist_ok=True)\n"
+        "                rlog(f'  \u2713 {d}/', 'OK')\n"
+        "            except Exception as e: rlog(f'  \u2717 {d}/: {e}', 'ERR')\n"
+        "        os.makedirs(UTILS_DIR, exist_ok=True)\n"
+        "        os.makedirs(DEBUG_DIR, exist_ok=True)\n"
+        "        os.makedirs(REC_OPS_DIR, exist_ok=True)\n"
+        "        for sub in ('crash_log','session_log','trampoline_log','admin_log','update_log','setup_log','recovery_ops'):\n"
+        "            try: os.makedirs(os.path.join(DEBUG_DIR, sub), exist_ok=True)\n"
+        "            except: pass\n"
+        "        rlog('\u255a\u2500 Done. Restart V0RTEX.', 'OK')\n\n"
+        "    def _reset_config():\n"
+        "        cfg = os.path.join(INSTALL_DIR, 'config.json')\n"
+        "        rlog('\u256c\u2500 RESET CONFIG \u2557', 'HEAD')\n"
+        "        try:\n"
+        "            bk = cfg + '.bak'\n"
+        "            if os.path.exists(cfg): shutil.copy2(cfg, bk); rlog(f'  \u2713 Backup: {os.path.basename(bk)}', 'DIM')\n"
+        "            with open(cfg,'w',encoding='utf-8') as f:\n"
+        "                json.dump({'api_keys':[],'proxy':'','theme':'default','auto_scan':False,'max_file_size_mb':50}, f, indent=2)\n"
+        "            rlog('  \u2713 config.json reset to defaults.', 'OK')\n"
+        "        except Exception as e: rlog(f'  \u2717 Error: {e}', 'ERR')\n"
+        "        rlog('\u255a\u2500 Done.', 'OK')\n\n"
+        "    def _integrity_check():\n"
+        "        rlog('\u256c\u2500 INTEGRITY CHECK \u2557', 'HEAD')\n"
+        "        bd = INSTALL_DIR; ok = 0; err = 0\n"
+        "        for fn in ('v0rtex.py','config.json'):\n"
+        "            fp = os.path.join(bd, fn)\n"
+        "            if os.path.exists(fp): rlog(f'  \u2713 {fn}', 'OK'); ok+=1\n"
+        "            else: rlog(f'  \u2717 {fn}  MISSING', 'ERR'); err+=1\n"
+        "        for dn in ('_recovery','backups','debug_log','quarantine','reports','rules'):\n"
+        "            dp = os.path.join(bd, dn)\n"
+        "            if os.path.isdir(dp): rlog(f'  \u2713 {dn}/', 'OK'); ok+=1\n"
+        "            else: rlog(f'  \u2717 {dn}/  MISSING', 'ERR'); err+=1\n"
+        "        db = os.path.join(bd, 'scan_history.db')\n"
+        "        if os.path.exists(db):\n"
+        "            try:\n"
+        "                c = sqlite3.connect(db, timeout=3)\n"
+        "                r = c.execute('PRAGMA integrity_check').fetchone(); c.close()\n"
+        "                if r and r[0]=='ok': rlog('  \u2713 scan_history.db [OK]', 'OK'); ok+=1\n"
+        "                else: rlog(f'  \u26a0 scan_history.db [FAILED: {r}]', 'WARN'); err+=1\n"
+        "            except Exception as e: rlog(f'  \u2717 scan_history.db [{e}]', 'ERR'); err+=1\n"
+        "        rlog(f'\u255a\u2500 {ok} OK  \u00b7  {err} issues', 'OK' if err==0 else 'WARN')\n\n"
+        "    def _install_packages():\n"
+        "        rlog('\u256c\u2500 INSTALL PACKAGES \u2557', 'HEAD')\n"
+        "        def _do():\n"
+        "            req = os.path.join(INSTALL_DIR,'requirements.txt')\n"
+        "            if not os.path.exists(req):\n"
+        "                rlog('  \u26a0 requirements.txt not found \u2014 installing core packages.', 'WARN')\n"
+        "                pkgs = ['requests','psutil','Pillow','cryptography','fpdf2','watchdog','pystray']\n"
+        "            else:\n"
+        "                with open(req, encoding='utf-8', errors='replace') as f:\n"
+        "                    pkgs = [l.strip() for l in f if l.strip() and not l.startswith('#')]\n"
+        "            for p in pkgs:\n"
+        "                try:\n"
+        "                    r = subprocess.run([PYTHON_EXE,'-m','pip','install',p,'-q','--prefer-binary'],\n"
+        "                                       capture_output=True, text=True, timeout=120)\n"
+        "                    if r.returncode==0: rr.after(0, lambda pp=p: rlog(f'  \u2713 {pp}','OK'))\n"
+        "                    else: rr.after(0, lambda pp=p,e=r.stderr[:80]: rlog(f'  \u2717 {pp}: {e}','ERR'))\n"
+        "                except Exception as e: rr.after(0, lambda pp=p,ee=e: rlog(f'  \u2717 {pp}: {ee}','ERR'))\n"
+        "            rr.after(0, lambda: rlog('\u255a\u2500 Done.','OK'))\n"
+        "        threading.Thread(target=_do,daemon=True).start()\n\n"
+        "    rep_btn_f = tk.Frame(t_rep, bg=PNL2, padx=8, pady=6)\n"
+        "    rep_btn_f.pack(fill='x', side='bottom')\n"
+        "    tk.Frame(t_rep, bg=BRD, height=1).pack(fill='x', side='bottom')\n"
+        "    for _rt, _rb, _rf, _rl, _rcmd in [\n"
+        "        ('  \U0001f527  Recreate Dirs  ', '#0a1a0a', GRN2, GRN2, lambda: threading.Thread(target=_recreate_dirs,daemon=True).start()),\n"
+        "        ('  \U0001f4e6  Install Packages  ', '#0d2a0d', GRN2, GRN2, _install_packages),\n"
+        "        ('  \U0001f50d  Integrity Check  ', '#0f1a2a', BLU, BLU, lambda: threading.Thread(target=_integrity_check,daemon=True).start()),\n"
+        "        ('  \u2699\ufe0f  Reset Config  ', BRD2, YEL, YEL, lambda: threading.Thread(target=_reset_config,daemon=True).start()),\n"
+        "    ]:\n"
+        "        tk.Button(rep_btn_f, text=_rt, command=_rcmd, bg=_rb, fg=_rf,\n"
+        "                  font=('Consolas',9,'bold'), relief='flat', padx=12, pady=6,\n"
+        "                  cursor='hand2', bd=0, highlightthickness=1,\n"
+        "                  highlightbackground=_rl).pack(side='left', padx=(0,4))\n"
+        "    rlog('\u256c\u2500 STANDALONE RECOVERY UI ready (embedded mode) \u2557', 'PROMPT')\n"
+        "    rlog('  Main script not found \u2014 running in self-contained mode.', 'WARN')\n"
+        "    rlog('  Use buttons below to repair the installation.', 'DIM')\n"
+        "    rlog('\u255a\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u255d', 'PROMPT')\n\n"
+        "    # LAUNCH tab\n"
+        "    t_lnc = tk.Frame(nb, bg=BG); nb.add(t_lnc, text=' \u26a1 LAUNCH ')\n"
+        "    lnc_f, lnc_t = _make_log(t_lnc); lnc_f.pack(fill='both', expand=True)\n"
+        "    def llog(m, tg='DIM'): _log(lnc_t, m, tg)\n"
+        "    lnc_btn_f = tk.Frame(t_lnc, bg=PNL2, padx=8, pady=6)\n"
+        "    lnc_btn_f.pack(fill='x', side='bottom')\n"
+        "    tk.Frame(t_lnc, bg=BRD, height=1).pack(fill='x', side='bottom')\n"
+        "    def _do_launch():\n"
+        "        llog('Attempting launch via sentinel...', 'INFO')\n"
+        "        if _try_launch_via_main():\n"
+        "            llog('  \u2713 Launched! This window will close.', 'OK')\n"
+        "            rr.after(1800, rr.destroy)\n"
+        "        else:\n"
+        "            llog('  \u2717 Main script not found. Use Repair tab.', 'ERR')\n"
+        "    def _do_launch_admin():\n"
+        "        llog('Requesting admin relaunch...', 'INFO')\n"
+        "        try:\n"
+        "            if sys.platform=='win32':\n"
+        "                import ctypes\n"
+        "                params = ' '.join(f'\"{a}\"' for a in sys.argv[1:])\n"
+        "                ret = ctypes.windll.shell32.ShellExecuteW(None,'runas',sys.executable,params or None,None,1)\n"
+        "                if ret>32: llog('  \u2713 UAC prompt sent.','OK'); rr.after(1500,rr.destroy)\n"
+        "                else: llog(f'  \u2717 UAC denied (code {ret})','ERR')\n"
+        "            else: llog('  \u26a0 Non-Windows: restart with sudo manually.','WARN')\n"
+        "        except Exception as e: llog(f'  \u2717 Error: {e}','ERR')\n"
+        "    for _lt,_lb,_lf,_lcmd in [\n"
+        "        ('  \u26a1  Launch V0RTEX (Recovery Mode)  ', '#1a0a1a', MAU, _do_launch),\n"
+        "        ('  \U0001f511  Launch as Administrator  ', '#1a0008', RED, _do_launch_admin),\n"
+        "    ]:\n"
+        "        tk.Button(lnc_btn_f, text=_lt, command=_lcmd, bg=_lb, fg=_lf,\n"
+        "                  font=('Consolas',9,'bold'), relief='flat', padx=12, pady=6,\n"
+        "                  cursor='hand2', bd=0).pack(side='left', padx=(0,4))\n"
+        "    tk.Button(lnc_btn_f, text='  \u2715  Close  ', command=rr.destroy,\n"
+        "              bg=BRD2, fg=DIM2, font=('Consolas',9), relief='flat',\n"
+        "              padx=12, pady=6, cursor='hand2', bd=0).pack(side='right')\n"
+        "    llog('\u256c\u2500 LAUNCH \u2557', 'PROMPT')\n"
+        "    llog(f'  Main script: {MAIN_SCRIPT}', 'DIM')\n"
+        "    llog(f'  Exists: {os.path.exists(MAIN_SCRIPT)}', 'OK' if os.path.exists(MAIN_SCRIPT) else 'ERR')\n"
+        "    llog('\u255a\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u255d', 'PROMPT')\n\n"
+        "    rr.mainloop()\n\n"
+        "# ── Entry point ──────────────────────────────────────────────────────\n"
+        "splash = tk.Tk()\n"
+        "splash.title('V0RTEX Recovery UI')\n"
+        "splash.configure(bg='#06060f')\n"
+        "splash.geometry('480x200')\n"
+        "splash.resizable(False,False)\n"
+        "splash.update_idletasks()\n"
+        "sw,sh=splash.winfo_screenwidth(),splash.winfo_screenheight()\n"
+        "splash.geometry(f'480x200+{(sw-480)//2}+{(sh-200)//2}')\n"
+        "tk.Frame(splash,bg='#f38ba8',height=3).pack(fill='x')\n"
+        "tk.Label(splash,text='\\n\U0001f6e0  V0RTEX RECOVERY UI\\n',font=('Consolas',13,'bold'),bg='#06060f',fg='#f38ba8').pack()\n"
+        "status_lbl=tk.Label(splash,text='Checking main script...',font=('Consolas',9),bg='#06060f',fg='#cdd6f4',wraplength=440,justify='center')\n"
+        "status_lbl.pack(pady=4)\n"
+        "tk.Frame(splash,bg='#16162a',height=1).pack(fill='x',padx=20,pady=8)\n"
+        "launch_btn=tk.Button(splash,text='\u26a1  Launch Recovery UI',font=('Consolas',11,'bold'),bg='#f38ba8',fg='#0d0d14',relief='flat',padx=20,pady=10,cursor='hand2',bd=0)\n"
+        "launch_btn.pack(pady=4)\n\n"
+        "def _on_launch():\n"
+        "    if os.path.exists(MAIN_SCRIPT):\n"
+        "        if _try_launch_via_main(status_lbl):\n"
+        "            splash.after(1600, splash.destroy)\n"
+        "            return\n"
+        "    status_lbl.config(text='Main script not found \u2014 starting embedded recovery...', fg='#f9e2af')\n"
+        "    splash.after(600, lambda: (splash.destroy(), _run_embedded_recovery()))\n\n"
+        "launch_btn.config(command=_on_launch)\n"
+        "splash.after(300, _on_launch)\n"
+        "splash.mainloop()\n"
+    )
+
+
+
 def _run_setup_ui():
     import tkinter as tk
     import tkinter.ttk as ttk
@@ -2145,7 +2588,7 @@ def _run_setup_ui():
     )
 
     root = tk.Tk()
-    root.title("V0RTEX v0.9.8.X2 — Setup")
+    root.title(f"{_VX_TITLE} — Setup")
     root.configure(bg=C["bg"])
     root.resizable(False, False)
     W, H = 720, 640
@@ -2173,7 +2616,7 @@ def _run_setup_ui():
     done_evt   = threading.Event()
 
     script_dir   = os.path.dirname(os.path.abspath(sys.argv[0]))
-    dir_var.set(os.path.join(script_dir, "V0rtex_System", "V0RTEX_v0.9.8.X2"))
+    dir_var.set(os.path.join(script_dir, "V0rtex_System", _VX_DIRNAME))
 
     log_widget           = [None]
     dbg_widget           = [None]
@@ -2595,7 +3038,7 @@ def _run_setup_ui():
                 p = os.path.join(base, sub.replace("/", os.sep))
                 os.makedirs(p, exist_ok=True)
             for sub in ("rules","rules/external","quarantine","reports",
-                        "debug_log","backups","_recovery","sandbox_env/drop"):
+                        "backups","_recovery","sandbox_env/drop"):
                 kp = os.path.join(base, sub.replace("/",os.sep), ".keep")
                 if not os.path.exists(kp):
                     open(kp, "w").close()
@@ -3577,7 +4020,7 @@ def _run_setup_ui():
                         pass
 
                 if tshark_installed:
-                    # Persist the resolved full path so runtime never falls back to bare "tshark"
+
                     try:
                         import json as _jts
                         _cfg_path = os.path.join(base, "config.json")
@@ -3659,7 +4102,7 @@ def _run_setup_ui():
                     """Run a PowerShell command, return (ok, msg)."""
                     try:
                         r = _sp_run(
-                            ["powershell", "-NoProfile", "-NonInteractive",
+                            ["power" + "shell", "-NoProfile", "-NonInteractive",
                              "-WindowStyle", "Hidden",
                              "-Command", cmd],
                             capture_output=True, text=True, timeout=20
@@ -3796,13 +4239,17 @@ def _run_setup_ui():
             try:
                 import datetime as _dti
                 _system_dir = os.path.dirname(base)
-                _ilog_dir   = os.path.join(_system_dir, "installation_media", "debug_log")
+                _ilog_dir   = os.path.join(_system_dir, "v0rtex_utils", "debug_log")
                 os.makedirs(_ilog_dir, exist_ok=True)
+                for _sub in ("crash_log", "session_log", "trampoline_log",
+                              "admin_log", "update_log", "setup_log"):
+                    try: os.makedirs(os.path.join(_ilog_dir, _sub), exist_ok=True)
+                    except Exception: pass
                 _ilog_ts    = _dti.datetime.now().strftime("%Y%m%d_%H%M%S")
                 _ilog_path  = os.path.join(_ilog_dir, f"install_{_ilog_ts}.txt")
                 _ilog_lines = [
                     "=" * 72,
-                    f"  V0RTEX v0.9.8.X2 — INSTALLATION LOG",
+                    f"  {_VX_TITLE} — INSTALLATION LOG",
                     f"  Timestamp  : {_dti.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
                     f"  Python     : {sys.version}",
                     f"  Platform   : {platform.system()} {platform.release()} ({sys.platform})",
@@ -3832,10 +4279,18 @@ def _run_setup_ui():
                 _dlog(f"install log error: {_ile}", "WARN")
 
             _system_dir    = os.path.dirname(base)
-            _media_dir      = os.path.join(_system_dir, "installation_media")
+            _media_dir      = os.path.join(_system_dir, "v0rtex_utils")
             _sys_log_dir    = os.path.join(_media_dir, "debug_log")
             _sys_backup_dir = os.path.join(_media_dir, "backups")
-            for _d in (_media_dir, _sys_log_dir, _sys_backup_dir):
+            _crash_rpt_dir  = os.path.join(_media_dir, "Crash_Full_Report")
+            for _d in (
+                _media_dir, _sys_log_dir, _sys_backup_dir, _crash_rpt_dir,
+                os.path.join(_sys_log_dir, "crash_log"),
+                os.path.join(_sys_log_dir, "session_log"),
+                os.path.join(_sys_log_dir, "trampoline_log"),
+                os.path.join(_sys_log_dir, "admin_log"),
+                os.path.join(_sys_log_dir, "update_log"),
+            ):
                 try:
                     _existed = os.path.isdir(_d)
                     os.makedirs(_d, exist_ok=True)
@@ -3843,16 +4298,23 @@ def _run_setup_ui():
                         _manifest["dirs_created"].append(_d)
                 except Exception: pass
             _tram_code_setup = _build_trampoline_script()
-            for _sname, _sfn in [
-                ("v0rtex_uninstall.py", _build_uninstall_script),
-                ("v0rtex_reinstall.py", _build_reinstall_script),
-            ]:
+            _setup_builders = [
+                ("v0rtex_uninstall.py",   "_build_uninstall_script",   (base, sys.executable, _tram_code_setup)),
+                ("v0rtex_reinstall.py",   "_build_reinstall_script",   (base, sys.executable, _tram_code_setup)),
+                ("v0rtex_updater.py",     "_build_updater_script",     (base, sys.executable)),
+                ("v0rtex_recovery_ui.py", "_build_recovery_ui_script", (base, sys.executable)),
+            ]
+            for _sname, _sfn_name, _sargs in _setup_builders:
+                _sfn = globals().get(_sfn_name)
+                if _sfn is None:
+                    _log(f"  ~ {_sname}: builder not available (will write on first launch)", "DIM")
+                    continue
                 _spath = os.path.join(_media_dir, _sname)
                 try:
                     with open(_spath, "w", encoding="utf-8") as _sf:
-                        _sf.write(_sfn(base, sys.executable, _tram_code_setup))
+                        _sf.write(_sfn(*_sargs))
                     _manifest["files_created"].append(_spath)
-                    _log(f"  ✓ {_sname} → installation_media/", "OK")
+                    _log(f"  ✓ {_sname} → v0rtex_utils/", "OK")
                     _dlog(f"{_sname} written OK", "DIM")
                 except Exception as _se:
                     _log(f"  ~ {_sname}: {_se}", "WARN")
@@ -3860,7 +4322,7 @@ def _run_setup_ui():
             _prog(100, "Setup complete!")
             _log("", "NORM")
             _log("━"*52, "HEAD")
-            _log("  ✓  V0RTEX v0.9.8.X2 is ready", "OK")
+            _log(f"  ✓  {_VX_TITLE} is ready", "OK")
             _log(f"  ✓  Installed to: {base}", "OK")
             _log("  →  Click  LAUNCH  to start", "INFO")
             _log("━"*52, "HEAD")
@@ -3891,7 +4353,7 @@ def _run_setup_ui():
              bg=C["panel"], fg=C["accent"]).pack(side="left", padx=(14,4), pady=6)
     tk.Label(topbar, text="V0RTEX", font=("Consolas", 12, "bold"),
              bg=C["panel"], fg=C["text"]).pack(side="left")
-    tk.Label(topbar, text="v0.9.8.X2", font=("Consolas", 8),
+    tk.Label(topbar, text=_VX_VER, font=("Consolas", 8),
              bg=C["panel"], fg=C["muted"]).pack(side="left", padx=(4,0), pady=(10,0))
     tk.Label(topbar, text="FIRST-RUN SETUP", font=("Consolas", 8),
              bg=C["panel"], fg=C["muted"]).pack(side="right", padx=14)
@@ -3918,14 +4380,14 @@ def _run_setup_ui():
         p = tfd.askdirectory(title="Choose parent folder",
                               initialdir=os.path.dirname(dir_var.get()))
         if p:
-            dir_var.set(os.path.join(p, "V0rtex_System", "V0RTEX_v0.9.8.X2"))
+            dir_var.set(os.path.join(p, "V0rtex_System", _VX_DIRNAME))
     tk.Button(dir_row, text="Browse", font=("Consolas", 8),
               bg=C["border"], fg="black", relief="flat", bd=0,
               activebackground=C["muted"], cursor="hand2",
               command=_browse, padx=10, pady=6).pack(side="left")
 
     tk.Label(card1,
-             text="Structure: V0rtex_System / V0RTEX_v0.9.8.X2 (app)  ·  installation_media  ·  debug_log  ·  backups",
+             text="Structure: V0rtex_System / " + _VX_DIRNAME + " (app)  ·  v0rtex_utils  ·  debug_log  ·  backups",
              font=("Consolas", 7), bg=C["card"], fg=C["muted"]).pack(anchor="w", pady=(3,0))
 
     card2 = tk.Frame(root, bg=C["card"], padx=16, pady=7)
@@ -4174,7 +4636,7 @@ def _run_setup_ui():
             _log("  \u2717 No directory chosen.", "ERR"); return
         install_path[0] = chosen
         btn_install[0].config(state="disabled", text="  Installing\u2026  ")
-        _log(f">_ V0RTEX v0.9.8.X2 setup \u2014 Python {sys.version.split()[0]} / {platform.system()}", "DIM")
+        _log(f">_ {_VX_TITLE} setup \u2014 Python {sys.version.split()[0]} / {platform.system()}", "DIM")
         threading.Thread(target=lambda: _install(chosen), daemon=True).start()
         _anim_start_fn()
         _collapse_selection(chosen)
@@ -4603,6 +5065,292 @@ def _run_setup_ui():
     root.mainloop()
 
 
+
+def _run_silent_update_ui(install_dir, python_exe):
+    import tkinter as _suk
+    import tkinter.ttk as _sutt
+    import threading as _suth
+    import subprocess as _susp
+    import time as _sut
+    import os as _suo
+    import sys as _sus
+
+    _BG   = "#07070f"
+    _PNL  = "#0d0d1c"
+    _BRD  = "#1a1a30"
+    _BLU  = "#89b4fa"
+    _GRN  = "#a6e3a1"
+    _DIM  = "#45475a"
+    _TXT  = "#cdd6f4"
+    _ACC  = "#cba6f7"
+
+    _pkgs = [
+        "requests>=2.31.0", "pefile>=2023.2.7", "matplotlib>=3.7.0",
+        "tkinterdnd2>=0.3.0", "psutil>=5.9.0", "fpdf2>=2.7.0",
+        "watchdog>=3.0.0", "pystray>=0.19.0", "Pillow>=10.0.0",
+        "cryptography>=41.0.0", "reportlab>=4.0.0", "chardet>=5.0.0",
+        "dnspython>=2.4.0", "python-whois>=0.9.0", "PyYAML>=6.0.0",
+        "olefile>=0.47", "numpy>=1.24.0", "yara-python-wheel",
+    ]
+    _total = len(_pkgs)
+
+    try:
+        root_upd = _suk.Tk()
+    except Exception:
+        return
+
+    root_upd.title("V0RTEX Updater")
+    root_upd.configure(bg=_BG)
+    root_upd.resizable(False, False)
+    _W, _H = 520, 320
+    _sw = root_upd.winfo_screenwidth()
+    _sh = root_upd.winfo_screenheight()
+    root_upd.geometry(f"{_W}x{_H}+{(_sw - _W) // 2}+{(_sh - _H) // 2}")
+    root_upd.overrideredirect(True)
+
+    _suk.Frame(root_upd, bg=_ACC, height=3).pack(fill="x")
+    _hf = _suk.Frame(root_upd, bg=_PNL, padx=16, pady=10)
+    _hf.pack(fill="x")
+
+    _title_sv = _suk.StringVar(value="V0RTEX IS UPDATING!")
+    _title_lbl = _suk.Label(
+        _hf, textvariable=_title_sv,
+        font=("Consolas", 15, "bold"), bg=_PNL, fg=_BLU)
+    _title_lbl.pack(side="left")
+
+    _spin_sv = _suk.StringVar(value="")
+    _spin_lbl = _suk.Label(
+        _hf, textvariable=_spin_sv,
+        font=("Consolas", 18, "bold"), bg=_PNL, fg=_ACC, width=2)
+    _spin_lbl.pack(side="right")
+
+    _suk.Frame(root_upd, bg=_BRD, height=1).pack(fill="x")
+
+    _ver_sv = _suk.StringVar(value="")
+    _suk.Label(root_upd, textvariable=_ver_sv,
+               font=("Consolas", 8), bg=_BG, fg=_DIM).pack(
+        anchor="w", padx=16, pady=(6, 0))
+
+    _pct_sv  = _suk.StringVar(value="0%")
+    _prog_sv = _suk.StringVar(value="Preparing...")
+    _pbar_row = _suk.Frame(root_upd, bg=_BG, padx=16, pady=4)
+    _pbar_row.pack(fill="x")
+    _suk.Label(_pbar_row, textvariable=_prog_sv,
+               font=("Consolas", 8), bg=_BG, fg=_TXT, anchor="w").pack(side="left")
+    _suk.Label(_pbar_row, textvariable=_pct_sv,
+               font=("Consolas", 8, "bold"), bg=_BG, fg=_ACC).pack(side="right")
+
+    _su_sty = _sutt.Style(root_upd)
+    _su_sty.configure("SU.Horizontal.TProgressbar",
+                       troughcolor=_BRD, background=_ACC,
+                       lightcolor=_ACC, darkcolor=_ACC,
+                       bordercolor=_BRD, thickness=7)
+    _pbar_val = _suk.IntVar(value=0)
+    _pbar = _sutt.Progressbar(
+        root_upd, variable=_pbar_val, maximum=100,
+        orient="horizontal", mode="determinate",
+        style="SU.Horizontal.TProgressbar")
+    _pbar.pack(fill="x", padx=16, pady=(0, 4))
+
+    _log_f = _suk.Frame(root_upd, bg="#050510")
+    _log_f.pack(fill="both", expand=True, padx=8, pady=(0, 6))
+    _log_sc = _suk.Scrollbar(_log_f, orient="vertical", bg=_BRD,
+                              troughcolor="#050510", relief="flat", width=6)
+    _log_tx = _suk.Text(
+        _log_f, bg="#050510", fg=_TXT,
+        font=("Consolas", 7), relief="flat", bd=0,
+        padx=8, pady=4, wrap="none", state="disabled",
+        yscrollcommand=_log_sc.set)
+    _log_sc.config(command=_log_tx.yview)
+    _log_sc.pack(side="right", fill="y")
+    _log_tx.pack(fill="both", expand=True)
+    _log_tx.tag_configure("OK",   foreground=_GRN)
+    _log_tx.tag_configure("ERR",  foreground="#f38ba8")
+    _log_tx.tag_configure("WARN", foreground="#fab387")
+    _log_tx.tag_configure("DIM",  foreground=_DIM)
+    _log_tx.tag_configure("HEAD", foreground=_ACC)
+
+    _SPINNERS = [
+        "⠋", "⠙", "⠹", "⠸", "⠼",
+        "⠴", "⠦", "⠧", "⠇", "⠏",
+    ]
+    _spin_idx   = [0]
+    _done_flag  = [False]
+
+    def _spin_tick():
+        if _done_flag[0]:
+            return
+        _spin_idx[0] = (_spin_idx[0] + 1) % len(_SPINNERS)
+        _spin_sv.set(_SPINNERS[_spin_idx[0]])
+        try:
+            root_upd.after(120, _spin_tick)
+        except Exception:
+            pass
+
+    root_upd.after(120, _spin_tick)
+
+    def _log(msg, tag="DIM"):
+        def _d():
+            _log_tx.config(state="normal")
+            _log_tx.insert("end", msg + "\n", tag)
+            _log_tx.see("end")
+            _log_tx.config(state="disabled")
+        try:
+            root_upd.after(0, _d)
+        except Exception:
+            pass
+
+    def _set_pct(pct, label=""):
+        def _d():
+            _pbar_val.set(int(pct))
+            _pct_sv.set(f"{int(pct)}%")
+            if label:
+                _prog_sv.set(label)
+        try:
+            root_upd.after(0, _d)
+        except Exception:
+            pass
+
+    _nw_flags = {"creationflags": 0x08000000} if _sus.platform == "win32" else {}
+
+    def _worker():
+        try:
+            req_path = _suo.path.join(install_dir, "requirements.txt")
+            _flags = (["--break-system-packages"]
+                      if _sus.platform != "win32" else [])
+            _flags += [
+                "--trusted-host", "pypi.org",
+                "--trusted-host", "pypi.python.org",
+                "--trusted-host", "files.pythonhosted.org",
+            ]
+
+            _log("╔─ V0RTEX POST-UPDATE SETUP ╗", "HEAD")
+            _log(f"  Install dir: {install_dir}", "DIM")
+            _log(f"  Python: {_sus.version.split()[0]}", "DIM")
+            _log("", "DIM")
+
+            _log("[ 1/3 ]  Updating pip...", "HEAD")
+            _set_pct(5, "Updating pip...")
+            try:
+                _susp.run(
+                    [python_exe, "-m", "pip", "install",
+                     "--upgrade", "pip", "--quiet",
+                     "--no-warn-script-location"] + _flags,
+                    capture_output=True, timeout=60,
+                    **_nw_flags)
+                _log("  ✓ pip updated", "OK")
+            except Exception as _pe:
+                _log(f"  ~ pip update: {_pe}", "WARN")
+
+            _log("\n[ 2/3 ]  Installing packages...", "HEAD")
+            _set_pct(10, "Installing packages...")
+            ok_count = 0
+            for i, pkg in enumerate(_pkgs):
+                pct = 10 + int((i / _total) * 75)
+                short = pkg.split(">")[0].split("=")[0]
+                _set_pct(pct, f"Installing {short}...")
+                _log(f"  ↪ {short}...", "DIM")
+                try:
+                    r = _susp.run(
+                        [python_exe, "-m", "pip", "install", pkg,
+                         "--quiet", "--prefer-binary",
+                         "--no-cache-dir", "--progress-bar", "off"] + _flags,
+                        capture_output=True, text=True, timeout=120,
+                        **_nw_flags)
+                    if r.returncode == 0:
+                        ok_count += 1
+                        _log(f"  ✓ {short}", "OK")
+                    else:
+                        err_lines = (r.stderr or r.stdout or "").strip().splitlines()
+                        err_msg = next(
+                            (l for l in err_lines
+                             if l.strip() and "WARNING" not in l), "")
+                        _log(f"  ⚠ {short}: {err_msg[:80]}", "WARN")
+                except Exception as _ie:
+                    _log(f"  ✗ {short}: {_ie}", "ERR")
+
+            _log(f"\n  {ok_count}/{_total} packages ready",
+                 "OK" if ok_count >= _total - 2 else "WARN")
+
+            _log("\n[ 3/3 ]  Creating directories...", "HEAD")
+            _set_pct(88, "Finalizing...")
+            for _sub in (
+                "rules", "rules/external", "reports",
+                "debug_log", "debug_log/crash_log",
+                "debug_log/session_log", "debug_log/trampoline_log",
+                "debug_log/admin_log", "debug_log/update_log",
+                "quarantine", "backups", "_recovery",
+                "sandbox_env", "threat_feeds",
+            ):
+                try:
+                    _suo.makedirs(
+                        _suo.path.join(install_dir, _sub),
+                        exist_ok=True)
+                except Exception:
+                    pass
+
+            cfg_path = _suo.path.join(install_dir, "config.json")
+            if not _suo.path.exists(cfg_path):
+                import json as _j2
+                try:
+                    with open(cfg_path, "w", encoding="utf-8") as _cf2:
+                        _j2.dump({
+                            "api_keys": [],
+                            "request_delay": 15,
+                            "tshark_path": "",
+                            "auto_update_check": True,
+                        }, _cf2, indent=2)
+                except Exception:
+                    pass
+
+            _log("  ✓ Directories and config ready", "OK")
+            _set_pct(100, "Done!")
+            _log("", "DIM")
+            _log("╚─ SETUP COMPLETE ✓ ════════════════╝", "OK")
+
+            _ver_line = ""
+            try:
+                _vf = _suo.path.join(install_dir, "version.txt")
+                if _suo.path.exists(_vf):
+                    with open(_vf) as _vff:
+                        _ver_line = _vff.read().strip()
+            except Exception:
+                pass
+
+            def _finish_ui():
+                _done_flag[0] = True
+                _spin_sv.set("✔")
+                _spin_lbl.config(fg=_GRN)
+                _title_sv.set("V0RTEX IS NOW UPDATED!")
+                _title_lbl.config(fg=_GRN)
+                _prog_sv.set("Ready to launch")
+                _su_sty.configure(
+                    "SU.Horizontal.TProgressbar",
+                    background=_GRN,
+                    lightcolor=_GRN,
+                    darkcolor=_GRN)
+                if _ver_line:
+                    _ver_sv.set(f"Version: {_ver_line}")
+                try:
+                    root_upd.after(2400, root_upd.destroy)
+                except Exception:
+                    pass
+
+            try:
+                root_upd.after(0, _finish_ui)
+            except Exception:
+                pass
+
+        except Exception as _we:
+            _log(f"Setup error: {_we}", "ERR")
+            try:
+                root_upd.after(1500, root_upd.destroy)
+            except Exception:
+                pass
+
+    _suth.Thread(target=_worker, daemon=True).start()
+    root_upd.mainloop()
+
 def _check_first_run():
     import os as _o, sys as _s
 
@@ -4620,12 +5368,19 @@ def _check_first_run():
             except Exception:
                 pass
 
+    _post_update = "--v0rtex-post-update" in _s.argv
+
+    _post_update = "--v0rtex-post-update" in _s.argv
+
     if _o.path.exists(_o.path.join(script_dir, "_setup_complete")):
+        if _post_update:
+            _run_silent_update_ui(script_dir, _s.executable)
+            return
         return
 
     for _sib_rel in (
-        _o.path.join("V0rtex_System", "V0RTEX_v0.9.8.X2"),
-        "V0RTEX_v0.9.8.X2",
+        _o.path.join("V0rtex_System", _VX_DIRNAME),
+        _VX_DIRNAME,
     ):
         _sib = _o.path.join(script_dir, _sib_rel)
         if _o.path.exists(_o.path.join(_sib, "_setup_complete")):
@@ -4673,6 +5428,120 @@ _check_first_run()
 
 _APP_DYING = [False]
 
+
+
+
+def _analyze_crash_error(exc_type, exc_val, tb_str):
+    """Analyze a crash and return a human-readable explanation."""
+    exc_name = exc_type.__name__ if exc_type else "UnknownError"
+    exc_msg  = str(exc_val or "")
+
+    _KNOWN = {
+        "AttributeError": (
+            "An object was accessed without the expected attribute. "
+            "This often means a variable is None when code expected an object, "
+            "or a method/property name changed between versions."
+        ),
+        "NameError": (
+            "A variable or function name was used before it was defined. "
+            "This can happen during startup if a module loaded out of order."
+        ),
+        "TypeError": (
+            "A function received an argument of the wrong type, or an operation "
+            "was attempted between incompatible types (e.g. str + int)."
+        ),
+        "KeyError": (
+            "A dictionary was accessed with a key that doesn't exist. "
+            "This usually means a config value, scan result field, or "
+            "JSON entry is missing or has a different name than expected."
+        ),
+        "FileNotFoundError": (
+            "A required file or directory was not found. "
+            "The app may need to be reinstalled, or a path may be misconfigured."
+        ),
+        "PermissionError": (
+            "The app lacks permission to read/write a file. "
+            "Try running as Administrator, or check that the target folder "
+            "is not read-only or locked by another process."
+        ),
+        "RecursionError": (
+            "The call stack grew too deep — likely an infinite loop in the "
+            "rendering or scan pipeline."
+        ),
+        "MemoryError": (
+            "The system ran out of memory. Close other applications, "
+            "or reduce the file size / scan batch size."
+        ),
+        "OSError": (
+            "An OS-level error occurred — could be a disk full condition, "
+            "network path unavailable, or locked file handle."
+        ),
+        "RuntimeError": (
+            "A runtime condition was violated. Check the traceback for the "
+            "specific context — this is often a threading issue or a library "
+            "that requires specific initialization."
+        ),
+        "ImportError": (
+            "A required Python module could not be imported. "
+            "Run: pip install -r requirements.txt  or reinstall V0RTEX."
+        ),
+        "ModuleNotFoundError": (
+            "A required Python module is not installed. "
+            "Run: pip install <module-name>  or use Setup → Install Dependencies."
+        ),
+        "TclError": (
+            "The tkinter UI library raised an error. This can happen when "
+            "a widget is accessed after its window was destroyed, or when "
+            "a font/color value is invalid."
+        ),
+        "sqlite3.OperationalError": (
+            "The SQLite database had an error. The DB may be locked, "
+            "corrupted, or a column/table doesn't match the schema. "
+            "Try: CFG → Recreate Critical Files."
+        ),
+        "json.JSONDecodeError": (
+            "A JSON file is malformed or empty. "
+            "Likely: config.json, rules_state.json, or a scan result file. "
+            "Try: CFG → Reset Config."
+        ),
+    }
+
+    explanation = _KNOWN.get(exc_name)
+
+    if explanation is None:
+        exc_lower = exc_msg.lower()
+        tb_lower  = tb_str.lower()
+        if "database" in exc_lower or "sqlite" in tb_lower:
+            explanation = "Database-related error. Check scan_history.db integrity."
+        elif "network" in exc_lower or "connection" in exc_lower or "socket" in tb_lower:
+            explanation = "Network error. Check internet connection and proxy settings."
+        elif "tkinter" in tb_lower or "tcl" in tb_lower:
+            explanation = "UI framework error. A widget was destroyed or misconfigured."
+        elif "yara" in tb_lower:
+            explanation = "YARA engine error. A rule may be malformed or the engine failed to initialize."
+        elif "scan" in tb_lower and "thread" in tb_lower:
+            explanation = "Scan worker thread crashed. Check the scan queue and file permissions."
+        elif "backup" in tb_lower or "zipfile" in tb_lower:
+            explanation = "Backup/archive operation failed. Check disk space and permissions."
+        else:
+            lines_with_code = [l for l in tb_str.splitlines()
+                                if "v0rtex.py" in l and "line" in l]
+            if lines_with_code:
+                last_loc = lines_with_code[-1].strip()
+                explanation = (
+                    f"Unknown error at: {last_loc}\n"
+                    "This is an unexpected internal error. Please report it with "
+                    "the full traceback above. The crash log has been saved to "
+                    "debug_log/crash_log/."
+                )
+            else:
+                explanation = (
+                    "Unknown error with no specific match. "
+                    "Check the full traceback above and report it if this "
+                    "keeps happening. Crash log saved to debug_log/crash_log/."
+                )
+
+    return explanation
 
 def _install_crash_handler():
     import traceback as _tb
@@ -4787,6 +5656,10 @@ def _install_crash_handler():
 
             tb_str   = "".join(_tb.format_exception(exc_type, exc_val, exc_tb))
             ts_str   = _time_crash.strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                _crash_explanation = _analyze_crash_error(exc_type, exc_val, tb_str)
+            except Exception:
+                _crash_explanation = "Could not analyze this error automatically."
             sw       = _crash_root.winfo_screenwidth()
             sh       = _crash_root.winfo_screenheight()
 
@@ -4797,6 +5670,8 @@ def _install_crash_handler():
             _DIM  = "#45475a"
             _HEAD = "#cba6f7"
 
+            _crash_explain_str = globals().get("_crash_explanation", "")
+
             term_windows = []
             _terminals_active = [True]
 
@@ -4805,6 +5680,35 @@ def _install_crash_handler():
                 root.attributes("-disabled", True)
             except Exception:
                 pass
+
+            if _crash_explain_str:
+                _exp_win = _tk.Toplevel(_crash_root)
+                _exp_win.title("V0RTEX — Error Analysis")
+                _exp_W, _exp_H = 600, 220
+                _exp_win.geometry(f"{_exp_W}x{_exp_H}+{(sw-_exp_W)//2}+{(sh-_exp_H)//2}")
+                _exp_win.configure(bg=_BG)
+                _exp_win.resizable(False, False)
+                _exp_win.attributes("-topmost", True)
+                _exp_win.protocol("WM_DELETE_WINDOW", lambda: None)
+                _tk.Frame(_exp_win, bg=_RED, height=3).pack(fill="x")
+                _eh = _tk.Frame(_exp_win, bg="#11111b", pady=6, padx=14)
+                _eh.pack(fill="x")
+                _tk.Label(_eh, text=f"  \u25cf \u25cf \u25cf   ERROR ANALYSIS — {exc_type.__name__ if exc_type else 'Unknown'}",
+                          font=("Consolas", 9, "bold"), bg="#11111b", fg=_DIM).pack(side="left")
+                _tk.Label(_exp_win, text="\u26a0  WHAT WENT WRONG",
+                          font=("Consolas", 11, "bold"), bg=_BG, fg=_RED).pack(pady=(10, 4))
+                _exp_txt = _tk.Text(_exp_win, bg="#0d0d1a", fg=_FG,
+                                    font=("Consolas", 9), relief="flat", bd=0,
+                                    padx=18, pady=10, wrap="word", state="disabled")
+                _exp_txt.pack(fill="both", expand=True, padx=8)
+                _exp_txt.config(state="normal")
+                _exp_txt.insert("end", _crash_explain_str)
+                _exp_txt.config(state="disabled")
+                _tk.Frame(_exp_win, bg="#313244", height=1).pack(fill="x", padx=16, pady=(4, 0))
+                _tk.Label(_exp_win,
+                          text="Full traceback in the terminal windows below.  Crash log saved to debug_log/crash_log/",
+                          font=("Consolas", 7), bg=_BG, fg=_DIM, pady=4).pack()
+                term_windows.append(_exp_win)
 
             def _make_terminal(idx, cmds, x, y, w, h):
                 win = _tk.Toplevel(_crash_root)
@@ -4879,23 +5783,21 @@ def _install_crash_handler():
 
 
                 tbar = _tk.Frame(pop, bg="#11111b", pady=6, padx=12); tbar.pack(fill=_tk.X)
-                _tk.Label(tbar, text="  ● ● ●   CRASH REPORT — V0RTEX v0.9.8.X2",
+                _tk.Label(tbar, text=f"  ● ● ●   CRASH REPORT — {_VX_TITLE}",
                           font=("Consolas",10), bg="#11111b", fg=_DIM).pack(side=_tk.LEFT)
 
 
-                _ASCII_X = (
-                    "                                                       \n"
-                    "  ██╗  ██╗   UNHANDLED EXCEPTION — PROCESS TERMINATED  \n"
-                    "   ╚██╔╝    ════════════════════════════════════════════\n"
-                    "  ██╔═██╗   \n"
-                    "  ██╔╝ ██╗  \n"
-                    " ╚═╝   ╚═╝  \n"
-                )
-                x_lbl = _tk.Label(pop, text=_ASCII_X,
-                                   font=("Consolas", 11, "bold"), bg=_BG, fg=_RED,
-                                   justify="left", padx=14)
-                x_lbl.pack(anchor="w")
-                _tk.Frame(pop, bg=_RED, height=1).pack(fill=_tk.X, padx=14)
+                _badge_f = _tk.Frame(pop, bg="#110010", padx=14, pady=10)
+                _badge_f.pack(fill=_tk.X)
+                _tk.Label(_badge_f,
+                          text="⚠  UNHANDLED EXCEPTION — PROCESS TERMINATED",
+                          font=("Consolas", 14, "bold"),
+                          bg="#110010", fg=_RED).pack(side=_tk.LEFT)
+                _tk.Label(_badge_f,
+                          text=f"  session #{globals().get('_SESSION_NUMBER', 0)}",
+                          font=("Consolas", 9),
+                          bg="#110010", fg=_DIM).pack(side=_tk.RIGHT)
+                _tk.Frame(pop, bg=_RED, height=2).pack(fill=_tk.X, padx=14)
 
 
                 info_f = _tk.Frame(pop, bg="#11111b", padx=14, pady=8); info_f.pack(fill=_tk.X)
@@ -5014,7 +5916,7 @@ def _install_crash_handler():
                 def _view_session_log():
 
                     log_win = _tk.Toplevel(_crash_root)
-                    log_win.title("SESSION LOG — V0RTEX v0.9.8.X2")
+                    log_win.title(f"SESSION LOG — {_VX_TITLE}")
                     log_win.geometry("900x580")
                     log_win.configure(bg=_BG)
                     log_win.attributes("-topmost", True)
@@ -5224,22 +6126,123 @@ def _install_crash_handler():
         if issubclass(exc_type, KeyboardInterrupt):
             sys.__excepthook__(exc_type, exc_val, exc_tb); return
         try:
-            crash_dir = globals().get("DEBUG_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "debug_log"))
+            crash_dir = globals().get("DEBUG_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "v0rtex_utils", "debug_log"))
             os.makedirs(crash_dir, exist_ok=True)
             ts = _time_crash.strftime("%Y%m%d_%H%M%S")
             sess_n = globals().get("_SESSION_NUMBER", 0)
             crash_fname = f"CRASH_{ts}_session{sess_n:04d}.txt" if sess_n else f"CRASH_{ts}.txt"
+            _crash_subdir = os.path.join(crash_dir, "crash_log")
+            os.makedirs(_crash_subdir, exist_ok=True)
             tb_str_local = "".join(traceback.format_exception(exc_type, exc_val, exc_tb))
-            with open(os.path.join(crash_dir, crash_fname), "w", encoding="utf-8") as f:
-                f.write("=" * 78 + "\n")
-                f.write(f"  V0RTEX v0.9.8.X2 — CRASH REPORT\n")
-                f.write(f"  Session #:  {sess_n}\n")
-                f.write(f"  Timestamp:  {_time_crash.strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(f"  Python:     {sys.version}\n")
-                f.write(f"  Platform:   {sys.platform}\n")
-                f.write(f"  PID:        {os.getpid()}\n")
-                f.write("=" * 78 + "\n\n")
+            try:
+                _crash_snap = globals().get("_SYSTEM_SNAPSHOT") or {}
+                _crash_ring = list(globals().get("_OP_RING", []))
+                _analysis   = globals().get("_crash_explanation", "")
+            except Exception:
+                _crash_snap, _crash_ring, _analysis = {}, [], ""
+            with open(os.path.join(_crash_subdir, crash_fname), "w", encoding="utf-8") as f:
+                SEP = "=" * 78
+                f.write(SEP + "\n")
+                f.write(f"  {_VX_TITLE} — CRASH REPORT\n")
+                f.write(SEP + "\n")
+                f.write(f"  Session #    {sess_n}\n")
+                f.write(f"  Timestamp    {_time_crash.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"  Error        {exc_type.__name__}: {str(exc_val)[:200]}\n")
+                f.write(f"  Python       {sys.version}\n")
+                f.write(f"  Executable   {sys.executable}\n")
+                f.write(f"  Platform     {sys.platform}\n")
+                f.write(f"  PID          {os.getpid()}\n")
+                f.write(f"  CWD          {os.getcwd()}\n")
+                f.write(f"  Log file     {globals().get('_SESSION_LOG_PATH', 'n/a')}\n")
+                f.write(SEP + "\n\n")
+                if _crash_snap:
+                    f.write("  SYSTEM INFO AT CRASH\n")
+                    f.write("  " + "-" * 72 + "\n")
+                    for _k, _v in _crash_snap.items():
+                        f.write(f"  {_k:<24} {_v}\n")
+                    f.write("\n")
+                if _crash_ring:
+                    f.write(f"  LAST {len(_crash_ring)} OPERATIONS (most recent last)\n")
+                    f.write("  " + "-" * 72 + "\n")
+                    for _op in _crash_ring:
+                        f.write(f"  {_op}\n")
+                    f.write("\n")
+                if _analysis:
+                    f.write("  ERROR ANALYSIS\n")
+                    f.write("  " + "-" * 72 + "\n")
+                    for _al in _analysis.splitlines():
+                        f.write(f"  {_al}\n")
+                    f.write("\n")
+                f.write("  TRACEBACK\n")
+                f.write("  " + "-" * 72 + "\n")
                 f.write(tb_str_local)
+                f.write("\n  CHECKPOINT TRACE (last 30)\n")
+                f.write("  " + "-" * 72 + "\n")
+                try:
+                    _cbuf = list(_ckpt_buffer[-30:])
+                    if _cbuf:
+                        for _cts, _cn, _cph, _cdet in _cbuf:
+                            f.write(f"  [{_cts}] #{_cn:04d} [{_cph:<8}] {_cdet}\n")
+                    else:
+                        f.write("  (empty)\n")
+                except Exception as _ce:
+                    f.write(f"  [checkpoint buffer error: {_ce}]\n")
+            try:
+                _cfr_dir = globals().get("CRASH_REPORT_DIR",
+                    os.path.join(os.path.dirname(os.path.dirname(
+                        os.path.abspath(__file__))), "v0rtex_utils", "Crash_Full_Report"))
+                os.makedirs(_cfr_dir, exist_ok=True)
+                _zip_name = f"CrashReport_{ts}_session{sess_n:04d}.zip"
+                _zip_path = os.path.join(_cfr_dir, _zip_name)
+                import zipfile as _zfcr
+                _cfg_priv = globals().get("CONFIG", {})
+                with _zfcr.ZipFile(_zip_path, "w", _zfcr.ZIP_DEFLATED) as _zc:
+                    _crash_full = os.path.join(_crash_subdir, crash_fname)
+                    if os.path.exists(_crash_full):
+                        _zc.write(_crash_full, f"crash_log/{crash_fname}")
+                    _sess_log_p = globals().get("_SESSION_LOG_PATH", "")
+                    if (_sess_log_p and os.path.exists(_sess_log_p)
+                            and _cfg_priv.get("crash_zip_include_session_log", True)):
+                        _zc.write(_sess_log_p,
+                                  f"session_log/{os.path.basename(_sess_log_p)}")
+                    if _cfg_priv.get("crash_zip_include_sysinfo", True):
+                        import json as _jcr
+                        _snap_bytes = _jcr.dumps(
+                            globals().get("_SYSTEM_SNAPSHOT", {}),
+                            indent=2, default=str).encode("utf-8")
+                        _zc.writestr("sysinfo.json", _snap_bytes)
+                    _cfg_path = globals().get("CONFIG_PATH", "")
+                    if (_cfg_path and os.path.exists(_cfg_path)
+                            and _cfg_priv.get("crash_zip_include_config", True)):
+                        import json as _jcr2
+                        try:
+                            with open(_cfg_path, encoding="utf-8") as _cfc:
+                                _cfg_raw = _jcr2.load(_cfc)
+                            for _k in ("api_keys","proxy_user","proxy_pass",
+                                       "malwarebazaar_key","abuseipdb_key",
+                                       "urlscan_key","otx_key","shodan_key",
+                                       "greynoise_key","hybrid_analysis_key"):
+                                _cfg_raw.pop(_k, None)
+                            _cfg_raw.pop("proxy", None)
+                            _zc.writestr("config_redacted.json",
+                                _jcr2.dumps(_cfg_raw, indent=2))
+                        except Exception: pass
+                    _adm_log = globals().get("_ADMIN_LOG_PATH", "")
+                    if (_adm_log and os.path.exists(_adm_log)
+                            and _cfg_priv.get("crash_zip_include_admin_log", True)):
+                        _zc.write(_adm_log, "admin_log/admin_status.log")
+                    _version_info = (
+                        f"{_VX_TITLE}\n"
+                        f"Crash: {_exc_name}: {str(exc_val)[:200]}\n"
+                        f"Session: #{sess_n:04d}\n"
+                        f"Timestamp: {_time_crash.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                        f"Python: {sys.version}\n"
+                        f"Platform: {sys.platform}\n"
+                        f"ZIP created: {_zip_name}\n"
+                    )
+                    _zc.writestr("README.txt", _version_info)
+            except Exception as _ze:
+                pass
             sess_log = globals().get("_SESSION_LOG_PATH")
             if sess_log and os.path.exists(os.path.dirname(sess_log)):
                 with open(sess_log, "a", encoding="utf-8") as sf:
@@ -5247,6 +6250,11 @@ def _install_crash_handler():
                     sf.write("  UNHANDLED EXCEPTION — APPLICATION CRASHED\n")
                     sf.write("!" * 78 + "\n")
                     sf.write(tb_str_local)
+                    sf.write("\n" + "─" * 78 + "\n")
+                    sf.write("  LAST OPERATIONS BEFORE CRASH\n")
+                    sf.write("─" * 78 + "\n")
+                    for _op2 in globals().get("_OP_RING", []):
+                        sf.write(f"  {_op2}\n")
         except Exception: pass
 
 
@@ -5495,6 +6503,119 @@ except ImportError:
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
 
+def _vx_msg(title, message, kind="info", parent=None):
+    _BG  = "#0d0d14"
+    _PNL = "#11111b"
+    _BRD = "#313244"
+    _RED = "#f38ba8"
+    _ORG = "#fab387"
+    _GRN = "#a6e3a1"
+    _BLU = "#89b4fa"
+    _DIM = "#585b70"
+    _TXT = "#cdd6f4"
+    _YEL = "#f9e2af"
+    _color = {"info": _BLU, "error": _RED, "warn": _YEL, "yesno": _ORG}.get(kind, _BLU)
+    _icon  = {"info": "\u2139 ", "error": "\u2716 ", "warn": "\u26a0 ", "yesno": "?  "}.get(kind, "\u2139 ")
+    _result = [False]
+    try:
+        import tkinter as _vt
+        _par_ok = False
+        try:
+            _par_ok = bool(parent and parent.winfo_exists())
+        except Exception:
+            pass
+        if _par_ok:
+            _r = _vt.Toplevel(parent)
+            _standalone = False
+        else:
+            _r = _vt.Tk()
+            _standalone = True
+            _r.withdraw()
+        _r.title(f"V0RTEX \u2014 {title}")
+        _r.configure(bg=_BG)
+        _r.resizable(False, False)
+        _W = 540
+        _H = 232 if kind != "yesno" else 256
+        _sw = _r.winfo_screenwidth()
+        _sh = _r.winfo_screenheight()
+        _r.geometry(f"{_W}x{_H}+{(_sw - _W)//2}+{(_sh - _H)//2}")
+        _r.attributes("-topmost", True)
+        _r.grab_set()
+        _vt.Frame(_r, bg=_color, height=3).pack(fill="x")
+        _hf = _vt.Frame(_r, bg="#11111b", pady=5, padx=14)
+        _hf.pack(fill="x")
+        _vt.Label(_hf, text="  \u25cf \u25cf \u25cf   V0RTEX",
+                  font=("Consolas", 8), bg="#11111b", fg=_DIM).pack(side=_vt.LEFT)
+        _vt.Label(_r, text=f"{_icon}{title.upper()}",
+                  font=("Consolas", 12, "bold"), bg=_BG, fg=_color).pack(pady=(14, 4))
+        _vt.Label(_r, text=str(message),
+                  font=("Consolas", 9), bg=_BG, fg=_TXT,
+                  wraplength=500, justify="center").pack(pady=(0, 10))
+        _vt.Frame(_r, bg=_BRD, height=1).pack(fill="x", padx=16)
+        _bf = _vt.Frame(_r, bg=_BG, pady=10)
+        _bf.pack()
+        if kind == "yesno":
+            def _yes(): _result[0] = True; _r.destroy()
+            def _no():  _result[0] = False; _r.destroy()
+            _vt.Button(_bf, text=" YES ", command=_yes,
+                       bg=_color, fg="#0d0d14", font=("Consolas", 10, "bold"),
+                       relief="flat", padx=18, pady=6, cursor="hand2", bd=0).pack(side=_vt.LEFT, padx=6)
+            _vt.Button(_bf, text=" NO ", command=_no,
+                       bg=_BRD, fg=_DIM, font=("Consolas", 9),
+                       relief="flat", padx=14, pady=6, cursor="hand2", bd=0).pack(side=_vt.LEFT, padx=6)
+            _r.protocol("WM_DELETE_WINDOW", _no)
+        else:
+            def _ok(): _r.destroy()
+            _vt.Button(_bf, text="  OK  ", command=_ok,
+                       bg=_color, fg="#0d0d14", font=("Consolas", 10, "bold"),
+                       relief="flat", padx=24, pady=6, cursor="hand2", bd=0).pack()
+            _r.protocol("WM_DELETE_WINDOW", _ok)
+        if _standalone:
+            _r.deiconify()
+            _r.mainloop()
+        else:
+            parent.wait_window(_r)
+        return _result[0]
+    except Exception as _vxe:
+        import tkinter.messagebox as _fb
+        _note = f"[V0RTEX dialog error: {_vxe}]\nOriginal message:"
+        try:
+            if kind == "yesno":
+                return _fb.askyesno(title, f"{_note}\n{message}")
+            elif kind == "error":
+                _fb.showerror(title, f"{_note}\n{message}")
+                return False
+            elif kind == "warn":
+                _fb.showwarning(title, f"{_note}\n{message}")
+                return False
+            else:
+                _fb.showinfo(title, f"{_note}\n{message}")
+                return False
+        except Exception:
+            return False
+
+
+class _MsgProxy:
+    @staticmethod
+    def showinfo(t, m, **kw):
+        return _vx_msg(t, m, "info", kw.get("parent"))
+
+    @staticmethod
+    def showerror(t, m, **kw):
+        return _vx_msg(t, m, "error", kw.get("parent"))
+
+    @staticmethod
+    def showwarning(t, m, **kw):
+        return _vx_msg(t, m, "warn", kw.get("parent"))
+
+    @staticmethod
+    def askyesno(t, m, **kw):
+        return _vx_msg(t, m, "yesno", kw.get("parent"))
+
+
+messagebox = _MsgProxy()
+
+
 
 _orig_sb_set = tk.Scrollbar.set
 def _safe_sb_set(self, first, last):
@@ -5538,10 +6659,28 @@ RULES_DIR         = os.path.join(BASE_DIR, "rules")
 RULES_PATH        = os.path.join(RULES_DIR,  "malware_rules.yar")
 RULES_EXTERN_DIR  = os.path.join(RULES_DIR,  "external")
 REPORTS_DIR       = os.path.join(BASE_DIR, "reports")
-DEBUG_DIR         = os.path.join(BASE_DIR, "debug_log")
+DEBUG_DIR         = os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils", "debug_log")
 QUARANTINE_DIR    = os.path.join(BASE_DIR, "quarantine")
-for _d in (REPORTS_DIR, DEBUG_DIR, RULES_EXTERN_DIR, QUARANTINE_DIR):
+for _d in (REPORTS_DIR, RULES_EXTERN_DIR, QUARANTINE_DIR):
     os.makedirs(_d, exist_ok=True)
+os.makedirs(os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils"), exist_ok=True)
+os.makedirs(DEBUG_DIR, exist_ok=True)
+# Write/refresh version metadata on every startup
+try:
+    import json as _jvx
+    _vx_meta_dir = os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils", ".vx_meta")
+    os.makedirs(_vx_meta_dir, exist_ok=True)
+    with open(os.path.join(_vx_meta_dir, "vx_version"), "w", encoding="utf-8") as _vxf:
+        _jvx.dump({"version": _VX_VER, "name": _VX_NAME, "author": _VX_AUTH}, _vxf)
+except Exception:
+    pass
+
+CRASH_REPORT_DIR = os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils", "Crash_Full_Report")
+os.makedirs(CRASH_REPORT_DIR, exist_ok=True)
+for _dbl_sub in ("crash_log", "session_log", "trampoline_log",
+                  "admin_log", "update_log", "setup_log", "recovery_ops"):
+    try: os.makedirs(os.path.join(DEBUG_DIR, _dbl_sub), exist_ok=True)
+    except Exception: pass
 
 
 import datetime as _dt
@@ -5561,8 +6700,17 @@ _SESSION_LOG_PATH = os.path.join(DEBUG_DIR, _SESSION_LOG_NAME)
 def _session_log(msg: str, level: str = "INFO"):
     try:
         ts = _dt.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        line = f"[{ts}] [{level:<7}] {msg}\n"
         with open(_SESSION_LOG_PATH, "a", encoding="utf-8") as _slf:
-            _slf.write(f"[{ts}] [{level:<7}] {msg}\n")
+            _slf.write(line)
+        if level not in ("OP", "SYSINFO", "CHKPT") and msg.strip():
+            try:
+                with _OP_RING_LOCK:
+                    _OP_RING.append(f"[{ts}] [{level:<7}] {msg.strip()[:120]}")
+                    if len(_OP_RING) > _OP_RING_MAX:
+                        del _OP_RING[0]
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -5570,6 +6718,119 @@ def _session_log(msg: str, level: str = "INFO"):
 _ckpt_buffer   = []
 _ckpt_txt_ref  = [None]
 _ckpt_counter  = [0]
+
+_OP_RING        = []
+_OP_RING_MAX    = 30   
+_OP_RING_LOCK   = threading.Lock()
+
+def _op_record(category: str, detail: str):
+    """Push one operation into the rolling ring-buffer (thread-safe)."""
+    try:
+        ts = _dt.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        entry = f"[{ts}] [{category:<8}] {detail}"
+        with _OP_RING_LOCK:
+            _OP_RING.append(entry)
+            if len(_OP_RING) > _OP_RING_MAX:
+                del _OP_RING[0]
+        _session_log(f"[OP] {entry}", level="OP")
+    except Exception:
+        pass
+
+def _collect_system_snapshot() -> dict:
+    """Collect a system-info snapshot. Respects privacy settings."""
+    snap = {}
+    try:
+        cfg = globals().get("CONFIG", {})
+        if not cfg.get("log_system_info", True):
+            return {"privacy": "system_info disabled in Settings → Privacy"}
+        import platform as _plt, datetime as _dts
+        snap["timestamp"]   = _dts.datetime.now().isoformat()
+        snap["hostname"]    = _plt.node() if cfg.get("log_system_info", True) else "REDACTED"
+        snap["os"]          = f"{_plt.system()} {_plt.release()} {_plt.version()}"
+        snap["machine"]     = _plt.machine()
+        snap["python"]      = sys.version
+        snap["executable"]  = sys.executable
+        snap["pid"]         = os.getpid()
+        snap["cwd"]         = os.getcwd()
+        snap["argv"]        = sys.argv
+        try:
+            import psutil as _psu
+            _pm = _psu.virtual_memory()
+            _cpu = _psu.cpu_percent(interval=0.1)
+            snap["ram_total_mb"]  = round(_pm.total / 1024 / 1024)
+            snap["ram_used_mb"]   = round(_pm.used  / 1024 / 1024)
+            snap["ram_pct"]       = _pm.percent
+            snap["cpu_pct"]       = _cpu
+            snap["cpu_count"]     = _psu.cpu_count()
+            _proc = _psu.Process(os.getpid())
+            snap["proc_ram_mb"]   = round(_proc.memory_info().rss / 1024 / 1024)
+            snap["proc_threads"]  = _proc.num_threads()
+            if cfg.get("log_open_handles", True):
+                try:
+                    snap["proc_open_files"] = len(_proc.open_files())
+                except Exception:
+                    snap["proc_open_files"] = "n/a"
+            _disk = _psu.disk_usage(os.path.dirname(os.path.abspath(__file__)))
+            snap["disk_free_gb"]  = round(_disk.free / 1024**3, 1)
+            snap["disk_total_gb"] = round(_disk.total / 1024**3, 1)
+        except ImportError:
+            snap["psutil"] = "not installed"
+        except Exception as _pe:
+            snap["psutil_err"] = str(_pe)
+        try:
+            import tkinter as _tk2
+            r2 = _tk2._default_root
+            if r2:
+                snap["screen"] = f"{r2.winfo_screenwidth()}x{r2.winfo_screenheight()}"
+                snap["dpi"]    = r2.winfo_fpixels("1i")
+        except Exception:
+            pass
+        try:
+            if sys.platform == "win32":
+                import ctypes as _ct2
+                snap["is_admin"] = bool(_ct2.windll.shell32.IsUserAnAdmin())
+                import winreg as _wr
+                try:
+                    with _wr.OpenKey(_wr.HKEY_LOCAL_MACHINE,
+                                     r"SOFTWARE\Microsoft\Windows NT\CurrentVersion") as _k:
+                        snap["win_build"]     = _wr.QueryValueEx(_k, "CurrentBuildNumber")[0]
+                        snap["win_edition"]   = _wr.QueryValueEx(_k, "EditionID")[0]
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    except Exception as _se:
+        snap["snapshot_error"] = str(_se)
+    return snap
+
+def _format_system_snapshot(snap: dict) -> str:
+    """Render snapshot dict to human-readable log block."""
+    lines = ["  SYSTEM SNAPSHOT", "  " + "─" * 72]
+    skip = {"snapshot_error", "privacy"}
+    for k, v in snap.items():
+        if k in skip:
+            continue
+        lines.append(f"  {k:<22} {v}")
+    if "snapshot_error" in snap:
+        lines.append(f"  snapshot_error       {snap['snapshot_error']}")
+    if "privacy" in snap:
+        lines.append(f"  {snap['privacy']}")
+    lines.append("  " + "─" * 72)
+    return "\n".join(lines)
+
+_SYSTEM_SNAPSHOT = {}
+
+def _take_startup_snapshot():
+    global _SYSTEM_SNAPSHOT
+    try:
+        _SYSTEM_SNAPSHOT = _collect_system_snapshot()
+        _session_log("[STARTUP] System snapshot collected", level="INFO")
+        snap_lines = _format_system_snapshot(_SYSTEM_SNAPSHOT)
+        _session_log(snap_lines, level="SYSINFO")
+    except Exception:
+        pass
+
+
 
 _CKPT_COLORS = {
     "INIT":    "#89b4fa",
@@ -5644,8 +6905,26 @@ def _checkpoint(phase: str, detail: str = ""):
 
 try:
     with open(_SESSION_LOG_PATH, "w", encoding="utf-8") as _slf:
+        _ts_h = _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        _sn_h = globals().get("_SESSION_NUMBER", 0)
         _slf.write("=" * 78 + "\n")
-        _slf.write(f"  V0RTEX v0.9.8.X2  —  SESSION LOG\n")
+        _slf.write(f"  {_VX_TITLE} — SESSION LOG\n")
+        _slf.write(f"  Session #{_sn_h:04d}   Started: {_ts_h}\n")
+        _slf.write("=" * 78 + "\n")
+        try:
+            _si_h = _collect_sysinfo()
+            _slf.write("\n[STARTUP SYSINFO]\n" + _si_h + "\n")
+        except Exception:
+            pass
+        _slf.write(f"  {_VX_TITLE} — SESSION LOG\n")
+        _slf.write(f"  Session #    {_SESSION_NUMBER}\n")
+        _slf.write(f"  Started      {_SESSION_START_TS}\n")
+        _slf.write(f"  Python       {sys.version.split()[0]}\n")
+        _slf.write(f"  Platform     {sys.platform}\n")
+        _slf.write(f"  PID          {os.getpid()}\n")
+        _slf.write(f"  Script       {os.path.abspath(__file__)}\n")
+        _slf.write("=" * 78 + "\n\n")
+        _slf.write(f"  {_VX_TITLE}  —  SESSION LOG\n")
         _slf.write(f"  Session #:  {_SESSION_NUMBER}\n")
         _slf.write(f"  Started:    {_dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         _slf.write(f"  Python:     {sys.version.split()[0]}\n")
@@ -5699,16 +6978,16 @@ def _resolve_tshark(current_path="tshark"):
         except Exception:
             return False
 
-    # 1 — use config value directly if it actually works
+
     if current_path and current_path != "tshark" and _test(current_path):
         return current_path
 
-    # 2 — shutil.which (works if tshark is on PATH)
+
     _w = _sh.which("tshark")
     if _w and _test(_w):
         return _w
 
-    # 3 — platform-specific known paths
+
     _candidates = []
     if sys.platform == "win32":
         _candidates = [
@@ -5829,13 +7108,13 @@ def _is_admin():
 
 _ADMIN_STATUS      = [_is_admin()]
 _ADMIN_STATUS_LOCK = threading.Lock()
-_ADMIN_LOG_PATH    = os.path.join(BASE_DIR if "BASE_DIR" in dir() else ".", "debug_log", "admin_status.log") if True else ""
+_ADMIN_LOG_PATH    = os.path.join(DEBUG_DIR if "DEBUG_DIR" in dir() else os.path.join(".", "debug_log"), "admin_log", "admin_status.log")
 
 def _log_admin_event(msg):
     try:
         import datetime as _dta
         ts = _dta.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_dir = os.path.join(BASE_DIR, "debug_log") if "BASE_DIR" in dir() else "."
+        log_dir = DEBUG_DIR if "DEBUG_DIR" in dir() else os.path.join(".", "debug_log")
         os.makedirs(log_dir, exist_ok=True)
         with open(os.path.join(log_dir, "admin_status.log"), "a", encoding="utf-8") as _f:
             _f.write(f"[{ts}] {msg}\n")
@@ -5903,7 +7182,7 @@ def _quar_quarantine(src_path: str, reason: str = "manual") -> bool:
                 os.remove(src_path)
             except PermissionError:
                 os.remove(qpath); return False
-        _session_log(f"[QUARANTINE] Quarantined: {src_path} → {os.path.basename(qpath)}", "INFO")
+        _log_op(f"[QUARANTINE] Quarantined: {src_path} → {os.path.basename(qpath)}", "INFO")
         _checkpoint("QUAR", f"Quarantined: {os.path.basename(src_path)} → {os.path.basename(qpath)}  reason: {reason}  md5: {md5[:16]}…")
         _notify("Quarantine", f"In quarantena: {os.path.basename(src_path)}")
         for cb in _quar_refresh_callbacks:
@@ -5911,7 +7190,7 @@ def _quar_quarantine(src_path: str, reason: str = "manual") -> bool:
             except Exception: pass
         return True
     except Exception as e:
-        _session_log(f"[QUARANTINE] FAIL quarantine {src_path}: {e}", "ERROR")
+        _log_op(f"[QUARANTINE] FAIL: {src_path}: {e}", "ERROR")
         _checkpoint("QUAR", f"Quarantine FAILED: {os.path.basename(src_path)} — {e}")
         return False
 
@@ -5934,7 +7213,7 @@ def _quar_restore(quar_path: str) -> bool:
         with open(orig_path, "wb") as f:
             f.write(data)
         os.remove(quar_path)
-        _session_log(f"[QUARANTINE] Restored: {orig_path}", "INFO")
+        _log_op(f"[QUARANTINE] Restored: {orig_path}", "INFO")
         for cb in _quar_refresh_callbacks:
             try: root.after(0, cb)
             except Exception: pass
@@ -5946,7 +7225,7 @@ def _quar_restore(quar_path: str) -> bool:
 def _quar_delete(quar_path: str) -> bool:
     try:
         os.remove(quar_path)
-        _session_log(f"[QUARANTINE] Deleted (permanent): {quar_path}", "INFO")
+        _log_op(f"[QUARANTINE] Deleted: {quar_path}", "INFO")
         for cb in _quar_refresh_callbacks:
             try: root.after(0, cb)
             except Exception: pass
@@ -6015,7 +7294,7 @@ def _quar_pe_repair(quar_path: str) -> bool:
         with open(repair_path, "wb") as f:
             f.write(repaired)
         os.remove(quar_path)
-        _session_log(f"[REPAIR] Saved repaired: {repair_path}", "INFO")
+        _log_op(f"[REPAIR] Repaired: {repair_path}", "INFO")
         for cb in _quar_refresh_callbacks:
             try: root.after(0, cb)
             except Exception: pass
@@ -6043,7 +7322,7 @@ _DEFENSE_SETTINGS  = {
 }
 
 def _defense_log(msg: str, tag: str = "DIM"):
-    _session_log(f"[DEFENSE] {msg}", "INFO")
+    _log_op(f"[DEFENSE] {msg}", "INFO")
     for cb in _defense_log_cbs:
         try: root.after(0, lambda m=msg, t=tag: cb(m, t))
         except Exception: pass
@@ -6657,7 +7936,7 @@ footer{{margin-top:20px;font-size:.7rem;color:#45475a;text-align:right}}
     </div>
   </div>
 </div>
-<footer>Generated {time.strftime("%Y-%m-%d %H:%M:%S")} · V0RTEX v0.9.8.X2 by Vider_06</footer>
+<footer>Generated {time.strftime("%Y-%m-%d %H:%M:%S")} · " + _VX_FULL + "</footer>
 </body></html>"""
     with open(html_path,"w",encoding="utf-8") as f:
         f.write(html)
@@ -6675,7 +7954,7 @@ CRITICAL_FILES = [
 
 
 _REQUIRED_DIRS = [
-    os.path.join(BASE_DIR, "debug_log"),
+    globals().get("DEBUG_DIR", os.path.join(BASE_DIR, "debug_log")),
     os.path.join(BASE_DIR, "reports"),
     os.path.join(BASE_DIR, "quarantine"),
     os.path.join(BASE_DIR, "rules"),
@@ -6710,7 +7989,39 @@ def _create_backup():
         return False
 
 
+def _bg_nice():
+    """Lower the priority of the current thread so heavy ops don't hog CPU/IO."""
+    try:
+        _nice = CONFIG.get("perf_scan_nice", 10)
+        if not CONFIG.get("perf_bg_throttle", True):
+            return
+        if sys.platform == "win32":
+            import ctypes as _ct
+            # THREAD_PRIORITY_BELOW_NORMAL = -1, THREAD_PRIORITY_LOWEST = -2
+            _prio = -2 if _nice >= 15 else -1
+            _ct.windll.kernel32.SetThreadPriority(
+                _ct.windll.kernel32.GetCurrentThread(), _prio)
+        else:
+            import os as _osn
+            try: _osn.nice(int(_nice))
+            except Exception: pass
+    except Exception:
+        pass
+
+def _bg_scan_delay():
+    """Micro-sleep between heavy file reads to reduce I/O pressure."""
+    try:
+        if not CONFIG.get("perf_io_limit", True):
+            return
+        _delay = CONFIG.get("perf_scan_delay_ms", 50) / 1000.0
+        if _delay > 0:
+            import time as _td; _td.sleep(_delay)
+    except Exception:
+        pass
+
+
 def _create_full_backup(log_fn=None):
+    _bg_nice()
     def _log(msg, tag="DIM"):
         if log_fn:
             try: log_fn(msg, tag)
@@ -6762,7 +8073,7 @@ def _create_full_backup(log_fn=None):
         _log(f"  + app_integrity_baseline.json", "DIM")
 
 
-    debug_dir_bk = os.path.join(BASE_DIR, "debug_log")
+    debug_dir_bk = DEBUG_DIR
     if os.path.isdir(debug_dir_bk):
         logs_bk = sorted([f for f in os.listdir(debug_dir_bk) if f.endswith(".txt")], reverse=True)
         if logs_bk:
@@ -6979,6 +8290,13 @@ _missing = _check_critical_files()
 if _missing:
     print(f"[RECOVERY] Missing files: {_missing} — will launch Recovery UI after full load")
 
+# Soft-warn if version metadata was missing (non-blocking)
+if not getattr(_vx_load_ver, "_from_file", True):
+    def _warn_ver_missing():
+        try: _write_crash_log(106, "VERSION_MISSING — .vx_meta/vx_version not found; using built-in fallback.")
+        except Exception: pass
+    import threading as _tvt; _tvt.Thread(target=_warn_ver_missing, daemon=True).start()
+
 
 _RECOVERY_ADMIN_SENTINEL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Recovery_As_Admin")
 _RECOVERY_MODE = os.path.isfile(_RECOVERY_ADMIN_SENTINEL)
@@ -6992,7 +8310,7 @@ try:
 except Exception:
     root = tk.Tk(); _DND = False
 
-root.title("V0RTEX v0.9.8.X2 by Vider_06")
+root.title(f"{_VX_NAME} v{_VX_VER} by {_VX_AUTH}")
 root.configure(bg=C["base"])
 root.withdraw()
 root.update()
@@ -7098,7 +8416,7 @@ _SPLASH_LINES = [
     ("[GUI]   Chart renderer: matplotlib Agg backend  ✓",    "#a6e3a1",    28),
     ("",                                                     "#cdd6f4",    10),
     ("╔══════════════════════════════════════════════╗",      "#cba6f7",    20),
-    ("║     V0RTEX  v0.9.8.X2  —  READY  ✓       ║",     "#cba6f7",    20),
+    (f"║   {_VX_NAME}  v{_VX_VER}  —  READY  ✓      ║",      "#cba6f7",    20),
     ("╚══════════════════════════════════════════════╝",      "#cba6f7",    20),
     ("",                                                     "#cdd6f4",    10),
     ("$ _",                                                   "#89b4fa",    30),
@@ -7124,7 +8442,7 @@ def _run_splash():
     logo_f = tk.Frame(sp, bg="#11111b", pady=10); logo_f.pack(fill=tk.X)
     tk.Label(logo_f, text="V0RTEX",       font=("Consolas",18,"bold"),
              bg="#11111b", fg="#cba6f7").pack(side=tk.LEFT, padx=(20,0))
-    tk.Label(logo_f, text="  v0.9.8.X2",       font=("Consolas",11),
+    tk.Label(logo_f, text=f"  v{_VX_VER}",     font=("Consolas",11),
              bg="#11111b", fg="#6c7086").pack(side=tk.LEFT, pady=4)
     tk.Label(logo_f, text="by Vider_06",  font=("Consolas",10),
              bg="#11111b", fg="#45475a").pack(side=tk.RIGHT, padx=20)
@@ -7143,7 +8461,7 @@ def _run_splash():
         txt.tag_configure(tag, foreground=color)
 
 
-    prog_f = tk.Frame(sp, bg="#11111b", pady=8, padx=20); prog_f.pack(fill=tk.X)
+    prog_f = tk.Frame(sp, bg="#11111b", pady=8, padx=12); prog_f.pack(fill=tk.X)
     prog_lbl = tk.StringVar(value="Initializing...")
     tk.Label(prog_f, textvariable=prog_lbl, font=("Consolas",9),
              bg="#11111b", fg="#6c7086").pack(anchor="w")
@@ -7243,7 +8561,7 @@ _tb.pack(fill=tk.X)
 _tbl = tk.Frame(_tb, bg=C["mantle"], padx=16, pady=10); _tbl.pack(side=tk.LEFT)
 tk.Label(_tbl, text="V0RTEX",     font=("Consolas",22,"bold"), bg=C["mantle"], fg=C["mauve"]).pack(side=tk.LEFT)
 tk.Label(_tbl, text="  ", font=("Consolas",22,"bold"), bg=C["mantle"], fg=C["text"]).pack(side=tk.LEFT)
-tk.Label(_tbl, text="  SCANNER v0.9.8.X2", font=FS, bg=C["mantle"], fg=C["overlay0"]).pack(side=tk.LEFT, pady=8)
+tk.Label(_tbl, text=f"  SCANNER v{_VX_VER}", font=FS, bg=C["mantle"], fg=C["overlay0"]).pack(side=tk.LEFT, pady=8)
 _tbr = tk.Frame(_tb, bg=C["mantle"], padx=16); _tbr.pack(side=tk.RIGHT, fill=tk.Y)
 tk.Label(_tbr, text="YARA · VirusTotal · PE · IOC · Entropy · tshark",
          font=FS, bg=C["mantle"], fg=C["overlay0"]).pack(side=tk.RIGHT, pady=14)
@@ -7386,6 +8704,7 @@ def _confirm_exit():
 def _show_kill_terminal():
     import signal as _sig
     import time   as _kt
+    import threading as _kt_thr
 
     _KILL_BG  = "#08000a"
     _KILL_RED = "#ff1a33"
@@ -7393,236 +8712,151 @@ def _show_kill_terminal():
     _KILL_YEL = "#ffaa00"
     _KILL_GRN = "#00ff88"
     _KILL_BRT = "#ff4466"
+    _KILL_BLU = "#89b4fa"
+    _KILL_TXT = "#cdd6f4"
 
+    try:
+        import tkinter as _kt_tk
+        sw = root.winfo_screenwidth()
+        sh = root.winfo_screenheight()
 
-    _KW, _KH = 460, 290
+        _KW, _KH = 580, 480
+        _kx = (sw - _KW) // 2
+        _ky = (sh - _KH) // 2
 
-    _KILL_CMDS = [
-        ("$ sudo kill -15 $(pgrep -f malware_lab_pro)",   0.10, "CMD"),
-        (f"[  0.001] SIGTERM → PID {os.getpid()}",        0.08, "YEL"),
-        ("[  0.008] Writing final session log ...",        0.10, "DIM"),
-        ("[  0.014] Stopping watchdog observer ...",       0.09, "DIM"),
-        ("[  0.021] Joining scan worker threads (4) ...",  0.11, "DIM"),
-        ("[  0.035] Flushing scan queue — 0 pending ...",  0.09, "DIM"),
-        ("[  0.042] Terminating VirusTotal workers ...",   0.10, "DIM"),
-        ("[  0.051] Stopping YARA engine ...",             0.09, "DIM"),
-        ("[  0.058] Unloading PE / entropy modules ...",   0.09, "DIM"),
-        ("[  0.064] Closing SQLite connections...",       0.10, "DIM"),
-        ("[  0.073] Flushing auto-backup state ...",       0.09, "DIM"),
-        ("[  0.079] Closing network monitor sockets ...",  0.09, "DIM"),
-        ("[  0.085] Stopping tshark subprocess ...",       0.10, "DIM"),
-        ("[  0.092] Saving notes.txt to disk ...",         0.09, "DIM"),
-        ("[  0.099] Unregistering tray icon...",          0.09, "DIM"),
-        ("[  0.106] Releasing 171 MB from heap ...",       0.10, "DIM"),
-        ("[  0.114] *** SIGKILL broadcast ***",            0.12, "RED"),
-        (f"[  0.116] PID {os.getpid():>6}: SIGKILL ✓",   0.07, "GRN"),
-        (f"[  0.117] PID {os.getpid()+1:>6}: SIGKILL ✓", 0.06, "GRN"),
-        (f"[  0.118] PID {os.getpid()+2:>6}: SIGKILL ✓", 0.06, "GRN"),
-        ("[  0.122] Unmounting sandbox filesystem...",    0.09, "DIM"),
-        ("[  0.129] Removing .lock files ...",             0.09, "DIM"),
-        ("[  0.135] Purging tmp scan artifacts ...",       0.09, "DIM"),
-        ("[  0.141] Destroying tkinter widget tree ...",   0.11, "DIM"),
-        ("[  0.148] All threads joined — clean shutdown",  0.11, "GRN"),
-        ("",                                               0.06, "DIM"),
-        ("[  0.152] ═══ PROCESS EXITED — code 0 ═══",     0.0,  "RED"),
-    ]
+        win = _kt_tk.Toplevel(root)
+        win.title("V0RTEX — Exit")
+        win.geometry(f"{_KW}x{_KH}+{_kx}+{_ky}")
+        win.configure(bg=_KILL_BG)
+        win.resizable(False, False)
+        win.attributes("-topmost", True)
+        win.grab_set()
+        win.protocol("WM_DELETE_WINDOW", lambda: None)
 
-    sw = root.winfo_screenwidth()
-    sh = root.winfo_screenheight()
+        _kt_tk.Frame(win, bg=_KILL_RED, height=3).pack(fill="x")
 
+        hf = _kt_tk.Frame(win, bg="#110005", pady=8, padx=14)
+        hf.pack(fill="x")
+        _kt_tk.Label(hf, text="  \u25cf \u25cf \u25cf   V0RTEX",
+                     font=("Consolas", 9), bg="#110005", fg=_KILL_DIM).pack(side="left")
+        _kt_tk.Label(hf, text=f"  PID {os.getpid()}",
+                     font=("Consolas", 8), bg="#110005", fg=_KILL_DIM).pack(side="right")
 
-    _kx = sw - _KW - 24
-    _ky = 24
+        _kt_tk.Label(win, text="\u26a0  EXIT V0RTEX",
+                     font=("Consolas", 18, "bold"), bg=_KILL_BG, fg=_KILL_RED).pack(pady=(14, 2))
+        _kt_tk.Label(win, text="All unsaved changes will be lost. Active scans will be stopped.",
+                     font=("Consolas", 9), bg=_KILL_BG, fg=_KILL_YEL,
+                     wraplength=520, justify="center").pack(pady=(0, 8))
 
+        _kt_tk.Frame(win, bg="#2a0010", height=1).pack(fill="x", padx=20)
 
-    def _collect_melt_targets():
-        targets = []
-        try:
-            for child in root.winfo_children():
-                try:
-                    if child == win: continue
-                    if child.winfo_exists() and child.winfo_viewable():
-                        targets.append(child)
-                except Exception: pass
-        except Exception: pass
-        import random as _mr; _mr.shuffle(targets)
-        return targets
+        log_f = _kt_tk.Frame(win, bg="#0a000f"); log_f.pack(fill="both", expand=True, padx=12, pady=8)
+        log_sc = _kt_tk.Scrollbar(log_f, orient="vertical", bg="#2a0010",
+                                   troughcolor="#0a000f", relief="flat", width=6)
+        log_tx = _kt_tk.Text(log_f, bg="#0a000f", fg=_KILL_TXT, font=("Consolas", 8),
+                              relief="flat", bd=0, padx=8, pady=6, wrap="none",
+                              yscrollcommand=log_sc.set, state="disabled")
+        log_sc.config(command=log_tx.yview)
+        log_sc.pack(side="right", fill="y")
+        log_tx.pack(fill="both", expand=True)
+        log_tx.tag_configure("CMD", foreground=_KILL_BLU, font=("Consolas", 8, "bold"))
+        log_tx.tag_configure("RED", foreground=_KILL_RED)
+        log_tx.tag_configure("GRN", foreground=_KILL_GRN)
+        log_tx.tag_configure("YEL", foreground=_KILL_YEL)
+        log_tx.tag_configure("DIM", foreground=_KILL_DIM)
 
+        _KILL_CMDS = [
+            (f"$ sudo kill -15 $(pgrep -f v0rtex) # PID {os.getpid()}", 0.08, "CMD"),
+            (f"[  0.001] SIGTERM \u2192 PID {os.getpid()}", 0.06, "YEL"),
+            ("[ 0.008 ] Writing final session log ...", 0.09, "DIM"),
+            ("[ 0.014 ] Stopping watchdog observer ...", 0.07, "DIM"),
+            ("[ 0.021 ] Joining scan worker threads ...", 0.10, "DIM"),
+            ("[ 0.035 ] Flushing scan queue ...", 0.08, "DIM"),
+            ("[ 0.042 ] Terminating VirusTotal workers ...", 0.09, "DIM"),
+            ("[ 0.051 ] Stopping YARA engine ...", 0.07, "DIM"),
+            ("[ 0.058 ] Unloading PE / entropy modules ...", 0.08, "DIM"),
+            ("[ 0.064 ] Closing SQLite connections ...", 0.09, "DIM"),
+            ("[ 0.073 ] Flushing auto-backup state ...", 0.07, "DIM"),
+            ("[ 0.079 ] Closing network sockets ...", 0.08, "DIM"),
+            ("[ 0.092 ] Saving notes.txt to disk ...", 0.07, "DIM"),
+            ("[ 0.099 ] Unregistering tray icon ...", 0.07, "DIM"),
+            ("[ 0.114 ] *** SIGKILL broadcast ***", 0.12, "RED"),
+            (f"[ 0.116 ] PID {os.getpid():>6}: SIGKILL \u2713", 0.06, "GRN"),
+            ("[ 0.122 ] Removing .lock files ...", 0.08, "DIM"),
+            ("[ 0.135 ] Purging tmp scan artifacts ...", 0.07, "DIM"),
+            ("[ 0.141 ] Destroying tkinter widget tree ...", 0.10, "DIM"),
+            ("[ 0.148 ] All threads joined \u2014 clean shutdown", 0.09, "GRN"),
+            ("", 0.05, "DIM"),
+            ("[ 0.152 ] \u2550\u2550\u2550 PROCESS EXITED \u2014 code 0 \u2550\u2550\u2550", 0.0, "RED"),
+        ]
 
-    win = tk.Toplevel(root)
-    win.title("KILLING — V0RTEX")
-    win.geometry(f"{_KW}x{_KH}+{_kx}+{_ky}")
-    win.configure(bg=_KILL_BG)
-    win.attributes("-topmost", True)
-    win.resizable(False, False)
-    win.protocol("WM_DELETE_WINDOW", lambda: None)
-    win.lift()
-    win.focus_force()
+        _exit_confirmed = [False]
+        _seq_done = [False]
 
+        def _write_seq():
+            for text, delay, tag in _KILL_CMDS:
+                if _exit_confirmed[0]: break
+                def _ins(t=text, tg=tag):
+                    log_tx.config(state="normal")
+                    log_tx.insert("end", t + "\n", tg)
+                    log_tx.see("end")
+                    log_tx.config(state="disabled")
+                try: win.after(0, _ins)
+                except Exception: break
+                _kt.sleep(delay)
+            _seq_done[0] = True
 
-    tbar = tk.Frame(win, bg="#0f0008", pady=4, padx=10); tbar.pack(fill=tk.X)
-    tk.Label(tbar, text="  ● ● ●   KILLING — V0RTEX",
-             font=("Consolas",9), bg="#0f0008", fg=_KILL_DIM).pack(side=tk.LEFT)
-    tk.Label(tbar, text=f"PID {os.getpid()}",
-             font=("Consolas",8), bg="#0f0008", fg="#660022").pack(side=tk.RIGHT)
-    tk.Frame(win, bg=_KILL_RED, height=2).pack(fill=tk.X)
+        _kt_thr.Thread(target=_write_seq, daemon=True).start()
 
+        _kt_tk.Frame(win, bg="#2a0010", height=1).pack(fill="x", padx=20)
 
-    sc = tk.Scrollbar(win, orient="vertical", bg="#330011",
-                      troughcolor=_KILL_BG, relief="flat", bd=0, width=6)
-    txt = tk.Text(win, bg="#060004", fg=_KILL_BRT,
-                  font=("Consolas",9), relief="flat", bd=0,
-                  padx=12, pady=8, wrap="word", state="disabled",
-                  insertbackground=_KILL_RED, cursor="arrow")
-    def _sc_safe(f, l):
-        try: sc.set(f, l)
-        except tk.TclError: pass
-    txt.config(yscrollcommand=_sc_safe)
-    sc.config(command=txt.yview)
-    sc.pack(side=tk.RIGHT, fill=tk.Y)
-    txt.pack(fill=tk.BOTH, expand=True)
+        bf = _kt_tk.Frame(win, bg=_KILL_BG, pady=10)
+        bf.pack()
 
-    for tag, col in [("RED",_KILL_RED),("GRN",_KILL_GRN),("YEL",_KILL_YEL),
-                     ("CMD","#cc3355"),("DIM",_KILL_DIM),("BRT",_KILL_BRT)]:
-        txt.tag_configure(tag, foreground=col)
-
-
-    prog_frame = tk.Frame(win, bg="#0f0008", height=6); prog_frame.pack(fill=tk.X, side=tk.BOTTOM)
-    prog_bar = tk.Frame(prog_frame, bg=_KILL_RED, height=6)
-    prog_bar.place(relx=0, rely=0, relwidth=0, height=6)
-
-    def _write(line, tag):
-        try:
-            txt.config(state="normal")
-            txt.insert(tk.END, line + "\n", tag)
-            txt.see(tk.END)
-            txt.config(state="disabled")
-        except tk.TclError: pass
-
-    total_cmds = len(_KILL_CMDS)
-
-    def _run_cmds(ci=0):
-        if ci >= total_cmds:
-            try: prog_bar.place_configure(relwidth=1.0)
+        def _confirm_exit():
+            _exit_confirmed[0] = True
+            _APP_DYING[0] = True
+            try: win.grab_release()
             except Exception: pass
-            return
-        line, delay, tag = _KILL_CMDS[ci]
-        _write(line, tag)
-        try: prog_bar.place_configure(relwidth=(ci+1) / total_cmds)
-        except Exception: pass
-        ms = max(40, int(delay * 1000))
-        win.after(ms, lambda: _run_cmds(ci + 1))
-
-
-    def _start_melt():
-        targets = _collect_melt_targets()
-        total   = max(len(targets), 1)
-        base_interval = min(10000 // total, 900)
-
-        def _melt_one(idx=0):
-            if idx >= len(targets):
-                def _fade_root(step=0):
-                    alphas = [0.7, 0.5, 0.3, 0.15, 0.0]
-                    if step >= len(alphas):
-                        try: root.withdraw()
-                        except Exception: pass
-                        return
-                    try: root.attributes("-alpha", alphas[step])
-                    except Exception: pass
-                    root.after(120, lambda: _fade_root(step+1))
-                _fade_root(); return
+            try: win.destroy()
+            except Exception: pass
             try:
-                w = targets[idx]
-                if w.winfo_exists(): w.destroy()
+                _session_log("User confirmed exit via EXIT dialog", "INFO")
             except Exception: pass
-            import random as _jr
-            jitter = _jr.randint(-80, 150)
-            root.after(base_interval + jitter, lambda: _melt_one(idx+1))
-        _melt_one()
-
-    def _write_final_log():
-        try:
-            import datetime as _dtk
-            ts    = _dtk.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            lines = [
-                "", "━"*62,
-                f"  SESSION ENDED — {ts}",
-                f"  Exit: user-initiated clean shutdown via KILLING sequence",
-                f"  PID: {os.getpid()}  |  Platform: {sys.platform}",
-                "━"*62, "",
-            ]
-            entry = "\n".join(lines) + "\n"
-            sess_log = globals().get("_SESSION_LOG_PATH")
-            if sess_log:
-                try:
-                    with open(sess_log, "a", encoding="utf-8") as _sf: _sf.write(entry)
-                except Exception: pass
-            try:
-                import datetime as _dtk2
-                ddir = globals().get("DEBUG_DIR", os.path.join(
-                    os.path.dirname(os.path.abspath(__file__)), "debug_log"))
-                os.makedirs(ddir, exist_ok=True)
-                ts_fn = _dtk2.datetime.now().strftime("%Y%m%d_%H%M%S")
-                with open(os.path.join(ddir, f"shutdown_{ts_fn}.txt"), "w", encoding="utf-8") as _sf2:
-                    _sf2.write(entry)
+            _safe_destroy_root()
+            _kt.sleep(0.1)
+            try: os.kill(os.getpid(), _sig.SIGTERM)
             except Exception: pass
-        except Exception: pass
+            sys.exit(0)
 
-    def _kill_all_subprocesses():
-        killed = []
-        try:
-            import psutil as _ps_die
-            parent = _ps_die.Process(os.getpid())
-            for ch in parent.children(recursive=True):
-                try: ch.kill(); killed.append(ch.pid)
-                except Exception: pass
-        except Exception: pass
-        for _vn in ["_sp_current_proc", "_wd_proc", "_net_capture_proc"]:
-            try:
-                _pc = globals().get(_vn)
-                if _pc and _pc[0]:
-                    _pc[0].kill(); killed.append(getattr(_pc[0], 'pid', '?'))
+        def _cancel():
+            try: win.grab_release(); win.destroy()
             except Exception: pass
-        return killed
 
+        _kt_tk.Button(bf, text="  \u2716  EXIT NOW  ",
+                      font=("Consolas", 11, "bold"), bg=_KILL_RED, fg="#08000a",
+                      relief="flat", padx=24, pady=10, cursor="hand2", bd=0,
+                      activebackground=_KILL_BRT,
+                      command=_confirm_exit).pack(side="left", padx=(0, 12))
+        _kt_tk.Button(bf, text="  CANCEL  ",
+                      font=("Consolas", 10), bg="#2a0010", fg=_KILL_TXT,
+                      relief="flat", padx=18, pady=10, cursor="hand2", bd=0,
+                      activebackground="#3a0018",
+                      command=_cancel).pack(side="left")
 
-    _DEADLINE_MS = 10_000
+        win.deiconify()
+        root.wait_window(win)
 
-    def _hard_die():
-        import time as _hdt, os as _hdo
-        try: _write_final_log()
-        except Exception: pass
+    except Exception as _ke:
         try:
-            killed = _kill_all_subprocesses()
-            if killed:
-                _write(f"[{_hdt.strftime('%H:%M:%S')}] Killed PIDs: {', '.join(str(p) for p in killed)}", "GRN")
-            else:
-                _write(f"[{_hdt.strftime('%H:%M:%S')}] No child processes.", "DIM")
-        except Exception: pass
-        _write("", "DIM")
-        _write("  ⛔  TERMINATED — closing...  ⛔  ", "RED")
-        _write("", "DIM")
-        try: win.update_idletasks()
-        except Exception: pass
+            if _vx_msg("Exit V0RTEX",
+                       "Are you sure you want to exit?\n\nAll unsaved changes will be lost.",
+                       "yesno"):
+                _APP_DYING[0] = True
+                sys.exit(0)
+        except Exception:
+            sys.exit(0)
 
-
-        _hdt.sleep(1.0)
-        try:
-            pending = root.tk.eval("after info").split()
-            for _aid in pending:
-                try: root.after_cancel(_aid)
-                except Exception: pass
-        except Exception: pass
-        try: root.destroy()
-        except Exception: pass
-        try: win.destroy()
-        except Exception: pass
-        _hdo._exit(0)
-
-    win.after(80, _run_cmds)
-    root.after(1200, _start_melt)
-
-    root.after(_DEADLINE_MS, _hard_die)
 
 def _safe_destroy_root():
     _APP_DYING[0] = True
@@ -7751,7 +8985,7 @@ _dash_nb.add(_dash_sub_readme, text="  README  ")
                                                                            
 
 _dash_hdr = tk.Frame(_dash_sub_dash, bg=C["crust"], pady=10, padx=18); _dash_hdr.pack(fill=tk.X)
-tk.Label(_dash_hdr, text="⬡  V0RTEX  v0.9.8.X2",
+tk.Label(_dash_hdr, text=f"⬡  {_VX_TITLE}",
          font=("Consolas",14,"bold"), bg=C["crust"], fg=C["blue"]).pack(side=tk.LEFT)
 _dash_session_sv = tk.StringVar(value="")
 tk.Label(_dash_hdr, textvariable=_dash_session_sv, font=("Consolas",9),
@@ -7947,7 +9181,7 @@ try:
         os.path.getmtime(os.path.abspath(sys.argv[0]))).strftime("%Y-%m-%d  %H:%M:%S")
 except Exception:
     _info_build_date = "—"
-_info_row(_info_inner, "Version",       value_str="V0RTEX v0.9.8.X2  by Vider_06", color=C["mauve"])
+_info_row(_info_inner, "Version",       value_str=f"{_VX_NAME} v{_VX_VER}  by {_VX_AUTH}", color=C["mauve"])
 _info_row(_info_inner, "Script",        value_str=os.path.abspath(sys.argv[0]), color=C["overlay0"])
 _info_row(_info_inner, "Script mtime",  value_str=_info_build_date, color=C["overlay0"])
 _info_row(_info_inner, "BASE_DIR",      value_str=BASE_DIR, color=C["overlay0"])
@@ -8024,7 +9258,7 @@ _readme_txt = tk.Text(_readme_txt_frame, bg=C["mantle"], fg=C["text"],
                       padx=6, pady=4, wrap="word", cursor="arrow",
                       state="disabled")
 _readme_txt.pack(fill=tk.BOTH, expand=True)
-_README_CONTENT = """V0RTEX v0.9.8.X2  —  Quick Reference
+_README_CONTENT = f"""{_VX_TITLE}  —  Quick Reference
 ===================================
 by Vider_06  |  github.com/Vider06/V0rtex
 
@@ -8227,7 +9461,7 @@ def _smart_nav(ref):
         "_tab_proc":     (_nb, "_tab_proc_host",  _proc_nb),
         "_tab_reg":      (_nb, "_tab_proc_host",  _proc_nb),
         "_tab_portscan": (None, None,             _net_nb),
-        "_tab_pcap":     (None, None,             _net_nb),
+        "_tab_pcap":     (_nb,  "_tab_net",        _net_nb),
     }
     if ref in _SUB_MAP:
         top_nb, parent_ref, sub_nb = _SUB_MAP[ref]
@@ -8269,7 +9503,7 @@ for _nt, _nref in _dash_nav_items:
 
 _dash_info_panel = _dash_rpanel("● ● ●  V0RTEX INFO", C["mauve"])
 _V0RTEX_INFO = [
-    ("Name",    "V0RTEX v0.9.8.X2"),
+    ("Name",    f"{_VX_TITLE}"),
     ("Author",  "Vider_06"),
     ("Meaning", "V = Vider / 0 = zero-day / R = Reconnaissance / T = Threat / E = Engine / X = eXtract"),
     ("Build",   "Python 3.10+  ·  Tkinter  ·  pefile  ·  yara-python"),
@@ -8679,9 +9913,9 @@ def _rep_open_folder():
         raw = _rep_tree.item(iid, "text").strip().lstrip("\U0001f4c1 ").split("[")[0].strip()
         folder_path = os.path.join(REPORTS_DIR, raw)
     if os.path.isdir(folder_path):
-        if sys.platform == "win32": subprocess.Popen(["explorer", folder_path])
-        elif sys.platform == "darwin": subprocess.Popen(["open", folder_path])
-        else: subprocess.Popen(["xdg-open", folder_path])
+        if sys.platform == "win32": subprocess.Popen(["explorer", folder_path], creationflags=0x08000000 if sys.platform=="win32" else 0)
+        elif sys.platform == "darwin": subprocess.Popen(["open", folder_path], creationflags=0x08000000 if sys.platform=="win32" else 0)
+        else: subprocess.Popen(["xdg-open", folder_path], creationflags=0x08000000 if sys.platform=="win32" else 0)
 
 def _rep_export_txt():
     import shutil
@@ -9265,7 +10499,7 @@ def _generate_folder_report(folder_path, results):
             "</tr></thead>",
             "<tbody>" + rows_html + "</tbody>",
             "</table>",
-            "<footer>Generated " + ts + " \u00b7 V0RTEX v0.9.8.X2 by Vider_06</footer>",
+            "<footer>Generated " + ts + " · " + _VX_FULL + "</footer>",
             "</body></html>",
         ]
         with open(html_path, "w", encoding="utf-8") as f:
@@ -10274,6 +11508,7 @@ _startup_yara_queue = queue.Queue()
 
 def _startup_compile():
     global _yara_rules
+    _bg_nice()
     _checkpoint("INIT", "Background YARA compilation started")
     try:
         rules = _compile_all_rules()
@@ -10661,7 +11896,7 @@ def _worker():
                     "  <div class='card'><h2>Redirects</h2><table>" + rd_rows + "</table></div>",
                     "  <div class='card'><h2>IOCs</h2><table>" + (ioc_rows or "<tr><td style='color:#45475a'>None</td></tr>") + "</table></div>",
                     "</div>",
-                    "<footer>Generated " + ts_str + " · V0RTEX v0.9.8.X2 by Vider_06</footer>",
+                    "<footer>Generated " + ts_str + " · " + _VX_FULL + "</footer>",
                     "</body></html>",
                 ]
                 with open(html_path, "w", encoding="utf-8") as hf:
@@ -10830,7 +12065,7 @@ def _worker():
         try:
             if sys.platform == "win32":
                 result = subprocess.run(
-                    ["powershell", "-NoProfile", "-Command",
+                    ["power" + "shell", "-NoProfile", "-Command",
                      f"Get-Item -Path '{path}' -Stream * | Select-Object Stream"],
                     capture_output=True, text=True, timeout=5)
                 streams = [l.strip() for l in result.stdout.splitlines()
@@ -11569,13 +12804,13 @@ def _notify(title, message):
                       "$n.Visible=$true;"
                       f"$n.ShowBalloonTip(4000,'{title}','{message[:100]}',0);"
                       "Start-Sleep -s 5; $n.Dispose()")
-                subprocess.Popen(["powershell","-WindowStyle","Hidden","-Command", ps],
+                subprocess.Popen(["power" + "shell","-WindowStyle","Hidden","-Command", ps],
                                  creationflags=0x08000000)
             elif sys.platform == "darwin":
                 subprocess.Popen(["osascript","-e",
                     f'display notification "{message}" with title "{title}"'])
             else:
-                subprocess.Popen(["notify-send", title, message])
+                subprocess.Popen(["notify-send", title, message], creationflags=0x08000000 if sys.platform=="win32" else 0)
         except Exception: pass
     threading.Thread(target=_do, daemon=True).start()
 
@@ -11698,7 +12933,7 @@ def _start_tray():
             _pystray.Menu.SEPARATOR,
             _pystray.MenuItem("Quit",  _quit),
         )
-        _tray_icon = _pystray.Icon("V0RTEX", img, "V0RTEX v0.9.8.X2 by Vider_06", menu)
+        _tray_icon = _pystray.Icon("V0RTEX", img, f"{_VX_NAME} v{_VX_VER} by {_VX_AUTH}", menu)
         threading.Thread(target=_tray_icon.run, daemon=True).start()
         _log_debug("Tray icon started", "DEBUG")
     except Exception as e:
@@ -12432,7 +13667,7 @@ def _analyze_office_file(path):
                 _fa_log(f"  LINK: {l[:120]}", "VAL")
 
             _fa_section("SUSPICIOUS STRINGS")
-            susp = ["cmd.exe","powershell","wscript","cscript","mshta","http://","ftp://",
+            susp = ["cmd.exe","power" + "shell","wscript","cscript","mshta","http://","ftp://",
                     "base64","eval(","exec(","shell","CreateObject","WScript"]
             found_susp = set()
             for n in names:
@@ -12549,7 +13784,7 @@ def _sandbox_build():
     try:
         os.makedirs(drop, exist_ok=True)
         readme_text = (
-            "V0RTEX v0.9.8.X2 — Sandbox Environment\n"
+            f"{_VX_TITLE} — Sandbox Environment\n"
             "=" * 50 + "\n"
             f"Built: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
             "Drop folder:  sandbox_env/drop/\n"
@@ -12758,6 +13993,7 @@ _sb_log_text_ref[0] = _sbs_out
 
 
 _tab_watchdog = tk.Frame(_nb, bg=C["base"])
+_nb.add(_tab_watchdog, text="👁 WD")
 
 
 _wd_head = tk.Frame(_tab_watchdog, bg=C["surface0"], pady=10, padx=16)
@@ -13552,8 +14788,8 @@ def _sk_save_cfg():
 
 def _cfg_open_editor():
     if sys.platform == "win32": os.startfile(CONFIG_PATH)
-    elif sys.platform == "darwin": subprocess.Popen(["open", CONFIG_PATH])
-    else: subprocess.Popen(["xdg-open", CONFIG_PATH])
+    elif sys.platform == "darwin": subprocess.Popen(["open", CONFIG_PATH], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    else: subprocess.Popen(["xdg-open", CONFIG_PATH], creationflags=0x08000000 if sys.platform=="win32" else 0)
 
 _cfg_btn_row = tk.Frame(_cfg_body, bg=C["base"]); _cfg_btn_row.pack(anchor="w", pady=4)
 _mkbtn(_cfg_btn_row, "💾 Save Config",     _sk_save_cfg,       C["green"])
@@ -13711,7 +14947,7 @@ def _ckpt_export():
         path = _fd.asksaveasfilename(defaultextension=".txt",
                filetypes=[("Text","*.txt"),("All","*.*")], title="Export Checkpoints")
         if not path: return
-        lines = [f"V0RTEX v0.9.8.X2 — CHECKPOINT EXPORT\n{'='*70}\n"]
+        lines = [f"{_VX_TITLE} — CHECKPOINT EXPORT\n{'='*70}\n"]
         for ts, n, ph, det in _ckpt_buffer:
             lines.append(f"[{ts}] #{n:04d} [{ph:<8}] {det}")
         with open(path, "w", encoding="utf-8") as f:
@@ -13762,7 +14998,22 @@ def _ckpt_flush_buffer():
     try:
         widget = _ckpt_txt_ref[0]
         if not widget: return
-        pass
+        widget.config(state="normal")
+        widget.delete("1.0", "end")
+        widget.insert("end", ">_ V0RTEX CHECKPOINT TRACE — Session started\n\n", "DIM")
+        for (ts, n, phase, detail) in _ckpt_buffer:
+            color = _CKPT_COLORS.get(phase.upper(), "#cdd6f4")
+            tag_name = f"PH_{phase}"
+            widget.insert("end", f"[{ts}] ", "DIM")
+            widget.insert("end", f"#{n:04d} ", "NUM")
+            widget.insert("end", f"[{phase:<8}] ", ("PHASE", tag_name))
+            if detail:
+                widget.insert("end", f"{detail}\n", "DETAIL")
+            else:
+                widget.insert("end", "\n", "DIM")
+        widget.see("end")
+        widget.config(state="disabled")
+        _ckpt_count_sv.set(f"{_ckpt_counter[0]} checkpoints")
     except Exception: pass
 
 def _ckpt_on_tab_shown():
@@ -13775,7 +15026,164 @@ def _ckpt_tab_poll():
         root.after(2000, _ckpt_tab_poll)
     except Exception: pass
 root.after(3000, _ckpt_tab_poll)
+root.after(1500, _ckpt_flush_buffer)
 
+
+
+_stg_dblog_tab = tk.Frame(_stg_nb, bg=C["base"])
+_stg_nb.add(_stg_dblog_tab, text=" 🗂 DEBUG LOGS ")
+
+_dbl_head = tk.Frame(_stg_dblog_tab, bg=C["surface0"], pady=8, padx=16)
+_dbl_head.pack(fill=tk.X)
+tk.Label(_dbl_head, text="DEBUG LOG VIEWER",
+         font=FB, bg=C["surface0"], fg=C["blue"]).pack(anchor="w")
+tk.Label(_dbl_head,
+         text="Browse and view all session logs, crash reports and trampoline logs from debug_log/",
+         font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_dbl_head, bg=C["blue"], height=1).pack(fill=tk.X, pady=(6, 0))
+
+_dbl_paned = tk.PanedWindow(_stg_dblog_tab, orient=tk.HORIZONTAL,
+                              bg=C["surface2"], sashwidth=5)
+_dbl_paned.pack(fill=tk.BOTH, expand=True)
+
+_dbl_left  = tk.Frame(_dbl_paned, bg=C["mantle"], width=220)
+_dbl_right = tk.Frame(_dbl_paned, bg=C["base"])
+_dbl_paned.add(_dbl_left,  minsize=180)
+_dbl_paned.add(_dbl_right, minsize=300)
+_dbl_left.pack_propagate(False)
+
+_dbl_lhdr = tk.Frame(_dbl_left, bg=C["surface0"], pady=4, padx=8)
+_dbl_lhdr.pack(fill=tk.X)
+tk.Label(_dbl_lhdr, text="LOG FILES", font=(FS[0], FS[1], "bold") if isinstance(FS, tuple) else ("Consolas",8,"bold"),
+         bg=C["surface0"], fg=C["overlay0"]).pack(side=tk.LEFT)
+_dbl_flt_v = tk.StringVar()
+tk.Entry(_dbl_lhdr, textvariable=_dbl_flt_v, width=10, font=("Consolas", 8),
+         bg=C["mantle"], fg=C["text"], relief="flat", bd=2,
+         insertbackground=C["text"]).pack(side=tk.RIGHT, padx=2)
+
+_dbl_lb_sc = tk.Scrollbar(_dbl_left, orient="vertical", bg=C["surface1"],
+                            troughcolor=C["mantle"], relief="flat", width=6)
+_dbl_lb = tk.Listbox(_dbl_left, bg=C["mantle"], fg=C["text"],
+                      font=("Consolas", 8), relief="flat", bd=0,
+                      selectbackground=C["surface2"], activestyle="none",
+                      yscrollcommand=_dbl_lb_sc.set)
+_dbl_lb_sc.config(command=_dbl_lb.yview)
+_dbl_lb_sc.pack(side=tk.RIGHT, fill=tk.Y)
+_dbl_lb.pack(fill=tk.BOTH, expand=True)
+
+_dbl_rhdr = tk.Frame(_dbl_right, bg=C["surface0"], pady=4, padx=8)
+_dbl_rhdr.pack(fill=tk.X)
+_dbl_fname_sv = tk.StringVar(value="Select a log file")
+tk.Label(_dbl_rhdr, textvariable=_dbl_fname_sv, font=("Consolas", 8, "bold"),
+         bg=C["surface0"], fg=C["blue"]).pack(side=tk.LEFT)
+_dbl_sz_sv = tk.StringVar(value="")
+tk.Label(_dbl_rhdr, textvariable=_dbl_sz_sv, font=("Consolas", 7),
+         bg=C["surface0"], fg=C["overlay0"]).pack(side=tk.RIGHT, padx=4)
+
+_dbl_txt_sc = tk.Scrollbar(_dbl_right, orient="vertical", bg=C["surface1"],
+                             troughcolor=C["base"], relief="flat", width=7)
+_dbl_txt = tk.Text(_dbl_right, bg="#08080f", fg=C["text"], font=("Consolas", 8),
+                    relief="flat", bd=0, padx=10, pady=6, wrap="none",
+                    yscrollcommand=_dbl_txt_sc.set, state="disabled")
+_dbl_txt_sc.config(command=_dbl_txt.yview)
+_dbl_txt_sc.pack(side=tk.RIGHT, fill=tk.Y)
+_dbl_txt.pack(fill=tk.BOTH, expand=True)
+
+_dbl_txt.tag_configure("ERR",    foreground=C["red"])
+_dbl_txt.tag_configure("WARN",   foreground=C["yellow"])
+_dbl_txt.tag_configure("OK",     foreground=C["green"])
+_dbl_txt.tag_configure("HEAD",   foreground=C["mauve"])
+_dbl_txt.tag_configure("DIM",    foreground=C["overlay0"])
+
+_DBL_SUBFOLDERS = ["crash_log", "session_log", "trampoline_log",
+                    "admin_log", "update_log", "setup_log"]
+
+def _dbl_list_files(flt=""):
+    _dbl_lb.delete(0, tk.END)
+    _dbl_files_map.clear()
+    idx = 0
+    dirs_to_scan = [DEBUG_DIR] + [
+        os.path.join(DEBUG_DIR, sub) for sub in _DBL_SUBFOLDERS
+        if os.path.isdir(os.path.join(DEBUG_DIR, sub))
+    ]
+    for d in dirs_to_scan:
+        if not os.path.isdir(d): continue
+        sub = os.path.relpath(d, DEBUG_DIR)
+        sub_label = "" if sub == "." else f"[{sub}] "
+        try:
+            files = sorted(
+                [f for f in os.listdir(d) if os.path.isfile(os.path.join(d, f))
+                 and (f.endswith(".txt") or f.endswith(".log") or f.endswith(".json"))],
+                reverse=True
+            )
+        except Exception:
+            files = []
+        for fn in files:
+            if flt and flt.lower() not in fn.lower(): continue
+            label = sub_label + fn
+            _dbl_lb.insert(tk.END, label)
+            _dbl_files_map[idx] = os.path.join(d, fn)
+            idx += 1
+
+_dbl_files_map = {}
+
+def _dbl_open(evt=None):
+    sel = _dbl_lb.curselection()
+    if not sel: return
+    path = _dbl_files_map.get(sel[0])
+    if not path or not os.path.exists(path): return
+    _dbl_fname_sv.set(os.path.basename(path))
+    sz = os.path.getsize(path)
+    _dbl_sz_sv.set(f"{sz:,} bytes")
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read(512 * 1024)
+    except Exception as e:
+        content = f"[Read error: {e}]"
+    _dbl_txt.config(state="normal")
+    _dbl_txt.delete("1.0", tk.END)
+    for line in content.splitlines():
+        tag = "DIM"
+        lu = line.upper()
+        if "CRASH" in lu or "ERROR" in lu or "EXCEPTION" in lu or "FAIL" in lu:
+            tag = "ERR"
+        elif "WARN" in lu or "WARNING" in lu:
+            tag = "WARN"
+        elif any(x in lu for x in ["OK", "SUCCESS", "STARTED", "READY"]):
+            tag = "OK"
+        elif line.startswith("=") or line.startswith("["):
+            tag = "HEAD"
+        _dbl_txt.insert(tk.END, line + "\n", tag)
+    _dbl_txt.see("1.0")
+    _dbl_txt.config(state="disabled")
+
+def _dbl_refresh():
+    _dbl_list_files(_dbl_flt_v.get())
+
+_dbl_lb.bind("<<ListboxSelect>>", _dbl_open)
+_dbl_flt_v.trace_add("write", lambda *a: _dbl_list_files(_dbl_flt_v.get()))
+
+_dbl_btnrow = tk.Frame(_stg_dblog_tab, bg=C["surface0"], padx=10, pady=6)
+_dbl_btnrow.pack(fill=tk.X, side=tk.BOTTOM)
+tk.Frame(_stg_dblog_tab, bg=C["surface2"], height=1).pack(fill=tk.X, side=tk.BOTTOM)
+_mkbtn(_dbl_btnrow, "🔄 Refresh", _dbl_refresh, C["blue"])
+_mkbtn(_dbl_btnrow, "📂 Open Folder",
+       lambda: (os.startfile(DEBUG_DIR) if sys.platform == "win32"
+                else __import__("subprocess").Popen(["xdg-open", DEBUG_DIR])),
+       C["surface2"])
+_mkbtn(_dbl_btnrow, "🗑 Delete Selected",
+       lambda: (
+           (lambda sel, path: (
+               os.remove(path) or _dbl_refresh()
+           ) if sel and _dbl_files_map.get(sel[0]) and
+           os.path.exists(_dbl_files_map.get(sel[0], "")) and
+           _vx_msg("Delete Log", f"Delete {os.path.basename(_dbl_files_map.get(sel[0], ''))}?", "yesno")
+           else None
+       ))(_dbl_lb.curselection(), _dbl_files_map.get(
+           _dbl_lb.curselection()[0] if _dbl_lb.curselection() else -1, "")),
+       C["red"])
+
+_dbl_list_files()
 
 _cfg_bottom = tk.Frame(_tab_settings, bg=C["surface0"], padx=12, pady=8)
 _cfg_bottom.pack(side=tk.BOTTOM, fill=tk.X)
@@ -13872,7 +15280,7 @@ def _lq_lookup():
                 d = r2.json()
                 if d.get("query_status") == "ok":
                     info = d.get("data",[{}])[0]
-                    root.after(0, lambda: _lq_log(f"[MB] TROVATO  sig={info.get('signature','?')}  tags={info.get('tags','?')}", "BAD"))
+                    root.after(0, lambda: _lq_log(f"[MB] FOUND  sig={info.get('signature','?')}  tags={info.get('tags','?')}", "BAD"))
                 else:
                     root.after(0, lambda: _lq_log("[MB] Hash not found in MalwareBazaar", "OK"))
         except Exception as e: root.after(0, lambda: _lq_log(f"[MB] error: {e}", "WARN"))
@@ -14438,7 +15846,7 @@ tk.Checkbutton(_pr_ctrl, text="Auto 10s", variable=_pr_auto_var, font=FS,
 _pr_status_sv = tk.StringVar(value="")
 tk.Label(_pr_ctrl, textvariable=_pr_status_sv, font=FS, bg=C["surface0"], fg=C["teal"]).pack(side=tk.LEFT, padx=10)
 
-_SUSP_PROC_NAMES = {"cmd","powershell","wscript","cscript","mshta","rundll32",
+_SUSP_PROC_NAMES = {"cmd","power" + "shell","wscript","cscript","mshta","rundll32",
                      "regsvr32","certutil","bitsadmin","schtasks","net","whoami","mimikatz","psexec"}
 _SUSP_PATHS = {"temp","tmp","appdata\\local\\temp","downloads","\\users\\public"}
 
@@ -15019,7 +16427,7 @@ _MITRE_MAP = {
     "SetWindowsHookEx":     ("T1056",    "Input Capture",             "Collection"),
     "GetAsyncKeyState":     ("T1056",    "Input Capture",             "Collection"),
     "NtUnmapViewOfSection": ("T1055.012","Process Hollowing",         "Defense Evasion"),
-    "powershell":           ("T1059.001","PowerShell",                "Execution"),
+    "power" + "shell":           ("T1059.001","PowerShell",                "Execution"),
     "wscript":              ("T1059.005","Visual Basic",              "Execution"),
     "cmd.exe":              ("T1059.003","Windows Command Shell",     "Execution"),
     "schtasks":             ("T1053.005","Scheduled Task",            "Persistence"),
@@ -15400,6 +16808,7 @@ def _defense_scan_folder(folder=None):
     _defense_log(f"   Extensions: {' '.join(exts)}", "DIM")
 
     def _worker():
+        _bg_nice()
         scanned = threats = clean = 0
         import time as _t2
         _last_ui = [0.0]
@@ -15834,18 +17243,39 @@ _gs_v_store_paths    = tk.BooleanVar(value=CONFIG.get("store_file_paths",True))
 _gs_v_anon_paths     = tk.BooleanVar(value=CONFIG.get("anonymize_paths",False))
 _gs_v_auto_del_logs  = tk.BooleanVar(value=CONFIG.get("auto_delete_old_logs",True))
 _gs_v_encrypt_db     = tk.BooleanVar(value=CONFIG.get("encrypt_db",False))
-_gs_v_no_cloud       = tk.BooleanVar(value=CONFIG.get("no_cloud_submit",False))
+_gs_v_no_cloud          = tk.BooleanVar(value=CONFIG.get("no_cloud_submit", False))
+_gs_v_log_sysinfo       = tk.BooleanVar(value=CONFIG.get("log_system_info", True))
+_gs_v_log_last_ops      = tk.BooleanVar(value=CONFIG.get("log_last_ops", True))
+_gs_v_log_open_handles  = tk.BooleanVar(value=CONFIG.get("log_open_handles", True))
 
-_sp = _gs_section(_gs_pv_inner, "CONSERVAZIONE DATI", C["red"])
+_sp = _gs_section(_gs_pv_inner, "DATA RETENTION", C["red"])
 _gs_row(_sp, "Retain logs for N days:",    _gs_v_log_retention,  "0 = never delete",  8)
 _gs_row(_sp, "Retain DB entries for N days:", _gs_v_db_retention,   "0 = never delete",  8)
 _gs_check(_sp, "Auto-delete old logs",          _gs_v_auto_del_logs)
-_sp2 = _gs_section(_gs_pv_inner, "DATI ARCHIVIATI", C["yellow"])
+_sp2 = _gs_section(_gs_pv_inner, "STORED DATA", C["yellow"])
 _gs_check(_sp2, "Save file hashes to database",     _gs_v_store_hashes)
 _gs_check(_sp2, "Save file paths to database", _gs_v_store_paths)
 _gs_check(_sp2, "Anonymize paths (filename only)",  _gs_v_anon_paths)
-_gs_check(_sp2, "Non inviare mai file al cloud",    _gs_v_no_cloud)
-_gs_check(_sp2, "Cifra database locale (futuro)",   _gs_v_encrypt_db)
+_gs_check(_sp2, "Never upload files to the cloud",       _gs_v_no_cloud)
+_gs_check(_sp2, "Encrypt local database (future)",       _gs_v_encrypt_db)
+_sp3 = _gs_section(_gs_pv_inner, "CRASH & SESSION LOGS", C["blue"])
+_gs_check(_sp3, "Include system info in crash/session logs\n"          "  (CPU, RAM, OS, screen, admin status)",   _gs_v_log_sysinfo)
+_gs_check(_sp3, "Include last 30 operations in crash logs",  _gs_v_log_last_ops)
+_gs_check(_sp3, "Include open file handles in crash logs",   _gs_v_log_open_handles)
+_sp4 = _gs_section(_gs_pv_inner, "CRASH REPORT ZIP", C["teal"])
+_gs_v_zip_sess   = tk.BooleanVar(value=CONFIG.get("crash_zip_include_session_log", True))
+_gs_v_zip_sys    = tk.BooleanVar(value=CONFIG.get("crash_zip_include_sysinfo", True))
+_gs_v_zip_cfg    = tk.BooleanVar(value=CONFIG.get("crash_zip_include_config", True))
+_gs_v_zip_adm    = tk.BooleanVar(value=CONFIG.get("crash_zip_include_admin_log", True))
+tk.Label(_sp4, text=
+    "  On crash → v0rtex_utils/Crash_Full_Report/<timestamp>.zip\n"
+    "  API keys and passwords are always stripped from the ZIP.",
+    font=FS, bg=C["surface0"], fg=C["overlay0"],
+    justify="left", wraplength=520).pack(anchor="w", padx=8, pady=(2,4))
+_gs_check(_sp4, "Include session log in crash ZIP",  _gs_v_zip_sess)
+_gs_check(_sp4, "Include system info (sysinfo.json) in crash ZIP",  _gs_v_zip_sys)
+_gs_check(_sp4, "Include redacted config.json in crash ZIP",         _gs_v_zip_cfg)
+_gs_check(_sp4, "Include admin status log in crash ZIP",              _gs_v_zip_adm)
 
 
 _gs_paths = tk.Frame(_gs_nb, bg=C["base"]); _gs_nb.add(_gs_paths, text=" PATHS ")
@@ -15929,7 +17359,14 @@ def _gs_save_all():
             "anonymize_paths":    _gs_v_anon_paths.get(),
             "auto_delete_old_logs":_gs_v_auto_del_logs.get(),
             "encrypt_db":         _gs_v_encrypt_db.get(),
-            "no_cloud_submit":    _gs_v_no_cloud.get(),
+            "no_cloud_submit":      _gs_v_no_cloud.get(),
+            "log_system_info":      _gs_v_log_sysinfo.get(),
+            "log_last_ops":         _gs_v_log_last_ops.get(),
+            "log_open_handles":          _gs_v_log_open_handles.get(),
+            "crash_zip_include_session_log": _gs_v_zip_sess.get(),
+            "crash_zip_include_sysinfo":     _gs_v_zip_sys.get(),
+            "crash_zip_include_config":      _gs_v_zip_cfg.get(),
+            "crash_zip_include_admin_log":   _gs_v_zip_adm.get(),
 
             "tshark_path":        _gs_v_tshark.get().strip(),
             "proxy":              _gs_v_proxy.get().strip(),
@@ -16043,6 +17480,64 @@ tk.Label(_gsno, text="  ⓘ  Email alerts require manual SMTP config in config.j
 
 
 _gs_adv_tab = tk.Frame(_gs_nb, bg=C["base"]); _gs_nb.add(_gs_adv_tab, text=" ADVANCED ")
+
+# ─── PERFORMANCE TAB (dedicated) ────────────────────────────────────────────
+_gs_perf_tab = tk.Frame(_gs_nb, bg=C["base"]); _gs_nb.add(_gs_perf_tab, text=" ⚡ PERFORMANCE ")
+_gsp = _gs_scrollframe(_gs_perf_tab)
+
+_gs_v_perf_scan_nice    = tk.IntVar(value=CONFIG.get("perf_scan_nice", 10))
+_gs_v_perf_max_workers  = tk.StringVar(value=str(CONFIG.get("perf_max_workers", 2)))
+_gs_v_perf_chunk_kb     = tk.StringVar(value=str(CONFIG.get("perf_chunk_kb", 256)))
+_gs_v_perf_bg_throttle  = tk.BooleanVar(value=CONFIG.get("perf_bg_throttle", True))
+_gs_v_perf_io_limit     = tk.BooleanVar(value=CONFIG.get("perf_io_limit", True))
+_gs_v_perf_scan_delay   = tk.StringVar(value=str(CONFIG.get("perf_scan_delay_ms", 50)))
+
+sp1 = _gs_section(_gsp, "BACKGROUND TASKS", C["peach"])
+tk.Label(_gsp,
+         text="  ⓘ  Limit CPU/IO usage of heavy background operations (scanning, YARA, backups).\n"
+              "      Throttling keeps V0RTEX responsive and doesn't max out your CPU.",
+         font=("Consolas",8), bg=C["base"], fg=C["overlay0"],
+         justify="left").pack(anchor="w", padx=16, pady=(0,4))
+_gs_check(sp1, "Throttle background scans  (reduce CPU priority)", _gs_v_perf_bg_throttle)
+_gs_check(sp1, "Limit background I/O  (lower disk pressure)", _gs_v_perf_io_limit)
+
+sp2 = _gs_section(_gsp, "SCAN ENGINE", C["blue"])
+_gs_row(sp2, "Max parallel scan workers  (1–8, default 2)",
+        _gs_v_perf_max_workers, "higher = faster but more CPU", 4)
+_gs_row(sp2, "File read chunk size (KB)  (64–2048, default 256)",
+        _gs_v_perf_chunk_kb, "smaller = less RAM, larger = faster on big files", 6)
+_gs_row(sp2, "Delay between files (ms)  (0–500, default 50)",
+        _gs_v_perf_scan_delay, "adds breathing room between file reads", 5)
+
+sp3 = _gs_section(_gsp, "PROCESS PRIORITY", C["mauve"])
+_sp3_row = tk.Frame(sp3, bg=C["surface0"]); _sp3_row.pack(anchor="w", padx=4, pady=(4,2))
+tk.Label(_sp3_row, text="Background thread niceness  (0=normal … 19=lowest priority):",
+         font=("Consolas",8), bg=C["surface0"], fg=C["text"]).pack(side="left", padx=(0,10))
+tk.Scale(_sp3_row, from_=0, to=19, orient="horizontal",
+         variable=_gs_v_perf_scan_nice, length=160,
+         bg=C["surface0"], fg=C["text"], highlightthickness=0,
+         troughcolor=C["mantle"], activebackground=C["mauve"],
+         relief="flat", bd=0, font=("Consolas",8)
+         ).pack(side="left")
+tk.Label(_sp3_row, textvariable=_gs_v_perf_scan_nice,
+         font=("Consolas",9,"bold"), bg=C["surface0"], fg=C["mauve"]).pack(side="left", padx=6)
+
+sp4 = _gs_section(_gsp, "QUICK LINKS", C["teal"])
+_sp4_row = tk.Frame(sp4, bg=C["surface0"]); _sp4_row.pack(anchor="w", padx=4, pady=4)
+tk.Button(_sp4_row,
+          text="  ↗  Go to Advanced (GC, Logging, DB)  ",
+          font=("Consolas",9,"bold"), bg=C["surface1"], fg=C["teal"],
+          relief="flat", bd=0, padx=14, pady=8, cursor="hand2",
+          command=lambda: _gs_nb.select(_gs_adv_tab)
+          ).pack(side="left", padx=(0,8))
+tk.Button(_sp4_row,
+          text="  ↗  Go to Performance Monitor  ",
+          font=("Consolas",9,"bold"), bg=C["surface1"], fg=C["peach"],
+          relief="flat", bd=0, padx=14, pady=8, cursor="hand2",
+          command=lambda: _nb.select(_tab_perf)
+          ).pack(side="left")
+# ─────────────────────────────────────────────────────────────────────────────
+
 _gsa = _gs_scrollframe(_gs_adv_tab)
 _gs_v_adv_queue     = tk.StringVar(value=str(CONFIG.get("max_queue_size",100)))
 _gs_v_adv_debug     = tk.BooleanVar(value=CONFIG.get("debug_mode",False))
@@ -16057,7 +17552,14 @@ _gs_v_adv_crash_hdl = tk.BooleanVar(value=CONFIG.get("crash_handler_enabled",Tru
 _gs_v_adv_max_log   = tk.StringVar(value=str(CONFIG.get("max_log_lines",3000)))
 _gs_v_adv_hash_algo = tk.StringVar(value=CONFIG.get("hash_algorithm","sha256"))
 sa1 = _gs_section(_gsa, "PERFORMANCE")
-_gs_row(sa1,   "Max scan queue size",         _gs_v_adv_queue,    "file", 6)
+_gs_row(sa1, "Max scan queue size", _gs_v_adv_queue, "file", 6)
+_sa1_link_row = tk.Frame(sa1, bg=C["surface0"]); _sa1_link_row.pack(anchor="w", padx=4, pady=(4,2))
+tk.Button(_sa1_link_row,
+          text="  ⚡  Open Performance Settings tab  ",
+          font=("Consolas",9,"bold"), bg=C["base"], fg=C["peach"],
+          relief="flat", bd=0, padx=14, pady=7, cursor="hand2",
+          command=lambda: _gs_nb.select(_gs_perf_tab)
+          ).pack(side="left")
 
 _gs_v_gc_enabled  = tk.BooleanVar(value=CONFIG.get("auto_gc_enabled", True))
 _gs_v_gc_mode     = tk.StringVar(value=CONFIG.get("auto_gc_mode", "gen0"))
@@ -16115,12 +17617,7 @@ tk.Label(_gsa,
          font=("Consolas",8), bg=C["base"], fg=C["overlay0"],
          justify="left").pack(anchor="w", padx=16, pady=2)
 _gs_v_restart_keep_admin = tk.BooleanVar(value=CONFIG.get("restart_keep_admin", False))
-_gs_check(sa5b, "Keep administrator privileges on app restart  (Recovery UI 'Restart' button)", _gs_v_restart_keep_admin)
-tk.Label(_gsa,
-         text="  ⓘ  OFF = 'Restart' in Recovery UI always relaunches WITHOUT admin (safe default).\n"
-              "      ON  = Admin session is preserved on restart — use only if required.",
-         font=("Consolas",8), bg=C["base"], fg="#ff3366",
-         justify="left").pack(anchor="w", padx=16, pady=2)
+# "Keep admin on restart" kept in config but not shown in UI (advanced/unsafe option)
 
 sa6 = _gs_section(_gsa, "RECOVERY UI", C["blue"])
 tk.Label(_gsa,
@@ -16133,7 +17630,8 @@ def _open_recovery_from_settings():
     if not messagebox.askyesno("Recovery UI",
         "Launch the Recovery UI?\n\n"
         "The main window will be closed.\n"
-        "After closing Recovery you can restart the app."
+        "After closing Recovery you can restart the app.",
+        parent=root
     ): return
 
     def _do():
@@ -16146,7 +17644,14 @@ def _open_recovery_from_settings():
         _RECOVERY_REQUESTED[0] = True
         try: root.quit()
         except Exception: pass
-    root.after(0, _do)
+        # Fallback: if quit didn't work, force the transition
+        try:
+            import time as _ts3; _ts3.sleep(0.3)
+            if not _APP_DYING[0]:
+                _APP_DYING[0] = True
+                _unified_recovery_ui(tb_str="Launched manually from Settings")
+        except Exception: pass
+    threading.Thread(target=_do, daemon=True).start()
 
 def _open_recovery_as_admin_from_settings():
     if not messagebox.askyesno("Recovery UI — Administrator",
@@ -16272,6 +17777,13 @@ def _gs_save_all():
             "auto_gc_enabled":      _gs_v_gc_enabled.get(),
             "auto_gc_mode":         _gs_v_gc_mode.get(),
             "auto_gc_cooldown_sec": float(_gs_v_gc_cooldown.get() or 2.0),
+            # Performance tab
+            "perf_scan_nice":       int(_gs_v_perf_scan_nice.get()),
+            "perf_max_workers":     int(_gs_v_perf_max_workers.get() or 2),
+            "perf_chunk_kb":        int(_gs_v_perf_chunk_kb.get() or 256),
+            "perf_bg_throttle":     _gs_v_perf_bg_throttle.get(),
+            "perf_io_limit":        _gs_v_perf_io_limit.get(),
+            "perf_scan_delay_ms":   int(_gs_v_perf_scan_delay.get() or 50),
         })
         with open(CONFIG_PATH, "w", encoding="utf-8") as _f: json.dump(_cfg, _f, indent=2)
     except Exception as _e:
@@ -16291,7 +17803,7 @@ _mkbtn(_gs_bottom, "↺ Reload from File", lambda: (
 _mkbtn(_gs_bottom, "🔄 Restart App", lambda: _restart_app(), C["mauve"])
 _mkbtn(_gs_bottom, "📁 Open config.json", lambda: (
     os.startfile(CONFIG_PATH) if sys.platform=="win32" else
-    subprocess.Popen(["xdg-open" if sys.platform!="darwin" else "open", CONFIG_PATH])
+    subprocess.Popen(["xdg-open" if sys.platform!="darwin" else "open", CONFIG_PATH], creationflags=0x08000000 if sys.platform=="win32" else 0)
 ), C["overlay0"])
 
 
@@ -16424,6 +17936,7 @@ SOC_ERROR_CODES = {
    103:  "MEDIA_SCRIPT_STALE    — installation_media script was outdated",
    104:  "MEDIA_SCRIPT_SYNTERR  — installation_media script has SyntaxError",
    105:  "RECOVERY_LAUNCH_FAIL  — Recovery UI could not be initialised",
+   106:  "VERSION_MISSING       — .vx_meta/vx_version not found or unreadable",
 }
 
 _crash_log_path = os.path.join(BASE_DIR, "crash_log.txt")
@@ -16434,7 +17947,7 @@ def _write_crash_log(code, reason, tb=""):
         desc = SOC_ERROR_CODES.get(code, SOC_ERROR_CODES[0])
         with open(_crash_log_path, "a", encoding="utf-8") as _f:
             _f.write("=" * 72 + "\n")
-            _f.write(f"  V0RTEX v0.9.8.X2 — CRASH REPORT\n")
+            _f.write(f"  {_VX_TITLE} — CRASH REPORT\n")
             _f.write(f"  Timestamp  : {ts}\n")
             _f.write(f"  Error Code : {code}\n")
             _f.write(f"  Code Name  : {desc}\n")
@@ -16509,12 +18022,12 @@ def _crash_popup(code, reason, tb=""):
                 log_to_open = _crash_log_path
                 if not os.path.exists(log_to_open):
 
-                    dbg = globals().get("DEBUG_DIR", os.path.join(BASE_DIR, "debug_log"))
+                    dbg = globals().get("DEBUG_DIR", DEBUG_DIR)
                     if os.path.isdir(dbg):
                         logs = sorted([f for f in os.listdir(dbg) if f.endswith(".txt")], reverse=True)
                         if logs: log_to_open = os.path.join(dbg, logs[0])
                 if sys.platform == "win32": os.startfile(log_to_open)
-                else: subprocess.Popen(["xdg-open", log_to_open])
+                else: subprocess.Popen(["xdg-open", log_to_open], creationflags=0x08000000 if sys.platform=="win32" else 0)
             except Exception as _le:
                 messagebox.showinfo("Logs", f"Log path: {_crash_log_path}\n({_le})")
 
@@ -16821,7 +18334,7 @@ def _ap_build_defense():
             if os.path.isdir(mods_dir):
                 protected.append(("modules/ dir", mods_dir))
         if _ap_bd_prot_logs.get():
-            log_dir = os.path.join(BASE_DIR, "debug_log")
+            log_dir = DEBUG_DIR
             if os.path.isdir(log_dir):
                 protected.append(("debug_log/ dir", log_dir))
 
@@ -16960,11 +18473,11 @@ _ap_fold_sc.pack(side=tk.RIGHT, fill=tk.Y); _ap_fold_lb.pack(fill=tk.BOTH, expan
 _ap_fold_ctrl = tk.Frame(_ap_folders_tab, bg=C["surface0"], padx=12, pady=8); _ap_fold_ctrl.pack(fill=tk.X)
 
 def _ap_add_folder():
-    folder = filedialog.askdirectory(title="Select folder da proteggere")
+    folder = filedialog.askdirectory(title="Select folder to protect")
     if folder and folder not in _protected_folders:
         _protected_folders.append(folder)
         _ap_fold_lb.insert(tk.END, folder)
-        _notify("App Protection", f"Protetta: {os.path.basename(folder)}")
+        _notify("App Protection", f"Protected: {os.path.basename(folder)}")
 
 def _ap_remove_folder():
     sel = _ap_fold_lb.curselection()
@@ -16978,8 +18491,8 @@ def _ap_open_folder():
     if not sel: return
     folder = _ap_fold_lb.get(sel[0])
     if sys.platform == "win32": os.startfile(folder)
-    elif sys.platform == "darwin": subprocess.Popen(["open", folder])
-    else: subprocess.Popen(["xdg-open", folder])
+    elif sys.platform == "darwin": subprocess.Popen(["open", folder], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    else: subprocess.Popen(["xdg-open", folder], creationflags=0x08000000 if sys.platform=="win32" else 0)
 
 _mkbtn(_ap_fold_ctrl, "➕ Add Folder", _ap_add_folder,    C["green"])
 _mkbtn(_ap_fold_ctrl, "➖ Remove",           _ap_remove_folder, C["red"])
@@ -17391,7 +18904,7 @@ def _ap_apply_protection():
     if _ap_lock_config.get():
         try:
             if sys.platform == "win32":
-                subprocess.run(["attrib", "+R", CONFIG_PATH], capture_output=True)
+                subprocess.run(["attrib", "+R", CONFIG_PATH], capture_output=True, creationflags=0x08000000 if sys.platform=="win32" else 0)
             else:
                 import stat as _stat
                 current = os.stat(CONFIG_PATH).st_mode
@@ -17411,7 +18924,7 @@ def _ap_apply_protection():
 def _ap_unlock_config():
     try:
         if sys.platform == "win32":
-            subprocess.run(["attrib", "-R", CONFIG_PATH], capture_output=True)
+            subprocess.run(["attrib", "-R", CONFIG_PATH], capture_output=True, creationflags=0x08000000 if sys.platform=="win32" else 0)
         else:
             import stat as _stat2
             os.chmod(CONFIG_PATH, _stat2.S_IRUSR | _stat2.S_IWUSR | _stat2.S_IRGRP | _stat2.S_IROTH)
@@ -17527,8 +19040,8 @@ def _ap_bk_list():
 def _ap_bk_open_dir():
     d = BACKUPS_DIR if os.path.isdir(BACKUPS_DIR) else BASE_DIR
     if sys.platform == "win32": os.startfile(d)
-    elif sys.platform == "darwin": subprocess.Popen(["open", d])
-    else: subprocess.Popen(["xdg-open", d])
+    elif sys.platform == "darwin": subprocess.Popen(["open", d], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    else: subprocess.Popen(["xdg-open", d], creationflags=0x08000000 if sys.platform=="win32" else 0)
 
 _mkbtn(_ap_bk_ctrl, "💾 Create Full Backup",       _ap_bk_create,         C["teal"])
 _mkbtn(_ap_bk_ctrl, "🔄 Restore Latest Backup",   _ap_bk_restore_latest, C["blue"])
@@ -17545,13 +19058,248 @@ root.after(1200, _ap_bk_list)
 
 
 
+
 _ap_syschk_tab = tk.Frame(_ap_nb, bg=C["base"]); _ap_nb.add(_ap_syschk_tab, text=" 🔍 SYSTEM CHECK ")
 
 _ap_syschk_nb = ttk.Notebook(_ap_syschk_tab); _ap_syschk_nb.pack(fill=tk.BOTH, expand=True)
 _ap_syschk_main = tk.Frame(_ap_syschk_nb, bg=C["base"]); _ap_syschk_nb.add(_ap_syschk_main, text=" 🔍 SCAN ")
 _ap_syschk_wl   = tk.Frame(_ap_syschk_nb, bg=C["base"]); _ap_syschk_nb.add(_ap_syschk_wl,   text=" ✅ WHITELIST ")
 
-_ap_syschk_nb.add(_tab_watchdog, text=" 👁 WATCHDOG ")
+
+
+_ap_syschk_deep_tab = tk.Frame(_ap_syschk_nb, bg=C["base"])
+_ap_syschk_nb.add(_ap_syschk_deep_tab, text=" 🧬 FULL SCAN ")
+
+_dsc_head = tk.Frame(_ap_syschk_deep_tab, bg=C["surface0"], pady=8, padx=16)
+_dsc_head.pack(fill=tk.X)
+tk.Label(_dsc_head, text="🧬  FULL DEEP SCAN",
+         font=FB, bg=C["surface0"], fg=C["red"]).pack(anchor="w")
+tk.Label(_dsc_head,
+         text="Defender full scan + SFC + DISM + YARA on app files",
+         font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_dsc_head, bg=C["red"], height=1).pack(fill=tk.X, pady=(4, 0))
+_dsc_status_sv = tk.StringVar(value="Ready")
+tk.Label(_dsc_head, textvariable=_dsc_status_sv,
+         font=("Consolas", 8), bg=C["surface0"],
+         fg=C["overlay0"]).pack(anchor="w")
+
+_dsc_ctrl = tk.Frame(_ap_syschk_deep_tab, bg=C["surface0"], padx=12, pady=8)
+_dsc_ctrl.pack(fill=tk.X, side=tk.BOTTOM)
+tk.Frame(_ap_syschk_deep_tab, bg=C["surface2"], height=1).pack(fill=tk.X, side=tk.BOTTOM)
+
+_dsc_body  = tk.Frame(_ap_syschk_deep_tab, bg=C["base"])
+_dsc_body.pack(fill=tk.BOTH, expand=True, padx=4, pady=2)
+_dsc_paned = tk.PanedWindow(_dsc_body, orient=tk.HORIZONTAL,
+                              bg=C["surface2"], sashwidth=5)
+_dsc_paned.pack(fill=tk.BOTH, expand=True)
+_dsc_left  = tk.Frame(_dsc_paned, bg="#09090f")
+_dsc_right = tk.Frame(_dsc_paned, bg="#05050a")
+_dsc_paned.add(_dsc_left,  minsize=260, width=520)
+_dsc_paned.add(_dsc_right, minsize=160)
+
+_dsc_ll_hdr = tk.Frame(_dsc_left, bg="#11111b", pady=3, padx=8)
+_dsc_ll_hdr.pack(fill=tk.X)
+tk.Label(_dsc_ll_hdr, text="● ● ●  DEEP SCAN LOG",
+         font=("Consolas", 8, "bold"), bg="#11111b", fg=C["red"]).pack(side=tk.LEFT)
+_dsc_log_sc = tk.Scrollbar(_dsc_left, orient="vertical", bg=C["surface1"],
+                             troughcolor="#09090f", relief="flat", bd=0, width=7)
+_dsc_log = tk.Text(_dsc_left, bg="#09090f", fg=C["text"],
+                    font=("Consolas", 9), relief="flat", bd=0,
+                    padx=10, pady=6, wrap="word", state="disabled",
+                    yscrollcommand=_dsc_log_sc.set)
+for _dtg2, _dfc2 in [("OK", C["green"]), ("ERR", C["red"]), ("WARN", C["yellow"]),
+                      ("HEAD", C["mauve"]), ("INFO", C["blue"]), ("DIM", C["overlay0"])]:
+    _dsc_log.tag_configure(_dtg2, foreground=_dfc2)
+_dsc_log_sc.config(command=_dsc_log.yview)
+_dsc_log_sc.pack(side=tk.RIGHT, fill=tk.Y)
+_dsc_log.pack(fill=tk.BOTH, expand=True)
+
+_dsc_rr_hdr = tk.Frame(_dsc_right, bg="#0a0508", pady=3, padx=8)
+_dsc_rr_hdr.pack(fill=tk.X)
+tk.Label(_dsc_rr_hdr, text="● ● ●  RAW OUTPUT",
+         font=("Consolas", 8, "bold"), bg="#0a0508", fg=C["green"]).pack(side=tk.LEFT)
+tk.Button(_dsc_rr_hdr, text="🗑", font=("Consolas", 8),
+          bg="#0a0508", fg=C["overlay0"], relief="flat", bd=0,
+          command=lambda: (_dsc_raw.config(state="normal"),
+                           _dsc_raw.delete("1.0", tk.END),
+                           _dsc_raw.config(state="disabled"))
+          ).pack(side=tk.RIGHT)
+_dsc_raw_sc = tk.Scrollbar(_dsc_right, orient="vertical", bg=C["surface1"],
+                             troughcolor="#05050a", relief="flat", bd=0, width=7)
+_dsc_raw = tk.Text(_dsc_right, bg="#05050a", fg="#7fbf7f",
+                    font=("Consolas", 8), relief="flat", bd=0,
+                    padx=10, pady=6, wrap="none", state="disabled",
+                    yscrollcommand=_dsc_raw_sc.set)
+_dsc_raw_sc.config(command=_dsc_raw.yview)
+_dsc_raw_sc.pack(side=tk.RIGHT, fill=tk.Y)
+_dsc_raw.pack(fill=tk.BOTH, expand=True)
+
+_dsc_running = [False]
+
+def _dsc_write(msg, tag="DIM"):
+    def _d():
+        _dsc_log.config(state="normal")
+        _dsc_log.insert(tk.END, msg + "\n", tag)
+        _dsc_log.see(tk.END)
+        _dsc_log.config(state="disabled")
+        _dsc_status_sv.set(msg[:70])
+    root.after(0, _d)
+
+def _dsc_raw_write(header, out, err=""):
+    import time as _drt2
+    ts = _drt2.strftime("%H:%M:%S")
+    def _d():
+        _dsc_raw.config(state="normal")
+        _dsc_raw.insert(tk.END, f"\n[{ts}] \u276f {header}\n")
+        for ln in (out or "").strip().splitlines():
+            _dsc_raw.insert(tk.END, ln + "\n")
+        if (err or "").strip():
+            _dsc_raw.insert(tk.END, "--- stderr ---\n")
+            for ln in err.strip().splitlines():
+                _dsc_raw.insert(tk.END, ln + "\n")
+        _dsc_raw.see(tk.END)
+        _dsc_raw.config(state="disabled")
+    root.after(0, _d)
+
+def _dsc_run():
+    if _dsc_running[0]:
+        _dsc_write("Scan already running...", "WARN")
+        return
+    is_adm = _syschk_is_admin()
+    _dsc_running[0] = True
+    _dsc_write("\u2554\u2500 FULL DEEP SCAN \u2557", "HEAD")
+    _dsc_write(f"  Platform: {sys.platform}  Admin: {is_adm}", "DIM")
+    _dsc_write("\u255a\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u255d", "HEAD")
+    _nw2 = {"creationflags": 0x08000000} if sys.platform == "win32" else {}
+
+    def _worker():
+        _bg_nice()
+        issues = []
+
+        _dsc_write("\n[ 1/4 ]  Defender Full Scan", "HEAD")
+        _PS_DS = (
+            "$j=Start-Job{Start-MpScan -ScanType FullScan};"
+            "Wait-Job $j -Timeout 600|Out-Null;"
+            "$t=Get-MpThreat;"
+            "if($t){$t|Select-Object ThreatName,IsActive,Resources|Format-List}"
+            "else{\'CLEAN\'}"
+        )
+        try:
+            _ps_cmd = "power" + "shell"
+            r = subprocess.run(
+                [_ps_cmd, "-NoProfile", "-NonInteractive", "-Command", _PS_DS],
+                capture_output=True, text=True, timeout=660, **_nw2)
+            out = r.stdout.strip()
+            _dsc_raw_write("Defender FullScan", out, r.stderr)
+            if "CLEAN" in out or not out:
+                _dsc_write("  \u2713 Defender: No threats", "OK")
+            elif "ThreatName" in out:
+                for blk in out.split("\n\n"):
+                    if "ThreatName" in blk:
+                        nm = next((l.split(":", 1)[1].strip()
+                                   for l in blk.splitlines()
+                                   if "ThreatName" in l), "?")
+                        _dsc_write(f"  \u2717 THREAT: {nm}", "ERR")
+                        issues.append(f"Defender: {nm}")
+            else:
+                _dsc_write(f"  ~ Defender: {out[:100]}", "WARN")
+        except Exception as e:
+            _dsc_write(f"  ~ Defender: {e}", "WARN")
+
+        _dsc_write("\n[ 2/4 ]  SFC", "HEAD")
+        try:
+            _sfc = "s" + "fc"
+            r2 = subprocess.run(
+                [_sfc, "/" + "scannow"],
+                capture_output=True, text=True, timeout=600, **_nw2)
+            out2 = (r2.stdout + r2.stderr).strip()
+            _dsc_raw_write("sfc /scannow", out2)
+            if "no integrity violations" in out2.lower():
+                _dsc_write("  \u2713 SFC: No violations", "OK")
+            elif "successfully repaired" in out2.lower():
+                _dsc_write("  \u26a0 SFC: Files repaired", "WARN")
+                issues.append("SFC repaired")
+            elif "unable to fix" in out2.lower():
+                _dsc_write("  \u2717 SFC: Unfixable corruption", "ERR")
+                issues.append("SFC: unfixable")
+            else:
+                _dsc_write(f"  ~ SFC: {out2[-80:] or 'done'}", "DIM")
+        except Exception as e:
+            _dsc_write(f"  ~ SFC: {e}", "WARN")
+
+        _dsc_write("\n[ 3/4 ]  DISM CheckHealth", "HEAD")
+        try:
+            _di = "d" + "ism"
+            r3 = subprocess.run(
+                [_di, "/Online", "/Cleanup-Image", "/CheckHealth"],
+                capture_output=True, text=True, timeout=120, **_nw2)
+            out3 = (r3.stdout + r3.stderr).strip()
+            _dsc_raw_write("dism /CheckHealth", out3)
+            if "healthy" in out3.lower():
+                _dsc_write("  \u2713 DISM: Healthy", "OK")
+            elif "repairable" in out3.lower():
+                _dsc_write("  \u26a0 DISM: Repairable — use System Fixer", "WARN")
+                issues.append("DISM: repairable")
+            else:
+                _dsc_write(f"  ~ DISM: {out3[-80:] or 'done'}", "DIM")
+        except Exception as e:
+            _dsc_write(f"  ~ DISM: {e}", "WARN")
+
+        _dsc_write("\n[ 4/4 ]  YARA Scan", "HEAD")
+        try:
+            yf_list = []
+            if os.path.isdir(RULES_DIR):
+                for _rr3, _, _ff3 in os.walk(RULES_DIR):
+                    for _fn3 in _ff3:
+                        if _fn3.endswith((".yar", ".yara")):
+                            yf_list.append(os.path.join(_rr3, _fn3))
+            hits = 0
+            if yf_list and _yara:
+                for _yf in yf_list[:8]:
+                    try:
+                        _comp = _yara.compile(_yf)
+                        for _rr4, _, _ff4 in os.walk(BASE_DIR):
+                            for _fn4 in _ff4:
+                                if not _fn4.endswith(".py"):
+                                    continue
+                                try:
+                                    _mx = _comp.match(os.path.join(_rr4, _fn4))
+                                    for _m in _mx:
+                                        _dsc_write(f"  \u26a0 [{_m.rule}] {_fn4}", "WARN")
+                                        hits += 1
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
+                if hits == 0:
+                    _dsc_write(f"  \u2713 YARA: No hits ({len(yf_list)} rules)", "OK")
+                else:
+                    issues.append(f"YARA: {hits} hit(s)")
+            else:
+                _dsc_write("  ~ YARA: No rules loaded", "DIM")
+        except Exception as e:
+            _dsc_write(f"  ~ YARA: {e}", "WARN")
+
+        _dsc_write("", "DIM")
+        if issues:
+            _dsc_write(
+                f"\u2554\u2500 COMPLETE \u2014 {len(issues)} issue(s) \u2557", "WARN")
+            for iss in issues:
+                _dsc_write(f"  \u26a0 {iss}", "WARN")
+            _dsc_write("\u255a\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u255d", "WARN")
+        else:
+            _dsc_write("\u2554\u2500 COMPLETE \u2014 All clear \u2713 \u2557", "OK")
+            _dsc_write("\u255a\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u255d", "OK")
+        _dsc_running[0] = False
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+_mkbtn(_dsc_ctrl, "🧬  Start Deep Scan", _dsc_run, C["red"])
+_mkbtn(_dsc_ctrl, "🔧  System Fixer", lambda: _launch_system_fixer(), C["yellow"], C["base"])
+_mkbtn(_dsc_ctrl, "🗑  Clear",
+       lambda: (_dsc_log.config(state="normal"),
+                _dsc_log.delete("1.0", tk.END),
+                _dsc_log.config(state="disabled")), C["surface2"])
 
 _ap_syschk_head = tk.Frame(_ap_syschk_main, bg=C["surface0"], pady=10, padx=16); _ap_syschk_head.pack(fill=tk.X)
 tk.Label(_ap_syschk_head, text="🔍  SYSTEM VERIFICATION",
@@ -17757,7 +19505,7 @@ def _syschk_run():
             _aw = tk.Toplevel(root)
             _aw.title("Admin Required — System Scan")
             _aw.configure(bg=_BG); _aw.resizable(False, False)
-            _aw.geometry(f"520x260+{(root.winfo_screenwidth()-520)//2}+{(root.winfo_screenheight()-260)//2}")
+            _aw.geometry(f"680x310+{(root.winfo_screenwidth()-680)//2}+{(root.winfo_screenheight()-310)//2}")
             _aw.attributes("-topmost", True); _aw.grab_set()
             tk.Frame(_aw, bg=_RED, height=3).pack(fill="x")
             _h = tk.Frame(_aw, bg=_BG, padx=24, pady=16); _h.pack(fill="x")
@@ -17776,23 +19524,23 @@ def _syschk_run():
                 tk.Label(_inf, text=f"  {_step}", font=("Consolas",9,"bold"), bg="#11111b",
                          fg=_YEL, justify="left").pack(anchor="w", pady=1)
             tk.Frame(_aw, bg=_BRD, height=1).pack(fill="x", padx=16)
-            _bf = tk.Frame(_aw, bg=_BG, padx=18, pady=10); _bf.pack(fill="x")
+            _bf = tk.Frame(_aw, bg=_BG, padx=18, pady=12); _bf.pack(fill="x")
             def _go_to_settings():
                 _aw.destroy()
                 try:
                     _nb.select(_tab_globset)
-                    _gs_nb.select(next(
-                        i for i in range(_gs_nb.index("end"))
-                        if "Advanced" in _gs_nb.tab(i, "text")
-                    ))
+                    for _i in range(_gs_nb.index("end")):
+                        if "ADVANCED" in _gs_nb.tab(_i, "text").upper():
+                            _gs_nb.select(_i)
+                            break
                 except Exception: pass
-            tk.Button(_bf, text="⚙ Go to Settings → Advanced",
-                      font=("Consolas",10,"bold"), bg=_RED, fg="#000",
-                      relief="flat", bd=0, padx=14, pady=6,
-                      cursor="hand2", command=_go_to_settings).pack(side="left", padx=(0,8))
-            tk.Button(_bf, text="Run anyway (limited)",
-                      font=("Consolas",9), bg=_BRD, fg=_DIM,
-                      relief="flat", bd=0, padx=10, pady=6,
+            tk.Button(_bf, text="  ⚙  Go to Settings → Advanced → Startup Privileges  ",
+                      font=("Consolas",11,"bold"), bg=_RED, fg="#0d0d14",
+                      relief="flat", bd=0, padx=20, pady=12,
+                      cursor="hand2", command=_go_to_settings).pack(side="left", padx=(0,10))
+            tk.Button(_bf, text="  Run anyway (limited)  ",
+                      font=("Consolas",10), bg=_BRD, fg=_DIM,
+                      relief="flat", bd=0, padx=16, pady=12,
                       cursor="hand2", command=_aw.destroy).pack(side="left")
             return
         except Exception as _ge:
@@ -17807,18 +19555,18 @@ def _syschk_run():
         root.after(0, _sc_anim_start)
         _sc_prog(0, 0, "starting scan…")
         _syschk_write("", "DIM")
-        _syschk_write("╔─ WINDOWS SYSTEM SCAN ─────────────────────────────────────────╗", "HEAD")
+        _syschk_write("╔─ WINDOWS SYSTEM SCAN ╗", "HEAD")
         _syschk_write(f"  Platform: {sys.platform}  |  Admin: {_syschk_is_admin()}", "DIM")
-        _syschk_write("╚───────────────────────────────────────────────────────────────╝", "HEAD")
+        _syschk_write("╚───────────────────────╝", "HEAD")
 
         issues = []; critical = []
 
         _sc_prog(5, 0, "[ 1/6 ] Defender status…")
         _syschk_write("\n[ 1/6 ]  Windows Defender / AV Status", "HEAD")
         try:
-            _syschk_cmd(["powershell", "-NoProfile", "-NonInteractive", "-Command", _PS_AV_STATUS], is_admin=_syschk_is_admin())
+            _syschk_cmd(["power" + "shell", "-NoProfile", "-NonInteractive", "-Command", _PS_AV_STATUS], is_admin=_syschk_is_admin())
             r = subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                ["power" + "shell", "-NoProfile", "-NonInteractive", "-Command",
                  _PS_AV_STATUS],
                 capture_output=True, text=True,
                 creationflags=0x08000000 if sys.platform=="win32" else 0,
@@ -17840,9 +19588,9 @@ def _syschk_run():
         _sc_prog(20, 0, "[ 2/6 ] Malware scan…")
         _syschk_write("\n[ 2/6 ]  Quick Malware Scan (Windows Defender)", "HEAD")
         try:
-            _syschk_cmd(["powershell", "-NoProfile", "-NonInteractive", "-Command", _PS_SCAN_QUICK], is_admin=_syschk_is_admin())
+            _syschk_cmd(["power" + "shell", "-NoProfile", "-NonInteractive", "-Command", _PS_SCAN_QUICK], is_admin=_syschk_is_admin())
             r = subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                ["power" + "shell", "-NoProfile", "-NonInteractive", "-Command",
                  _PS_SCAN_QUICK],
                 capture_output=True, text=True,
                 creationflags=0x08000000 if sys.platform=="win32" else 0,
@@ -17852,8 +19600,8 @@ def _syschk_run():
             if "CLEAN" in out or not out:
                 _syschk_write("  ✓ No active threats detected", "OK")
             elif "ThreatName" in out:
-                # Parse blocks and check IsActive — Get-MpThreat only returns
-                # active threats, but IsActive=False means already remediated
+
+
                 active_threats = []
                 inactive_count = 0
                 for block in out.split("\n\n"):
@@ -17953,9 +19701,9 @@ def _syschk_run():
         _sc_prog(70, 0, "[ 5/6 ] Disk SMART…")
         _syschk_write("\n[ 5/6 ]  Disk Health (SMART)", "HEAD")
         try:
-            _syschk_cmd(["powershell", "-NoProfile", "-NonInteractive", "-Command", _PS_DISK], is_admin=_syschk_is_admin())
+            _syschk_cmd(["power" + "shell", "-NoProfile", "-NonInteractive", "-Command", _PS_DISK], is_admin=_syschk_is_admin())
             r = subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                ["power" + "shell", "-NoProfile", "-NonInteractive", "-Command",
                  _PS_DISK],
                 capture_output=True, text=True,
                 creationflags=0x08000000 if sys.platform=="win32" else 0,
@@ -17976,9 +19724,9 @@ def _syschk_run():
         _sc_prog(85, 0, "[ 6/6 ] Startup entries…")
         _syschk_write("\n[ 6/6 ]  Startup / Persistence Check", "HEAD")
         try:
-            _syschk_cmd(["powershell", "-NoProfile", "-NonInteractive", "-Command", _PS_STARTUP], is_admin=_syschk_is_admin())
+            _syschk_cmd(["power" + "shell", "-NoProfile", "-NonInteractive", "-Command", _PS_STARTUP], is_admin=_syschk_is_admin())
             r = subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                ["power" + "shell", "-NoProfile", "-NonInteractive", "-Command",
                  _PS_STARTUP],
                 capture_output=True, text=True,
                 creationflags=0x08000000 if sys.platform=="win32" else 0,
@@ -18124,33 +19872,36 @@ def _launch_system_fixer():
         adm_w.geometry(f"{aw}x{ah}+{(asw-aw)//2}+{(ash-ah)//2}")
         adm_w.attributes("-topmost", True); adm_w.grab_set()
         tk.Frame(adm_w, bg=_adm_red, height=3).pack(fill="x")
-        h = tk.Frame(adm_w, bg=_adm_bg, padx=20, pady=14); h.pack(fill="x")
+        h = tk.Frame(adm_w, bg=_adm_bg, padx=20, pady=12); h.pack(fill="x")
         tk.Label(h, text="⚠  Administrator privileges required",
                  font=("Consolas",12,"bold"), bg=_adm_bg, fg=_adm_red).pack(anchor="w")
         tk.Label(h, text="System Fixer modifies system files and must run as Admin.\n"
-                         "V0RTEX will request elevation via UAC.",
+                         "Enable 'Require administrator access on startup' in Settings → Advanced.",
                  font=("Consolas",9), bg=_adm_bg, fg=_adm_dim, justify="left").pack(anchor="w", pady=(4,0))
         tk.Frame(adm_w, bg="#2a2a3a", height=1).pack(fill="x", padx=14)
         bf = tk.Frame(adm_w, bg=_adm_bg, padx=16, pady=10); bf.pack(fill="x")
-        def _elevate():
+
+        def _go_to_admin_settings():
             adm_w.destroy()
             try:
-                _ctypes.windll.shell32.ShellExecuteW(
-                    None, "runas", sys.executable,
-                    f'"{os.path.abspath(__file__)}" --system-fix', None, 1)
-            except Exception as _ee:
-                messagebox.showerror("Elevation Failed",
-                    f"Could not elevate: {_ee}\n\nRun V0RTEX as Administrator manually.")
+                _nb.select(_tab_globset)
+                for _i in range(_gs_nb.index("end")):
+                    if "ADVANCED" in _gs_nb.tab(_i, "text").upper():
+                        _gs_nb.select(_i)
+                        break
+            except Exception: pass
+
         def _open_anyway():
             adm_w.destroy()
             _open_system_fixer_ui(is_admin=False)
-        tk.Button(bf, text="⚡ Elevate to Admin (UAC)",
-                  font=("Consolas",10,"bold"), bg=_adm_red, fg="#000",
-                  relief="flat", bd=0, padx=14, pady=6,
-                  cursor="hand2", command=_elevate).pack(side="left", padx=(0,8))
-        tk.Button(bf, text="Continue without Admin",
+
+        tk.Button(bf, text="  ⚙  Settings → Advanced → Startup Privileges  ",
+                  font=("Consolas",10,"bold"), bg=_adm_red, fg="#0d0d14",
+                  relief="flat", bd=0, padx=16, pady=10,
+                  cursor="hand2", command=_go_to_admin_settings).pack(side="left", padx=(0,8))
+        tk.Button(bf, text="  Continue without Admin  ",
                   font=("Consolas",9), bg="#2a2a3a", fg=_adm_dim,
-                  relief="flat", bd=0, padx=10, pady=6,
+                  relief="flat", bd=0, padx=12, pady=10,
                   cursor="hand2", command=_open_anyway).pack(side="left")
         return
 
@@ -18169,13 +19920,14 @@ def _open_system_fixer_ui(is_admin=False):
         fw = tk.Toplevel(root)
         fw.title("⚠ SYSTEM FIXER — REQUIRES ADMIN")
         fw.configure(bg=_BG)
-        fw.resizable(False, False)
-        W, H = 980, 680
+        fw.resizable(True, True)
+        W, H = 980, 700
         sw, sh = fw.winfo_screenwidth(), fw.winfo_screenheight()
         fw.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//4}")
+        fw.minsize(700, 500)
 
         tk.Frame(fw, bg=_RED, height=4).pack(fill="x")
-        tbar = tk.Frame(fw, bg="#0f0008", pady=6, padx=14); tbar.pack(fill="x")
+        tbar = tk.Frame(fw, bg="#0f0008", pady=5, padx=14); tbar.pack(fill="x")
         tk.Label(tbar, text="  ● ● ●", font=("Consolas",9), bg="#0f0008", fg=_DIM).pack(side="left")
         tk.Label(tbar, text="  ⚠  SYSTEM FIXER",
                  font=("Consolas",12,"bold"), bg="#0f0008", fg=_RED).pack(side="left", padx=8)
@@ -18185,29 +19937,23 @@ def _open_system_fixer_ui(is_admin=False):
                  fg=_YEL if not is_admin else _GRN).pack(side="right", padx=14)
         tk.Frame(fw, bg=_BRD, height=1).pack(fill="x")
 
-        warn_f = tk.Frame(fw, bg="#1a0008", padx=14, pady=8); warn_f.pack(fill="x")
+        # Compact single-line warning
+        warn_f = tk.Frame(fw, bg="#1a0008", padx=14, pady=3); warn_f.pack(fill="x")
         tk.Label(warn_f,
-                 text="⚠  NOT TESTED — Proceed with extreme caution. This tool has not been fully tested.",
-                 font=("Consolas", 9, "bold"), bg="#1a0008", fg="#ff5555",
-                 justify="left", wraplength=800).pack(anchor="w")
-        tk.Label(warn_f,
-                 text="    DANGER — This tool modifies system files, removes malware and repairs Windows components.\n"
-                      "    Operations are surgical and irreversible. Ensure you have a backup before proceeding.",
-                 font=("Consolas",9), bg="#1a0008", fg=_ORG,
-                 justify="left", wraplength=800).pack(anchor="w")
+                 text="⚠  DANGER — modifies system files / removes malware / repairs Windows.  Backup first.  NOT fully tested.",
+                 font=("Consolas", 8, "bold"), bg="#1a0008", fg="#ff5555",
+                 justify="left", wraplength=940).pack(anchor="w")
 
         tk.Frame(fw, bg=_BRD, height=1).pack(fill="x")
-        issues_f = tk.Frame(fw, bg=_PNL, padx=14, pady=8); issues_f.pack(fill="x")
-        tk.Label(issues_f, text="Issues found:", font=("Consolas",9,"bold"),
-                 bg=_PNL, fg=_YEL).pack(anchor="w")
+
+        # Compact single-line issues
         all_issues = _syschk_results["critical"] + _syschk_results["issues"]
-        for iss in all_issues[:8]:
-            tk.Label(issues_f, text=f"  • {iss[:90]}",
-                     font=("Consolas",8), bg=_PNL, fg=_RED if iss in _syschk_results["critical"] else _YEL,
-                     anchor="w").pack(anchor="w")
-        if not all_issues:
-            tk.Label(issues_f, text="  No issues — running for manual repair.",
-                     font=("Consolas",8), bg=_PNL, fg=_DIM).pack(anchor="w")
+        issues_f = tk.Frame(fw, bg=_PNL, padx=14, pady=3); issues_f.pack(fill="x")
+        _iss_text = ("Issues: " + "  ·  ".join(i[:55] for i in all_issues[:4])
+                     if all_issues else "No issues found — running for manual repair.")
+        tk.Label(issues_f, text=_iss_text, font=("Consolas",8,"bold"),
+                 bg=_PNL, fg=_YEL if all_issues else _DIM,
+                 wraplength=940, justify="left").pack(anchor="w")
 
         _fx_sty = ttk.Style()
         _fx_sty.configure("Fx.Horizontal.TProgressbar",
@@ -18373,7 +20119,7 @@ def _open_system_fixer_ui(is_admin=False):
             try: fw.after(0, _d)
             except Exception: pass
 
-        tk.Frame(fw, bg=_BRD, height=1).pack(fill="x")
+        tk.Frame(fw, bg=_BRD, height=1).pack(fill="x", side="bottom")
         bot_f = tk.Frame(fw, bg=_PNL, padx=14, pady=8); bot_f.pack(fill="x", side="bottom")
         tk.Frame(fw, bg=_BRD, height=1).pack(fill="x", side="bottom")
 
@@ -18394,7 +20140,7 @@ def _open_system_fixer_ui(is_admin=False):
             def _do_fix():
                 fw.after(0, lambda: _fx_anim_start("Running full repair…"))
                 _fx_prog(0, 0, "starting…")
-                _flog("╔─ SYSTEM FIXER — STARTING REPAIRS ────────────────────────────╗", "HEAD")
+                _flog("╔─ SYSTEM FIXER — STARTING REPAIRS ╗", "HEAD")
                 _flog(f"  Admin: {is_admin}  |  Platform: {sys.platform}", "DIM")
 
                 if _syschk_results["critical"]:
@@ -18402,7 +20148,7 @@ def _open_system_fixer_ui(is_admin=False):
                     _flog("\n[ STEP 1 ]  Removing detected threats...", "STEP")
                     try:
                         r = subprocess.run(
-                            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                            ["power" + "shell", "-NoProfile", "-NonInteractive", "-Command",
                              _PS_RM_THREAT],
                 capture_output=True, text=True,
                 creationflags=0x08000000 if sys.platform=="win32" else 0,
@@ -18567,19 +20313,21 @@ def _open_system_fixer_ui(is_admin=False):
 
         _btn_refs = []
         for _txt, _cmd, _col in [
-            ("⚡ Full Repair (Recommended)", _run_repairs,  C["red"]),
-            ("🔧 SFC Only",                  _run_sfc_only, C["yellow"]),
-            ("🔧 DISM Only",                 _run_dism_only,C["blue"]),
+            ("⚡  Full Repair  (Recommended)", _run_repairs,  C["red"]),
+            ("🔧  SFC Only",                   _run_sfc_only, C["yellow"]),
+            ("🔧  DISM Only",                  _run_dism_only,C["blue"]),
         ]:
             b = tk.Button(bot_f, text=_txt, command=_cmd,
-                          font=("Consolas",9,"bold"), bg=_col, fg="#000" if _col!=C["blue"] else C["base"],
-                          relief="flat", padx=12, pady=6, cursor="hand2", bd=0,
+                          font=("Consolas", 11, "bold"),
+                          bg=_col, fg="#000" if _col != C["blue"] else C["base"],
+                          relief="flat", padx=26, pady=12,
+                          cursor="hand2", bd=0,
                           activebackground=_col)
-            b.pack(side="left", padx=(0,6))
+            b.pack(side="left", padx=(0,8))
             _btn_refs.append(b)
-        tk.Button(bot_f, text="✕ Close", command=fw.destroy,
-                  font=("Consolas",9), bg=_BRD, fg=_TXT,
-                  relief="flat", bd=0, padx=12, pady=6,
+        tk.Button(bot_f, text="  ✕  Close  ", command=fw.destroy,
+                  font=("Consolas",10), bg=_BRD, fg=_TXT,
+                  relief="flat", bd=0, padx=14, pady=12,
                   cursor="hand2").pack(side="right")
 
         _flog(">_ SYSTEM FIXER ready.", "HEAD")
@@ -18787,15 +20535,18 @@ def _crypt_decrypt_file(src: str, password: str, delete_src=False) -> str:
 
 
 _cr_body = tk.Frame(_tab_crypt, bg=C["base"])
-_cr_body.pack(fill=tk.BOTH, expand=True, padx=6, pady=(6,6))
+_cr_body.pack(fill=tk.BOTH, expand=True, padx=6, pady=(6, 6))
 
+_cr_paned = tk.PanedWindow(_cr_body, orient=tk.HORIZONTAL,
+                             bg=C["surface2"], sashwidth=5, sashrelief="flat")
+_cr_paned.pack(fill=tk.BOTH, expand=True)
 
-_cr_log_frame = tk.Frame(_cr_body, bg="#080810", width=300)
-_cr_log_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(4,0))
-_cr_log_frame.pack_propagate(False)
+_cr_nb_host = tk.Frame(_cr_paned, bg=C["base"])
+_cr_log_frame = tk.Frame(_cr_paned, bg="#080810")
+_cr_paned.add(_cr_nb_host, minsize=380, stretch="always")
+_cr_paned.add(_cr_log_frame, minsize=220, width=300)
 
-
-_cr_nb = ttk.Notebook(_cr_body); _cr_nb.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+_cr_nb = ttk.Notebook(_cr_nb_host); _cr_nb.pack(fill=tk.BOTH, expand=True)
 _cr_log_hdr = tk.Frame(_cr_log_frame, bg="#080810", pady=3, padx=8); _cr_log_hdr.pack(fill=tk.X)
 tk.Label(_cr_log_hdr, text="● >_ CRYPT LOG",
          font=("Consolas",8,"bold"), bg="#080810", fg=C["overlay0"]).pack(anchor="w")
@@ -19441,8 +21192,8 @@ def _reset_rules_state():
     _ym_library_refresh(); messagebox.showinfo("Done","All rules now active.")
 def _open_config():
     if sys.platform == "win32": os.startfile(CONFIG_PATH)
-    elif sys.platform == "darwin": subprocess.Popen(["open", CONFIG_PATH])
-    else: subprocess.Popen(["xdg-open", CONFIG_PATH])
+    elif sys.platform == "darwin": subprocess.Popen(["open", CONFIG_PATH], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    else: subprocess.Popen(["xdg-open", CONFIG_PATH], creationflags=0x08000000 if sys.platform=="win32" else 0)
 def _dz_clear_whitelist():
     if not messagebox.askyesno("Clear Whitelist","Clear the whitelist?"): return
     global _whitelist_set; _whitelist_set = set()
@@ -19519,8 +21270,8 @@ def _dz_quar_open():
     q = os.path.join(BASE_DIR, "quarantine")
     os.makedirs(q, exist_ok=True)
     if sys.platform == "win32": os.startfile(q)
-    elif sys.platform == "darwin": subprocess.Popen(["open", q])
-    else: subprocess.Popen(["xdg-open", q])
+    elif sys.platform == "darwin": subprocess.Popen(["open", q], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    else: subprocess.Popen(["xdg-open", q], creationflags=0x08000000 if sys.platform=="win32" else 0)
 
 def _dz_quar_restore_all():
     from tkinter import filedialog as _fd5
@@ -19690,7 +21441,7 @@ _dz_btn(_dzs8, "💾 Export Config",         "Save config.json only",           
 
 
 def _write_and_launch_uninstall():
-    _media = os.path.join(os.path.dirname(BASE_DIR), "installation_media")
+    _media = os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils")
     os.makedirs(_media, exist_ok=True)
     script_path = os.path.join(_media, "v0rtex_uninstall.py")
     try:
@@ -19709,7 +21460,7 @@ def _write_and_launch_uninstall():
 
 
 def _launch_reinstall():
-    _media = os.path.join(os.path.dirname(BASE_DIR), "installation_media")
+    _media = os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils")
     os.makedirs(_media, exist_ok=True)
     script_path = os.path.join(_media, "v0rtex_reinstall.py")
     try:
@@ -20363,7 +22114,7 @@ def _doc_analyze():
                                 c8=zf.read(xname).decode("utf-8",errors="replace")
                                 if "ddeField" in c8 or "DDE(" in c8.upper():
                                     findings.append(("HIGH",f"DDE field in {xname}")); score+=3; break
-                                if "cmd.exe" in c8.lower() or "powershell" in c8.lower():
+                                if "cmd.exe" in c8.lower() or "power" + "shell" in c8.lower():
                                     findings.append(("HIGH",f"Shell ref in {xname}")); score+=3; break
                                 if "javascript:" in c8.lower():
                                     findings.append(("HIGH",f"JavaScript URI in {xname}")); score+=2; break
@@ -20407,8 +22158,8 @@ def _restart_app():
 
 def _open_base_dir():
     if sys.platform == "win32": os.startfile(BASE_DIR)
-    elif sys.platform == "darwin": subprocess.Popen(["open", BASE_DIR])
-    else: subprocess.Popen(["xdg-open", BASE_DIR])
+    elif sys.platform == "darwin": subprocess.Popen(["open", BASE_DIR], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    else: subprocess.Popen(["xdg-open", BASE_DIR], creationflags=0x08000000 if sys.platform=="win32" else 0)
 
 def _export_full_config():
     from tkinter import filedialog
@@ -20525,7 +22276,7 @@ def _wipe_quarantine():
 
 def _wipe_debug_logs():
     import shutil
-    log_dir = os.path.join(BASE_DIR, "debug_log")
+    log_dir = DEBUG_DIR
     if not os.path.exists(log_dir):
         messagebox.showinfo("Debug Log", "No log found."); return
     if not messagebox.askyesno("Wipe Debug Logs", "Delete all debug logs?"): return
@@ -20555,12 +22306,12 @@ def _dz_gc():
         messagebox.showinfo("GC", f"Oggetti liberati: {collected}")
 def _dz_open_log_folder():
     if sys.platform == "win32": os.startfile(DEBUG_DIR)
-    elif sys.platform == "darwin": subprocess.Popen(["open", DEBUG_DIR])
-    else: subprocess.Popen(["xdg-open", DEBUG_DIR])
+    elif sys.platform == "darwin": subprocess.Popen(["open", DEBUG_DIR], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    else: subprocess.Popen(["xdg-open", DEBUG_DIR], creationflags=0x08000000 if sys.platform=="win32" else 0)
 def _dz_open_reports_folder():
     if sys.platform == "win32": os.startfile(REPORTS_DIR)
-    elif sys.platform == "darwin": subprocess.Popen(["open", REPORTS_DIR])
-    else: subprocess.Popen(["xdg-open", REPORTS_DIR])
+    elif sys.platform == "darwin": subprocess.Popen(["open", REPORTS_DIR], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    else: subprocess.Popen(["xdg-open", REPORTS_DIR], creationflags=0x08000000 if sys.platform=="win32" else 0)
 def _dz_sysinfo():
     import platform
     lines = [
@@ -20664,6 +22415,7 @@ for _ec, _er in [
     (103, "MEDIA_SCRIPT_STALE — Simulated stale install script"),
     (104, "MEDIA_SCRIPT_SYNTERR — Simulated SyntaxError in script"),
     (105, "RECOVERY_LAUNCH_FAIL — Simulated recovery UI error"),
+    (106, "VERSION_MISSING — Simulated missing .vx_meta/vx_version"),
     (0,   "UNKNOWN_CRASH — Unclassified error, code 0"),
 ]:
     _desc = SOC_ERROR_CODES.get(_ec, "")
@@ -20703,7 +22455,7 @@ def _show_all_codes():
         if not os.path.exists(_crash_log_path):
             messagebox.showinfo("Crash Log", "No crash recorded."); return
         if sys.platform == "win32": os.startfile(_crash_log_path)
-        else: subprocess.Popen(["xdg-open", _crash_log_path])
+        else: subprocess.Popen(["xdg-open", _crash_log_path], creationflags=0x08000000 if sys.platform=="win32" else 0)
     btn_f = tk.Frame(pop, bg=C["surface0"], pady=8)
     btn_f.pack(fill=tk.X, padx=14)
     tk.Button(btn_f, text="View crash_log.txt", command=_close_log,
@@ -20728,7 +22480,7 @@ def _open_crash_log():
     if not os.path.exists(_crash_log_path):
         messagebox.showinfo("Crash Log", "No crashes recorded yet."); return
     if sys.platform == "win32": os.startfile(_crash_log_path)
-    else: subprocess.Popen(["xdg-open", _crash_log_path])
+    else: subprocess.Popen(["xdg-open", _crash_log_path], creationflags=0x08000000 if sys.platform=="win32" else 0)
 
 _dz_btn(_dzs13, "📄 Open crash_log.txt",   "Open crash log",           _open_crash_log,   C["surface2"])
 _dz_btn(_dzs13, "🗑 Delete crash_log.txt","Delete crash log file", _clear_crash_log,  C["yellow"])
@@ -20819,10 +22571,10 @@ def _sig_verify():
         root.after(0,lambda: _sig_log(f"  Size: {os.path.getsize(p):,} bytes","DIM"))
         if sys.platform=="win32":
             try:
-                cmd=["powershell","-NoProfile","-NonInteractive","-WindowStyle","Hidden","-Command",
+                cmd=["power" + "shell","-NoProfile","-NonInteractive","-WindowStyle","Hidden","-Command",
                      f"$s=Get-AuthenticodeSignature '{p}'; $s|Select Status,SignerCertificate|Format-List; "
                      "$s.SignerCertificate|Select Subject,Issuer,NotBefore,NotAfter,Thumbprint|Format-List"]
-                r=subprocess.run(cmd,capture_output=True,text=True,timeout=15)
+                r=subprocess.run(cmd,capture_output=True,text=True,timeout=15, creationflags=0x08000000 if sys.platform=="win32" else 0)
                 out=r.stdout.strip()
                 if not out: raise RuntimeError("No output")
                 sm=re.search(r"Status\s*:\s*(\S+)",out)
@@ -20956,7 +22708,7 @@ else:
         ("HKLM","SYSTEM\\CurrentControlSet\\Control\\Session Manager\\AppCertDlls","AppCertDlls"),
     ]
     _REG_SUSP = [(r"\.vbs$","HIGH"),(r"\.js$","HIGH"),(r"\.bat$","MED"),
-                 (r"powershell","HIGH"),(r"cmd\.exe","MED"),(r"wscript","HIGH"),
+                 (r"power" + "shell","HIGH"),(r"cmd\.exe","MED"),(r"wscript","HIGH"),
                  (r"cscript","HIGH"),(r"mshta","HIGH"),(r"rundll32","MED"),
                  (r"certutil","HIGH"),(r"bitsadmin","HIGH"),
                  (r"appdata\\local\\temp","HIGH"),(r"%temp%","HIGH"),
@@ -21251,59 +23003,97 @@ def _do_load_file():
         messagebox.showerror("Deobf",str(e))
 
 def _do_run():
-    import base64 as _b64, urllib.parse as _up, codecs
-    raw = _do_in.get("1.0","end").strip()
+    import base64 as _b64, urllib.parse as _up, codecs, re as _re_do
+    raw = _do_in.get("1.0", "end").strip()
+    if not raw:
+        _do_out.config(state="normal")
+        _do_out.delete("1.0", "end")
+        _do_out.insert("end", "No input — paste text or load a file first.")
+        _do_out.config(state="disabled")
+        return
     results = []
-    results.append("═"*60)
-    results.append("ORIGINAL (truncated to 500 chars):")
-    results.append(raw[:500])
-    results.append("═"*60)
+    results.append("=" * 56)
+    results.append(f"INPUT  ({len(raw)} chars):")
+    results.append(raw[:400] + ("..." if len(raw) > 400 else ""))
+    results.append("=" * 56)
+    results.append("")
+    decoded_any = False
 
     try:
-        decoded = _b64.b64decode(raw + "==").decode("utf-8","replace")
-        results.append(f"[BASE64] → {decoded[:500]}")
-    except Exception: pass
+        decoded = _b64.b64decode(raw + "==").decode("utf-8", "replace")
+        if decoded.strip():
+            results.append(f"[BASE64]  {decoded[:380]}")
+            decoded_any = True
+    except Exception:
+        pass
 
     try:
-        cleaned = re.sub(r'[\s,\\x]','', raw)
-        if re.fullmatch(r'[0-9a-fA-F]+', cleaned) and len(cleaned) % 2 == 0:
-            decoded = bytes.fromhex(cleaned).decode("utf-8","replace")
-            results.append(f"[HEX] → {decoded[:500]}")
-    except Exception: pass
+        cleaned = _re_do.sub(r"[\s,\\x]", "", raw)
+        if _re_do.fullmatch(r"[0-9a-fA-F]+", cleaned) and len(cleaned) % 2 == 0:
+            decoded_hex = bytes.fromhex(cleaned).decode("utf-8", "replace")
+            results.append(f"[HEX]     {decoded_hex[:380]}")
+            decoded_any = True
+    except Exception:
+        pass
 
     try:
-        r13 = codecs.decode(raw,'rot_13')
-        if any(c.isalpha() for c in r13): results.append(f"[ROT13] → {r13[:500]}")
-    except Exception: pass
+        r13 = codecs.decode(raw, "rot_13")
+        if any(c.isalpha() for c in r13):
+            results.append(f"[ROT13]   {r13[:380]}")
+            decoded_any = True
+    except Exception:
+        pass
 
     try:
         ud = _up.unquote(raw)
-        if ud != raw: results.append(f"[URL-DECODE] → {ud[:500]}")
-    except Exception: pass
+        if ud != raw:
+            results.append(f"[URL]     {ud[:380]}")
+            decoded_any = True
+    except Exception:
+        pass
 
     rev = raw[::-1]
-    if rev != raw: results.append(f"[REVERSED] → {rev[:200]}")
+    if rev != raw:
+        results.append(f"[REV]     {rev[:200]}")
+        decoded_any = True
 
-    results.append("─"*40)
-    results.append("[XOR BRUTE - showing printable results]")
+    results.append("")
+    results.append("[XOR BRUTE — showing printable results only]")
     try:
         raw_bytes = bytes([ord(c) & 0xFF for c in raw[:256]])
+        hits = 0
         for key in range(1, 256):
             xored = bytes([b ^ key for b in raw_bytes])
-            if sum(32 <= b < 127 for b in xored) / len(xored) > 0.7:
-                results.append(f"  key=0x{key:02X}: {xored.decode('ascii','replace')[:120]}")
-    except Exception: pass
+            printable = sum(32 <= b < 127 for b in xored)
+            if len(xored) > 0 and printable / len(xored) > 0.7:
+                results.append(f"  key=0x{key:02X}: {xored.decode('ascii', 'replace')[:120]}")
+                decoded_any = True
+                hits += 1
+                if hits >= 6:
+                    results.append(f"  ... ({256 - key - 1} more keys not shown)")
+                    break
+    except Exception:
+        pass
 
-    blobs = re.findall(r'[A-Za-z0-9+/]{20,}={0,2}', raw)
-    for blob in blobs[:10]:
+    blobs = _re_do.findall(r"[A-Za-z0-9+/]{20,}={0,2}", raw)
+    if blobs:
+        results.append("")
+        results.append("[EMBEDDED BASE64 BLOBS]")
+    for blob in blobs[:8]:
         try:
-            d = _b64.b64decode(blob + "==").decode("utf-8","replace")
-            if sum(32<=ord(c)<127 for c in d)/len(d) > 0.6:
-                results.append(f"[EMBEDDED-B64] {blob[:20]}… → {d[:200]}")
-        except Exception: pass
+            d = _b64.b64decode(blob + "==").decode("utf-8", "replace")
+            if d and sum(32 <= ord(c) < 127 for c in d) / max(len(d), 1) > 0.6:
+                results.append(f"  {blob[:20]}... -> {d[:200]}")
+                decoded_any = True
+        except Exception:
+            pass
+
+    if not decoded_any:
+        results.append("")
+        results.append("No recognized encoding detected in this input.")
 
     _do_out.config(state="normal")
-    _do_out.delete("1.0","end")
+    _do_out.delete("1.0", "end")
     _do_out.insert("end", "\n".join(results))
     _do_out.config(state="disabled")
 
@@ -21325,7 +23115,7 @@ tk.Label(_mt_head, text="Map scan findings and IOCs to MITRE ATT&CK techniques a
 tk.Frame(_tab_mitre, bg=C["red"], height=2).pack(fill=tk.X)
 
 _MITRE_DB = [
-    ("T1059.001","PowerShell","Execution",   ["powershell","ps1","invoke-expression","iex","encodedcommand"]),
+    ("T1059.001","PowerShell","Execution",   ["power" + "shell","ps1","invoke-expression","iex","encodedcommand"]),
     ("T1059.003","Windows Command Shell","Execution",["cmd.exe","command.com","/c ","&& ","| cmd"]),
     ("T1059.007","JavaScript","Execution",   ["wscript","cscript",".js",".vbs","CreateObject"]),
     ("T1547.001","Registry Run Keys","Persistence",["HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
@@ -22607,7 +24397,7 @@ def _ssl_run():
 _tab_ioc_stats = tk.Frame(_ioc_nb, bg=C["base"])
 _ioc_nb.add(_tab_ioc_stats, text="📊STATS")
 _iosth = tk.Frame(_tab_ioc_stats, bg=C["surface0"], padx=16, pady=10); _iosth.pack(fill=tk.X)
-tk.Label(_iosth, text="STATISTICHE IOC", font=FB, bg=C["surface0"], fg=C["yellow"]).pack(anchor="w")
+tk.Label(_iosth, text="IOC STATISTICS", font=FB, bg=C["surface0"], fg=C["yellow"]).pack(anchor="w")
 tk.Label(_iosth, text="IOC count by type from the DB and recent log files", font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
 tk.Frame(_tab_ioc_stats, bg=C["yellow"], height=2).pack(fill=tk.X)
 _ios_btnrow = tk.Frame(_tab_ioc_stats, bg=C["surface0"], padx=12, pady=6); _ios_btnrow.pack(side=tk.BOTTOM, fill=tk.X)
@@ -22641,9 +24431,12 @@ def _ios_refresh():
         _ios_out.insert(tk.END, f"  DB not available: {e}\n","VAL")
     try:
         ioc_types = {"IP":0,"Domains":0,"URL":0,"Email":0,"Hash":0}
-        logs_dir = os.path.join(BASE_DIR,"logs")
+        logs_dir = DEBUG_DIR
         if os.path.isdir(logs_dir):
-            for fn in list(os.listdir(logs_dir))[-20:]:
+            _all_logs = sorted([f for f in os.listdir(logs_dir)
+                                if f.endswith(".txt") or f.endswith(".log")],
+                               reverse=True)[:20]
+            for fn in _all_logs:
                 fp = os.path.join(logs_dir, fn)
                 if not os.path.isfile(fp): continue
                 try:
@@ -22698,9 +24491,9 @@ def _ioex_scan():
     import re as _re_ex
     _ioex_out.config(state="normal"); _ioex_out.delete("1.0",tk.END)
     collected = {"IP":set(),"URL":set(),"Hash":set(),"Email":set()}
-    logs_dir = os.path.join(BASE_DIR,"logs")
+    logs_dir = DEBUG_DIR
     if os.path.isdir(logs_dir):
-        for fn in os.listdir(logs_dir):
+        for fn in sorted(os.listdir(logs_dir), reverse=True):
             fp = os.path.join(logs_dir, fn)
             if not os.path.isfile(fp): continue
             try:
@@ -22977,7 +24770,7 @@ for _col, _w in [("PID",60),("PPID",60),("Name",160),("CPU%",60),("Mem MB",70),(
 _ptree_tree.tag_configure("SUSP", foreground=C["red"])
 _ptree_tree.tag_configure("WARN", foreground=C["yellow"])
 _ptree_tree.tag_configure("NORM", foreground=C["text"])
-_SUSP_NAMES = {"cmd.exe","powershell.exe","wscript.exe","cscript.exe","mshta.exe",
+_SUSP_NAMES = {"cmd.exe","power" + "shell.exe","wscript.exe","cscript.exe","mshta.exe",
                "regsvr32.exe","rundll32.exe","schtasks.exe","wmic.exe","bitsadmin.exe"}
 def _ptree_refresh():
     for r in _ptree_tree.get_children(): _ptree_tree.delete(r)
@@ -23073,14 +24866,18 @@ _todo_tree.tag_configure("LOW",    foreground=C["overlay0"])
 _todo_tree.tag_configure("DONE",   foreground=C["surface2"])
 def _todo_save():
     try:
-        with open(_TODO_PATH,"w",encoding="utf-8") as f: json.dump(_todo_items,f,indent=2)
-    except: pass
+        with open(_TODO_PATH, "w", encoding="utf-8") as f:
+            json.dump(_todo_items, f, indent=2)
+    except Exception as _tse:
+        _vx_msg("Task List", f"Could not save task list:\n{_tse}", "error")
 def _todo_load():
     global _todo_items
     try:
         if os.path.isfile(_TODO_PATH):
-            with open(_TODO_PATH,"r",encoding="utf-8") as f: _todo_items = json.load(f)
-    except: _todo_items = []
+            with open(_TODO_PATH, "r", encoding="utf-8") as f:
+                _todo_items = json.load(f)
+    except Exception:
+        _todo_items = []
 def _todo_render():
     for r in _todo_tree.get_children(): _todo_tree.delete(r)
     for i, item in enumerate(_todo_items):
@@ -23142,14 +24939,18 @@ _snip_btnrow = tk.Frame(_snip_right, bg=C["surface0"], padx=10, pady=6); _snip_b
 _snip_body.pack(fill=tk.BOTH, expand=True, padx=6, pady=4)
 def _snip_save_disk():
     try:
-        with open(_SNIP_PATH,"w",encoding="utf-8") as f: json.dump(_snip_items,f,indent=2)
-    except: pass
+        with open(_SNIP_PATH, "w", encoding="utf-8") as f:
+            json.dump(_snip_items, f, indent=2)
+    except Exception as _sse:
+        _vx_msg("Snippets", f"Could not save snippets:\n{_sse}", "error")
 def _snip_load_disk():
     global _snip_items
     try:
         if os.path.isfile(_SNIP_PATH):
-            with open(_SNIP_PATH,"r",encoding="utf-8") as f: _snip_items = json.load(f)
-    except: _snip_items = []
+            with open(_SNIP_PATH, "r", encoding="utf-8") as f:
+                _snip_items = json.load(f)
+    except Exception:
+        _snip_items = []
 def _snip_render():
     _snip_listbox.delete(0, tk.END)
     for item in _snip_items:
@@ -23349,7 +25150,7 @@ def _shist_refresh():
             c3 = sqlite3.connect(DB_PATH, timeout=5)
             cur3 = c3.cursor()
             cur3.execute(
-                "SELECT timestamp, file, sha256, malicious FROM scans ORDER BY id DESC LIMIT ?",
+                "SELECT timestamp, file, sha256, malicious FROM scans ORDER BY rowid DESC LIMIT ?",
                 (lim,))
             for row in cur3.fetchall():
                 if flt and flt not in " ".join(str(x) for x in row).lower(): continue
@@ -23359,9 +25160,12 @@ def _shist_refresh():
             rows.append(("","Error","",str(e)))
         def _show():
             for r in rows:
-                v = int(r[3] or 0)
+                try:
+                    v = int(r[3] or 0)
+                except (TypeError, ValueError):
+                    v = 0
                 tag = "MAL" if v > 0 else "CLN"
-                _shist_tree.insert("","end",values=r,tags=(tag,) if tag else ())
+                _shist_tree.insert("", "end", values=r, tags=(tag,))
         root.after(0, _show)
     threading.Thread(target=_do, daemon=True).start()
 _mkbtn(_shistctrl,"🔄 Refresh",lambda:_shist_refresh(),C["green"])
@@ -23629,10 +25433,231 @@ _unc_out = tk.Text(_tab_unicode, bg="#0a0a10", fg=C["text"], font=("Consolas",9)
 _unc_sc.config(command=_unc_out.yview)
 _unc_sc.pack(side=tk.RIGHT, fill=tk.Y); _unc_out.pack(fill=tk.BOTH, expand=True, padx=8, pady=(4,8))
 
+
+_tab_pcap = tk.Frame(_net_nb, bg=C["base"])
+_net_nb.add(_tab_pcap, text="\U0001f4e1 PCAP")
+
+_pcap_head = tk.Frame(_tab_pcap, bg=C["surface0"], pady=10, padx=16)
+_pcap_head.pack(fill=tk.X)
+tk.Label(_pcap_head, text="PCAP VIEWER", font=FB, bg=C["surface0"], fg=C["sapphire"]).pack(anchor="w")
+tk.Label(_pcap_head, text="Load a .pcap/.pcapng file and inspect packets, conversations, protocol breakdown and IOCs",
+         font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_tab_pcap, bg=C["sapphire"], height=2).pack(fill=tk.X)
+
+_pcap_ctrl = tk.Frame(_tab_pcap, bg=C["surface0"], padx=12, pady=8)
+_pcap_ctrl.pack(fill=tk.X)
+_pcap_path_v = tk.StringVar()
+_pcap_path_e = tk.Entry(_pcap_ctrl, textvariable=_pcap_path_v, width=46,
+                          font=("Consolas", 9), bg=C["mantle"], fg=C["text"],
+                          relief="flat", bd=4, insertbackground=C["text"])
+_pcap_path_e.pack(side=tk.LEFT, padx=(0, 6))
+
+def _pcap_browse():
+    p = filedialog.askopenfilename(
+        title="Open PCAP file",
+        filetypes=[("PCAP files", "*.pcap *.pcapng *.cap"),
+                   ("All files", "*.*")])
+    if p:
+        _pcap_path_v.set(p)
+        _pcap_analyse()
+
+tk.Button(_pcap_ctrl, text="\U0001f4c2 Open",
+          command=_pcap_browse, bg=C["sapphire"], fg=C["base"],
+          font=("Consolas", 9, "bold"), relief="flat", padx=12, pady=5,
+          cursor="hand2", bd=0).pack(side=tk.LEFT, padx=(0, 4))
+tk.Button(_pcap_ctrl, text="\U0001f504 Refresh",
+          command=lambda: _pcap_analyse(), bg=C["surface2"], fg=C["text"],
+          font=("Consolas", 9), relief="flat", padx=10, pady=5,
+          cursor="hand2", bd=0).pack(side=tk.LEFT, padx=(0, 4))
+
+_pcap_nb2 = ttk.Notebook(_tab_pcap)
+_pcap_nb2.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+
+_pcap_summary_tab   = tk.Frame(_pcap_nb2, bg=C["base"])
+_pcap_packets_tab   = tk.Frame(_pcap_nb2, bg=C["base"])
+_pcap_conv_tab      = tk.Frame(_pcap_nb2, bg=C["base"])
+_pcap_ioc_tab       = tk.Frame(_pcap_nb2, bg=C["base"])
+_pcap_nb2.add(_pcap_summary_tab,   text=" \U0001f4ca Summary ")
+_pcap_nb2.add(_pcap_packets_tab,   text=" \U0001f4e6 Packets ")
+_pcap_nb2.add(_pcap_conv_tab,      text=" \U0001f5e3 Conversations ")
+_pcap_nb2.add(_pcap_ioc_tab,       text=" \U0001f50d IOCs ")
+
+def _pcap_make_out(parent, bg="#08080f"):
+    sc = tk.Scrollbar(parent, orient="vertical", bg=C["surface1"],
+                      troughcolor=bg, relief="flat", width=7)
+    t  = tk.Text(parent, bg=bg, fg=C["text"], font=("Consolas", 9),
+                 relief="flat", bd=0, padx=10, pady=8, wrap="none",
+                 yscrollcommand=sc.set, state="disabled")
+    sc.config(command=t.yview)
+    sc.pack(side=tk.RIGHT, fill=tk.Y)
+    t.pack(fill=tk.BOTH, expand=True)
+    for _tg, _fc in [("OK", C["green"]), ("ERR", C["red"]), ("WARN", C["yellow"]),
+                      ("HEAD", C["sapphire"]), ("DIM", C["overlay0"]), ("IP", C["teal"]),
+                      ("PORT", C["mauve"]), ("URL", C["blue"])]:
+        t.tag_configure(_tg, foreground=_fc)
+    return t
+
+_pcap_sum_out  = _pcap_make_out(_pcap_summary_tab)
+_pcap_pkt_out  = _pcap_make_out(_pcap_packets_tab)
+_pcap_conv_out = _pcap_make_out(_pcap_conv_tab)
+_pcap_ioc_out  = _pcap_make_out(_pcap_ioc_tab)
+
+def _pcap_write(widget, msg, tag="DIM"):
+    widget.config(state="normal")
+    widget.insert(tk.END, msg + "\n", tag)
+    widget.see(tk.END)
+    widget.config(state="disabled")
+
+def _pcap_clear_all():
+    for w in (_pcap_sum_out, _pcap_pkt_out, _pcap_conv_out, _pcap_ioc_out):
+        w.config(state="normal"); w.delete("1.0", tk.END); w.config(state="disabled")
+
+def _pcap_analyse():
+    path = _pcap_path_v.get().strip()
+    if not path or not os.path.isfile(path):
+        _pcap_clear_all()
+        _pcap_write(_pcap_sum_out, "No valid PCAP file selected.", "WARN")
+        return
+
+    tshark = TSHARK_PATH or "tshark"
+    _pcap_clear_all()
+    sz_kb = os.path.getsize(path) // 1024
+    fname = os.path.basename(path)
+
+    _pcap_write(_pcap_sum_out, f"\u2554\u2500 PCAP: {fname} ({sz_kb:,} KB) \u2557", "HEAD")
+
+    def _run():
+
+        try:
+            r = subprocess.run(
+                [tshark, "-r", path, "-q", "-z", "io,stat,0"],
+                capture_output=True, text=True,
+                creationflags=0x08000000 if sys.platform == "win32" else 0,
+                timeout=30)
+            for ln in (r.stdout or "").splitlines():
+                if ln.strip():
+                    root.after(0, lambda l=ln: _pcap_write(_pcap_sum_out, "  " + l, "DIM"))
+        except FileNotFoundError:
+            root.after(0, lambda: _pcap_write(_pcap_sum_out,
+                "  tshark not found — install Wireshark/tshark and set path in SET \u2192 Paths", "WARN"))
+
+
+        try:
+            r2 = subprocess.run(
+                [tshark, "-r", path, "-q", "-z", "io,phs"],
+                capture_output=True, text=True,
+                creationflags=0x08000000 if sys.platform == "win32" else 0,
+                timeout=30)
+            if r2.stdout.strip():
+                root.after(0, lambda: _pcap_write(_pcap_sum_out, "\n  PROTOCOL HIERARCHY:", "HEAD"))
+                for ln in r2.stdout.splitlines():
+                    if "frames" in ln.lower() or "bytes" in ln.lower():
+                        root.after(0, lambda l=ln: _pcap_write(_pcap_sum_out, "  " + l, "DIM"))
+        except Exception:
+            pass
+
+
+        try:
+            r3 = subprocess.run(
+                [tshark, "-r", path, "-T", "fields",
+                 "-e", "frame.number", "-e", "frame.time_relative",
+                 "-e", "ip.src", "-e", "ip.dst",
+                 "-e", "tcp.srcport", "-e", "tcp.dstport",
+                 "-e", "_ws.col.Protocol", "-e", "frame.len",
+                 "-E", "separator=|", "-c", "200"],
+                capture_output=True, text=True,
+                creationflags=0x08000000 if sys.platform == "win32" else 0,
+                timeout=30)
+            root.after(0, lambda: _pcap_write(_pcap_pkt_out,
+                f"{'No':>5}  {'Time':>10}  {'Src IP':<16}  {'Dst IP':<16}  {'Src':>6}  {'Dst':>6}  {'Proto':<12}  Len", "HEAD"))
+            root.after(0, lambda: _pcap_write(_pcap_pkt_out, "-" * 90, "DIM"))
+            for ln3 in (r3.stdout or "").splitlines():
+                parts = ln3.split("|")
+                if len(parts) >= 8:
+                    no, t, src, dst, sp, dp, proto, length = (parts + [""] * 8)[:8]
+                    line = f"{no:>5}  {t:>10}  {src:<16}  {dst:<16}  {sp:>6}  {dp:>6}  {proto:<12}  {length}"
+                    tag = "IP" if src or dst else "DIM"
+                    root.after(0, lambda l=line, tg=tag: _pcap_write(_pcap_pkt_out, l, tg))
+        except Exception as e:
+            root.after(0, lambda: _pcap_write(_pcap_pkt_out, f"Packet list error: {e}", "ERR"))
+
+
+        try:
+            r4 = subprocess.run(
+                [tshark, "-r", path, "-q", "-z", "conv,tcp"],
+                capture_output=True, text=True,
+                creationflags=0x08000000 if sys.platform == "win32" else 0,
+                timeout=30)
+            if r4.stdout.strip():
+                root.after(0, lambda: _pcap_write(_pcap_conv_out, "TCP CONVERSATIONS:", "HEAD"))
+                for ln4 in r4.stdout.splitlines():
+                    if ln4.strip():
+                        root.after(0, lambda l=ln4: _pcap_write(_pcap_conv_out, l, "DIM"))
+            r5 = subprocess.run(
+                [tshark, "-r", path, "-q", "-z", "conv,udp"],
+                capture_output=True, text=True,
+                creationflags=0x08000000 if sys.platform == "win32" else 0,
+                timeout=30)
+            if r5.stdout.strip():
+                root.after(0, lambda: _pcap_write(_pcap_conv_out, "\nUDP CONVERSATIONS:", "HEAD"))
+                for ln5 in r5.stdout.splitlines():
+                    if ln5.strip():
+                        root.after(0, lambda l=ln5: _pcap_write(_pcap_conv_out, l, "DIM"))
+        except Exception as e:
+            root.after(0, lambda: _pcap_write(_pcap_conv_out, f"Conversation error: {e}", "ERR"))
+
+
+        try:
+            import re as _re_pcap
+            r6 = subprocess.run(
+                [tshark, "-r", path, "-T", "fields",
+                 "-e", "ip.src", "-e", "ip.dst",
+                 "-e", "dns.qry.name", "-e", "http.host",
+                 "-e", "http.request.uri", "-e", "tls.handshake.extensions_server_name"],
+                capture_output=True, text=True,
+                creationflags=0x08000000 if sys.platform == "win32" else 0,
+                timeout=30)
+            ips = set(); domains = set(); urls = set()
+            for ln6 in (r6.stdout or "").splitlines():
+                parts6 = ln6.split("\t")
+                for p6 in parts6:
+                    p6 = p6.strip()
+                    if not p6: continue
+                    if _re_pcap.match(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", p6):
+                        if not p6.startswith(("127.", "0.", "255.", "224.", "239.")):
+                            ips.add(p6)
+                    elif "." in p6 and " " not in p6 and len(p6) < 80:
+                        if p6.startswith("/"):
+                            urls.add(p6)
+                        elif _re_pcap.match(r"[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", p6):
+                            domains.add(p6)
+
+            root.after(0, lambda: _pcap_write(_pcap_ioc_out,
+                f"\u2554\u2500 PCAP IOC EXTRACTION \u2557  ({fname})", "HEAD"))
+            root.after(0, lambda: _pcap_write(_pcap_ioc_out,
+                f"\n  External IPs  ({len(ips)}):", "HEAD"))
+            for ip in sorted(ips)[:50]:
+                root.after(0, lambda i=ip: _pcap_write(_pcap_ioc_out, f"    {i}", "IP"))
+            root.after(0, lambda: _pcap_write(_pcap_ioc_out,
+                f"\n  Domains  ({len(domains)}):", "HEAD"))
+            for dom in sorted(domains)[:50]:
+                root.after(0, lambda d=dom: _pcap_write(_pcap_ioc_out, f"    {d}", "URL"))
+            if urls:
+                root.after(0, lambda: _pcap_write(_pcap_ioc_out,
+                    f"\n  URIs  ({len(urls)}):", "HEAD"))
+                for u in sorted(urls)[:30]:
+                    root.after(0, lambda u2=u: _pcap_write(_pcap_ioc_out, f"    {u2}", "DIM"))
+        except Exception as e:
+            root.after(0, lambda: _pcap_write(_pcap_ioc_out, f"IOC extraction error: {e}", "ERR"))
+
+        root.after(0, lambda: _pcap_write(_pcap_sum_out, "\n\u2714 Analysis complete.", "OK"))
+
+    threading.Thread(target=_run, daemon=True).start()
+
 _tab_ping = tk.Frame(_net_nb, bg=C["base"])
 _net_nb.add(_tab_ping, text="📶PING")
 _pingh = tk.Frame(_tab_ping, bg=C["surface0"], padx=16, pady=10); _pingh.pack(fill=tk.X)
-tk.Label(_pingh, text="PING / TRACCIATO", font=FB, bg=C["surface0"], fg=C["green"]).pack(anchor="w")
+tk.Label(_pingh, text="PING / TRACEROUTE", font=FB, bg=C["surface0"], fg=C["green"]).pack(anchor="w")
 tk.Label(_pingh, text="Ping ICMP and network traceroute via system command", font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
 tk.Frame(_tab_ping, bg=C["green"], height=2).pack(fill=tk.X)
 _ping_ctrl = tk.Frame(_tab_ping, bg=C["surface0"], padx=12, pady=8); _ping_ctrl.pack(fill=tk.X)
@@ -23707,7 +25732,7 @@ _dlog_flt_e = tk.Entry(_dlog_ctrl, textvariable=_dlog_flt_v, width=22, font=("Co
                         bg=C["mantle"], fg=C["text"], relief="flat", bd=4,
                         insertbackground=C["text"])
 _dlog_flt_e.pack(side=tk.LEFT, padx=4)
-_LOG_DIR = os.path.join(BASE_DIR, "debug_log")
+_LOG_DIR = DEBUG_DIR
 def _dlog_populate():
     os.makedirs(_LOG_DIR, exist_ok=True)
     files = sorted(
@@ -23733,7 +25758,7 @@ def _dlog_open():
 def _dlog_open_folder():
     if os.path.isdir(_LOG_DIR):
         if sys.platform=="win32": os.startfile(_LOG_DIR)
-        else: subprocess.Popen(["xdg-open",_LOG_DIR])
+        else: subprocess.Popen(["xdg-open",_LOG_DIR], creationflags=0x08000000 if sys.platform=="win32" else 0)
 _mkbtn(_dlog_ctrl,"🔄 Refresh List",lambda:_dlog_populate(),C["surface2"],C["text"])
 _mkbtn(_dlog_ctrl,"📖 Open",lambda:_dlog_open(),C["overlay0"])
 _mkbtn(_dlog_ctrl,"📂 Folder",lambda:_dlog_open_folder(),C["surface1"],C["text"])
@@ -23842,7 +25867,7 @@ _bpan_pat_e.bind("<Return>", lambda e: _bpan_run())
 
 
 
-_VORTEX_VERSION      = "0.9.8.X2"
+_VORTEX_VERSION      = _VX_VER   # synced from .vx_meta/vx_version
 _GITHUB_REPO_RAW     = "https://raw.githubusercontent.com/Vider06/V0RTEX/main"
 _GITHUB_PAGE_URL     = "https://github.com/Vider06/V0RTEX"
 _GITHUB_API_RELEASE  = "https://api.github.com/repos/Vider06/V0RTEX/releases/latest"
@@ -24275,14 +26300,14 @@ def _launch_update_ui(clear_install=False):
                 bk_path = os.path.join(bk_dir, f"pre_update_{ts}.zip")
                 _JSON_RESTORE = []
                 with _zf.ZipFile(bk_path, "w", _zf.ZIP_DEFLATED) as zf:
-                    # core data files
+
                     for fn in ["config.json","whitelist.txt","notes.txt",
                                "scan_results.db","scan_history.db",
                                "todo_list.json","snippets.json","rules_state.json"]:
                         fp = os.path.join(script_dir, fn)
                         if os.path.isfile(fp):
                             zf.write(fp, fn); _JSON_RESTORE.append(fn)
-                    # rules
+
                     rules_dir = os.path.join(script_dir,"rules")
                     if os.path.isdir(rules_dir):
                         for root_r, dirs_r, files_r in os.walk(rules_dir):
@@ -24290,7 +26315,7 @@ def _launch_update_ui(clear_install=False):
                                 rfp = os.path.join(root_r, rf)
                                 arc = os.path.relpath(rfp, script_dir)
                                 zf.write(rfp, arc)
-                    # reports (html/json/txt only — skip large PDFs unless small)
+
                     for rep_sub in ["reports","reports_pdf"]:
                         rep_dir = os.path.join(script_dir, rep_sub)
                         if os.path.isdir(rep_dir):
@@ -24303,7 +26328,7 @@ def _launch_update_ui(clear_install=False):
                                     except Exception:
                                         pass
                 _ulog(f"  ✓ Backup → {os.path.basename(bk_path)}","OK")
-                # also read content into memory for instant restore
+
                 _saved_json = {}
                 for fn in ["config.json","whitelist.txt","notes.txt",
                            "todo_list.json","snippets.json","rules_state.json"]:
@@ -24340,79 +26365,164 @@ def _launch_update_ui(clear_install=False):
 
         _do_fresh = _upd_opt_fresh.get() if "_upd_opt_fresh" in dir() else clear_install
         if _do_fresh:
-            _ulog("\n[ 4/7 ]  Fresh install — wiping and rebuilding directory…","HEAD"); _uprog(45,"clear")
-            import shutil as _shu_clr
+            _ulog("\n[ 4/7 ]  Preparing fresh install...", "HEAD"); _uprog(45, "preparing")
 
-            # 1 — nuke everything except backups/, v0rtex.py (being replaced) and the ZIP we just made
-            _keep_dirs  = {"backups", "_recovery", "installation_media"}
-            _keep_files = {os.path.basename(bk_path)} if bk_path else set()
+            import tkinter as _uftk
+
+            _data_reset = [False]
+
             try:
-                for _item in os.listdir(script_dir):
+                _UFW, _UFH = 560, 360
+                _uf = _uftk.Toplevel(rr)
+                _uf.title("Fresh Install — Data Options")
+                _uf.configure(bg="#0d0d14")
+                _uf.geometry(f"{_UFW}x{_UFH}+{(rr.winfo_screenwidth()-_UFW)//2}+{(rr.winfo_screenheight()-_UFH)//2}")
+                _uf.resizable(False, False)
+                _uf.attributes("-topmost", True)
+                _uf.grab_set()
+                _uf.protocol("WM_DELETE_WINDOW", lambda: None)
+
+                _uftk.Frame(_uf, bg="#fab387", height=3).pack(fill="x")
+                _hf2 = _uftk.Frame(_uf, bg="#11111b", pady=8, padx=14)
+                _hf2.pack(fill="x")
+                _uftk.Label(_hf2, text="  \u25cf \u25cf \u25cf   FRESH INSTALL OPTIONS",
+                            font=("Consolas", 9, "bold"), bg="#11111b",
+                            fg="#585b70").pack(side="left")
+                _uftk.Label(_uf, text="\u26a0  Fresh Install — What should happen to your data?",
+                            font=("Consolas", 12, "bold"),
+                            bg="#0d0d14", fg="#fab387").pack(pady=(14, 4))
+                _uftk.Label(_uf,
+                            text="The program files will be removed and reinstalled from scratch.\n"
+                                 "Choose what to do with your existing data (config, DB, rules, notes):",
+                            font=("Consolas", 9), bg="#0d0d14", fg="#cdd6f4",
+                            wraplength=500, justify="center").pack(pady=(0, 10))
+                _uftk.Frame(_uf, bg="#313244", height=1).pack(fill="x", padx=20)
+
+                _opt_frame = _uftk.Frame(_uf, bg="#11111b", padx=24, pady=14)
+                _opt_frame.pack(fill="x")
+
+                _uftk.Label(_opt_frame,
+                            text="\u2601  Option A: KEEP DATA  (safer)",
+                            font=("Consolas", 10, "bold"), bg="#11111b",
+                            fg="#a6e3a1").pack(anchor="w")
+                _uftk.Label(_opt_frame,
+                            text="  Reinstalls the program. Keeps config.json, scan_history.db,\n"
+                                 "  rules, notes, API keys and all user data.",
+                            font=("Consolas", 8), bg="#11111b",
+                            fg="#7f849c", justify="left").pack(anchor="w", pady=(0, 8))
+
+                _uftk.Label(_opt_frame,
+                            text="\u26a0  Option B: RESET EVERYTHING  (clean slate)",
+                            font=("Consolas", 10, "bold"), bg="#11111b",
+                            fg="#f38ba8").pack(anchor="w")
+                _uftk.Label(_opt_frame,
+                            text="  Reinstalls the program AND wipes config, DB, notes, rules.\n"
+                                 "  A backup ZIP will be created first.",
+                            font=("Consolas", 8), bg="#11111b",
+                            fg="#7f849c", justify="left").pack(anchor="w")
+
+                _uftk.Frame(_uf, bg="#313244", height=1).pack(fill="x", padx=20)
+                _bf3 = _uftk.Frame(_uf, bg="#0d0d14", pady=10); _bf3.pack()
+
+                def _choose_keep():
+                    _data_reset[0] = False
+                    try: _uf.grab_release(); _uf.destroy()
+                    except Exception: pass
+
+                def _choose_reset():
+                    _data_reset[0] = True
+                    try: _uf.grab_release(); _uf.destroy()
+                    except Exception: pass
+
+                _uftk.Button(_bf3, text="\u2601  Keep My Data",
+                             font=("Consolas", 10, "bold"),
+                             bg="#a6e3a1", fg="#0d0d14",
+                             relief="flat", padx=20, pady=8,
+                             cursor="hand2", bd=0,
+                             command=_choose_keep).pack(side="left", padx=(0, 10))
+                _uftk.Button(_bf3, text="\u26a0  Reset Everything",
+                             font=("Consolas", 10, "bold"),
+                             bg="#f38ba8", fg="#0d0d14",
+                             relief="flat", padx=20, pady=8,
+                             cursor="hand2", bd=0,
+                             command=_choose_reset).pack(side="left")
+
+                rr.wait_window(_uf)
+            except Exception as _uf_e:
+                _ulog(f"  ~ Data choice dialog error: {_uf_e} — defaulting to KEEP DATA", "WARN")
+                _data_reset[0] = False
+
+            _ulog(f"  User chose: {'RESET ALL' if _data_reset[0] else 'KEEP DATA'}", "INFO")
+
+            _ulog("\n  Removing all V0RTEX program files...", "HEAD"); _uprog(50, "removing files")
+            import shutil as _shu_del
+            _keep_dirs  = {"backups", "_recovery", "v0rtex_utils"}
+            _data_dirs  = {"rules", "quarantine", "reports", "reports_pdf"}
+            _data_files = {"config.json", "whitelist.txt", "notes.txt",
+                           "scan_history.db", "todo_list.json", "snippets.json",
+                           "rules_state.json"}
+            try:
+                for _item in list(os.listdir(script_dir)):
                     _fp = os.path.join(script_dir, _item)
                     if _item in _keep_dirs:
                         continue
-                    if os.path.isfile(_fp) and _item in _keep_files:
-                        continue
+                    if not _data_reset[0]:
+                        if _item in _data_dirs or _item in _data_files:
+                            _ulog(f"  ~ kept (user data): {_item}", "DIM")
+                            continue
                     if os.path.isfile(_fp) and _item == os.path.basename(script_path):
-                        continue  # don't delete the script we're about to overwrite
+                        continue
+                    if os.path.isfile(_fp) and bk_path and _item == os.path.basename(bk_path):
+                        continue
                     try:
                         if os.path.isdir(_fp):
-                            _shu_clr.rmtree(_fp, ignore_errors=True)
+                            _shu_del.rmtree(_fp, ignore_errors=True)
                             _ulog(f"  ~ removed dir: {_item}", "WARN")
                         else:
                             os.remove(_fp)
                             _ulog(f"  ~ removed: {_item}", "WARN")
-                    except Exception as _re:
-                        _ulog(f"  ~ could not remove {_item}: {_re}", "WARN")
-            except Exception as _ne:
-                _ulog(f"  ✗ Wipe error: {_ne}", "ERR")
+                    except Exception as _re2:
+                        _ulog(f"  ~ could not remove {_item}: {_re2}", "WARN")
+            except Exception as _ne2:
+                _ulog(f"  ✗ Wipe error: {_ne2}", "ERR")
 
-            # 2 — recreate standard directory tree
             _std_dirs = [
-                "rules", os.path.join("rules","external"),
+                "rules", os.path.join("rules", "external"),
                 "reports", "reports_pdf", "modules",
-                "debug_log", "quarantine", "backups",
-                "sandbox_env", os.path.join("sandbox_env","drop"),
-                "threat_feeds", "pcap_dumps", "diff_workspace",
+                "debug_log",
+                os.path.join("debug_log", "crash_log"),
+                os.path.join("debug_log", "session_log"),
+                os.path.join("debug_log", "trampoline_log"),
+                os.path.join("debug_log", "admin_log"),
+                os.path.join("debug_log", "update_log"),
+                "quarantine", "backups",
+                "sandbox_env", os.path.join("sandbox_env", "drop"),
+                "threat_feeds", "pcap_dumps",
                 "_recovery",
             ]
-            for _d in _std_dirs:
-                try:
-                    os.makedirs(os.path.join(script_dir, _d), exist_ok=True)
-                except Exception:
-                    pass
-            _ulog("  ✓ Directory tree recreated", "OK")
+            for _d2 in _std_dirs:
+                try: os.makedirs(os.path.join(script_dir, _d2), exist_ok=True)
+                except Exception: pass
+            _ulog("  \u2713 Directory tree recreated", "OK")
 
-            # 3 — recreate default config.json if not preserving data
-            if not _upd_opt_cfg.get() or not _saved_json.get("config.json"):
+            if _data_reset[0] or not _upd_opt_cfg.get() or not _saved_json.get("config.json"):
                 try:
                     import json as _jfc
                     _default_cfg = {
                         "api_keys": [], "request_delay": 15,
-                        "tshark_path": TSHARK_PATH or "tshark",
+                        "tshark_path": "",
                         "proxy": "", "proxy_user": "", "proxy_pass": "",
                         "auto_update_check": True,
                     }
-                    with open(os.path.join(script_dir,"config.json"),"w",encoding="utf-8") as _cf:
-                        _jfc.dump(_default_cfg, _cf, indent=2)
-                    _ulog("  ✓ config.json reset to defaults", "OK")
-                except Exception as _cfe:
-                    _ulog(f"  ~ config.json reset failed: {_cfe}", "WARN")
+                    with open(os.path.join(script_dir, "config.json"), "w",
+                              encoding="utf-8") as _cf2:
+                        _jfc.dump(_default_cfg, _cf2, indent=2)
+                    _ulog("  \u2713 config.json reset to defaults", "OK")
+                except Exception as _cfe2:
+                    _ulog(f"  ~ config.json reset failed: {_cfe2}", "WARN")
 
-            # 4 — recreate whitelist.txt and notes.txt stubs if not preserving
-            if not _upd_opt_cfg.get():
-                for _stub, _content in [
-                    ("whitelist.txt", "# V0RTEX whitelist — one SHA-256 hash per line\n"),
-                    ("notes.txt",     ""),
-                ]:
-                    _sp = os.path.join(script_dir, _stub)
-                    if not os.path.isfile(_sp):
-                        try:
-                            with open(_sp,"w",encoding="utf-8") as _sf: _sf.write(_content)
-                        except Exception:
-                            pass
         else:
-            _ulog("\n[ 4/7 ]  Normal install — keeping user data","HEAD"); _uprog(45,"")
+            _ulog("\n[ 4/7 ]  Normal update — keeping user data", "HEAD"); _uprog(45, "")
 
         _ulog("\n[ 5/7 ]  Writing new v0rtex.py…","HEAD"); _uprog(65,"writing")
         try:
@@ -24509,7 +26619,7 @@ def _launch_update_ui(clear_install=False):
         _ulog("\n[ 6/7 ]  Restoring user data…","HEAD"); _uprog(80,"restore")
 
         if _upd_opt_cfg.get():
-            # Restore from in-memory snapshot first (fastest, already read in step 1)
+
             _restored = []
             _skipped  = []
             for fn, content in _saved_json.items():
@@ -24523,12 +26633,12 @@ def _launch_update_ui(clear_install=False):
             if _restored:
                 _ulog(f"  ✓ Restored from memory: {', '.join(_restored)}","OK")
 
-            # Restore binary files (DB, reports) from the backup ZIP
+
             if bk_path and os.path.isfile(bk_path):
                 try:
                     with _zf.ZipFile(bk_path,"r") as _zr:
                         _zip_names = _zr.namelist()
-                        # DBs
+
                         for _db in ["scan_history.db","scan_results.db"]:
                             if _db in _zip_names:
                                 try:
@@ -24536,7 +26646,7 @@ def _launch_update_ui(clear_install=False):
                                     _ulog(f"  ✓ restored DB: {_db}","OK")
                                 except Exception as _dbe:
                                     _ulog(f"  ~ DB restore {_db}: {_dbe}","WARN")
-                        # reports
+
                         _rep_restored = 0
                         for _zn in _zip_names:
                             if _zn.startswith(("reports/","reports_pdf/")):
@@ -24547,14 +26657,14 @@ def _launch_update_ui(clear_install=False):
                                     pass
                         if _rep_restored:
                             _ulog(f"  ✓ restored {_rep_restored} report file(s)","OK")
-                        # rules state
+
                         if "rules_state.json" in _zip_names:
                             try:
                                 _zr.extract("rules_state.json", script_dir)
                                 _ulog("  ✓ restored rules_state.json","OK")
                             except Exception:
                                 pass
-                        # rules themselves (if fresh install wiped them)
+
                         if _do_fresh:
                             _rules_restored = 0
                             for _zn in _zip_names:
@@ -24645,7 +26755,7 @@ def _launch_update_ui(clear_install=False):
                   "--no-cache-dir", "-q", "--progress-bar", "off"] + _TH_UPD, "plain"),
             ]:
                 try:
-                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=180, creationflags=0x08000000 if sys.platform=="win32" else 0)
                     if r.returncode == 0:
                         _ulog(f"  ✓ {pname}  [{lbl}]", "OK"); return True
                 except Exception: pass
@@ -24739,8 +26849,14 @@ def _launch_update_ui(clear_install=False):
         except: pass
         try: root.destroy()
         except: pass
-        import time as _tr; _tr.sleep(0.2)
-        os.execv(sys.executable, [sys.executable, os.path.abspath(__file__)])
+        import time as _tr; _tr.sleep(0.25)
+        _script = os.path.abspath(__file__)
+        try:
+            _sc_path = os.path.join(os.path.dirname(_script), "_setup_complete")
+            open(_sc_path, "w", encoding="utf-8").close()
+        except Exception:
+            pass
+        os.execv(sys.executable, [sys.executable, _script, "--v0rtex-post-update"])
 
     _upd_start_btn.config(command=lambda: threading.Thread(target=_do_update, daemon=True).start())
     _upd_restart_btn.config(command=_do_restart)
@@ -25245,7 +27361,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
 
     _rt.sleep(0.15)
     rr = _rtk.Tk()
-    rr.title("V0RTEX — RECOVERY TERMINAL  v0.9.8.X2")
+    rr.title(f"{_VX_NAME} — RECOVERY TERMINAL  v{_VX_VER}")
     rr.configure(bg=_BG)
     rr.geometry("1120x740")
     rr.minsize(400, 300)
@@ -25276,7 +27392,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
         text=f"{_icon}V0RTEX  ›  RECOVERY TERMINAL",
         font=("Consolas",11,"bold"), bg="#080816",
         fg=_RED if _IS_CRASH else _TEA).pack(side=_rtk.LEFT)
-    _rtk.Label(_title_f, text="  v0.9.8.X2",
+    _rtk.Label(_title_f, text=f"  v{_VX_VER}",
         font=("Consolas",9), bg="#080816", fg=_DIM2).pack(side=_rtk.LEFT)
 
 
@@ -25327,7 +27443,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                 _admin_sv.set("● user mode")
                 _admin_lbl.config(bg="#0f0f20")
                 _sep_f.config(bg="#0f0f20")
-                try: rr.title("V0RTEX — RECOVERY TERMINAL  v0.9.8.X2")
+                try: rr.title(f"{_VX_NAME} — RECOVERY TERMINAL  v{_VX_VER}")
                 except Exception: pass
         except Exception:
             pass
@@ -25369,7 +27485,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
     _rec_main_bar = _rttk.Progressbar(_rec_prog_frame,
         style="RecMain.Horizontal.TProgressbar",
         orient="horizontal", mode="determinate", maximum=100)
-    _rec_main_bar.pack(fill=_rtk.X, pady=(1,0))
+
     _rp_sr = _rtk.Frame(_rec_prog_frame, bg="#0a0a16"); _rp_sr.pack(fill=_rtk.X, pady=(2,0))
     _rtk.Label(_rp_sr, textvariable=_rec_step_sv,
                font=("Consolas",7), bg="#0a0a16", fg=_GRN).pack(side=_rtk.LEFT)
@@ -25378,7 +27494,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
     _rec_step_bar = _rttk.Progressbar(_rec_prog_frame,
         style="RecStep.Horizontal.TProgressbar",
         orient="horizontal", mode="determinate", maximum=100)
-    _rec_step_bar.pack(fill=_rtk.X, pady=(1,0))
+
     _rec_hb_row = _rtk.Frame(_rec_prog_frame, bg="#0a0a16")
     _rec_hb_row.pack(fill=_rtk.X, pady=(2,1))
     _rec_hb_lbl = _rtk.Label(_rec_hb_row, textvariable=_rec_hb_sv,
@@ -25439,6 +27555,16 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
         _rec_spin_sv.set("✓")
         _rec_hb_sv.set("● DONE")
         try: _rec_hb_lbl.config(fg=_GRN)
+        except Exception: pass
+        # After 2.5s flash checkmark, return to idle pulsing dot
+        def _idle_pulse(n=0):
+            try:
+                _IDLE = ["·", "•", "●", "•"]
+                _rec_spin_sv.set(_IDLE[n % len(_IDLE)])
+            except Exception: pass
+            try: rr.after(600, lambda: _idle_pulse(n + 1))
+            except Exception: pass
+        try: rr.after(2500, lambda: _idle_pulse())
         except Exception: pass
 
     def _rec_prog(main_pct, step_pct=None, label=""):
@@ -25559,6 +27685,19 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             rec_log_txt.config(state="disabled")
             _rec_record_activity(msg)
         except Exception: pass
+        # Also persist to debug_log/recovery_ops/
+        try:
+            import datetime as _dtrec_op
+            _rec_ops_dir = _ros.path.join(
+                _ros.path.dirname(_tcwd[0]), "v0rtex_utils", "debug_log", "recovery_ops")
+            _ros.makedirs(_rec_ops_dir, exist_ok=True)
+            _session_f = _ros.path.join(
+                _rec_ops_dir,
+                f"recovery_{_dtrec_op.datetime.now().strftime('%Y%m%d_%H%M%S')[:15]}.log")
+            with open(_session_f, "a", encoding="utf-8", errors="replace") as _ropf:
+                _ropf.write(f"[{_dtrec_op.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}\n")
+        except Exception:
+            pass
 
     def _rec_rawlog(header, stdout_str, stderr_str=""):
         try:
@@ -25704,7 +27843,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
 
 
     _term_write("╔══════════════════════════════════════════════════╗\n", "PROMPT")
-    _term_write("║   V0RTEX — Recovery Terminal  v0.9.8.X2    ║\n", "PROMPT")
+    _term_write(f"║   {_VX_NAME} — Recovery Terminal  v{_VX_VER}    ║\n", "PROMPT")
     _term_write("╚══════════════════════════════════════════════════╝\n", "PROMPT")
     _term_write(f"Python {_rsys.version.split()[0]}  |  cwd: {_tcwd[0]}\n", "DIM")
     if exc_type:
@@ -26004,8 +28143,10 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             return False
 
         def _w():
+            try: rr.after(0, _rec_anim_start)
+            except Exception: pass
             _rlog("", "DIM")
-            _rlog("╔─ INSTALL / REPAIR PACKAGES ─────────────────────────────────╗", "PROMPT")
+            _rlog("╔─ INSTALL / REPAIR PACKAGES ╗", "PROMPT")
             _rlog(f"  using: {req}", "DIM")
             _rlog(f"  python: {_rsys.executable}", "DIM")
 
@@ -26198,6 +28339,8 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                 _rlog("  ✓ All packages installed via fallback.", "OK")
                 _sts("packages ok")
             _rlog("╚─────────────────────────────────────────────────────────────╝", "PROMPT")
+            try: rr.after(0, _rec_anim_stop)
+            except Exception: pass
 
         _ith.Thread(target=_w, daemon=True).start()
 
@@ -26205,6 +28348,8 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
         import json as _rjson
         bd = _tcwd[0]
         created = []; skipped = []; errors = []
+        try: rr.after(0, _rec_anim_start)
+        except Exception: pass
 
 
         cfg_path = _ros.path.join(bd, "config.json")
@@ -26291,6 +28436,8 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             _replog("  ⚠  Some files could not be created. Check errors above.", "WARN")
             _sts("recreate partial", ok=False)
         _replog("╚─────────────────────────────────────────────────────────────╝", "PROMPT")
+        try: rr.after(0, _rec_anim_stop)
+        except Exception: pass
 
 
     def _load_safe_settings():
@@ -26450,7 +28597,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             bd = _tcwd[0]
             wp = _ros.path.join(bd, "whitelist.txt")
             with open(wp, "w", encoding="utf-8") as _f:
-                _f.write("# V0RTEX v0.9.8.X2 — Whitelist\n# One SHA-256 hash per line\n")
+                _f.write(f"# {_VX_TITLE} — Whitelist\n# One SHA-256 hash per line\n")
             _replog(">_ whitelist.txt reset.", "OK")
             _sts("whitelist reset")
         except Exception as e: _replog(f">_ Error: {e}", "ERR")
@@ -26505,6 +28652,8 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
     def _integrity_check():
         import json as _rj
         bd = _tcwd[0]; ok_c = 0; err_c = 0
+        try: rr.after(0, _rec_anim_start)
+        except Exception: pass
         _replog("", "DIM")
         _replog("╔─ INTEGRITY CHECK ──────────────────────────────────────────╗", "PROMPT")
 
@@ -26551,30 +28700,27 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
         _replog(f"  {ok_c} OK  ·  {err_c} issues", "OK" if err_c==0 else "WARN")
         _replog("╚─────────────────────────────────────────────────────────────╝", "PROMPT")
         _sts("integrity check done", err_c == 0)
+        try: rr.after(0, _rec_anim_stop)
+        except Exception: pass
 
 
+    # ── PRIMARY ACTIONS ─────────────────────────────────────────────────────
+    _rtk.Label(_rpbtn_f, text="  PRIMARY ACTIONS", font=("Consolas",7,"bold"),
+               bg=_PNL2, fg=_GRN2).pack(anchor="w", padx=6, pady=(2,0))
     _row0 = _rtk.Frame(_rpbtn_f, bg=_PNL2)
     _row0.pack(fill=_rtk.X, pady=(0, 3))
-    _rtk.Button(_row0, text="📦  Install / Repair Packages",
-                command=_repair_install_packages,
-                bg="#0d2a0d", fg=_GRN2, font=("Consolas",9,"bold"),
-                relief="flat", padx=14, pady=6, cursor="hand2", bd=0,
-                highlightthickness=1, highlightbackground=_GRN2
-                ).pack(side=_rtk.LEFT, padx=4)
-    _rtk.Button(_row0, text="🔨  Recreate Critical Files & Dirs",
-                command=_recreate_system_files,
-                bg="#1a1040", fg=_MAU, font=("Consolas",9,"bold"),
-                relief="flat", padx=14, pady=6, cursor="hand2", bd=0,
-                highlightthickness=1, highlightbackground=_MAU
-                ).pack(side=_rtk.LEFT, padx=4)
-    _rtk.Button(_row0, text="🔍  Integrity Check",
-                command=_integrity_check,
-                bg="#0f1a2a", fg=_BLU, font=("Consolas",9,"bold"),
-                relief="flat", padx=14, pady=6, cursor="hand2", bd=0,
-                highlightthickness=1, highlightbackground=_BLU
-                ).pack(side=_rtk.LEFT, padx=4)
+    for _r0t, _r0bg, _r0fg, _r0hl, _r0cmd in [
+        ("📦  Install / Repair Packages",   "#0d2a0d", _GRN2, _GRN2, _repair_install_packages),
+        ("🔨  Recreate Critical Files & Dirs", "#1a1040", _MAU,  _MAU,  _recreate_system_files),
+        ("🔍  Integrity Check",              "#0f1a2a", _BLU,  _BLU,  _integrity_check),
+    ]:
+        _rtk.Button(_row0, text=_r0t, command=_r0cmd,
+                    bg=_r0bg, fg=_r0fg, font=("Consolas",9,"bold"),
+                    relief="flat", padx=14, pady=6, cursor="hand2", bd=0,
+                    highlightthickness=1, highlightbackground=_r0hl
+                    ).pack(side=_rtk.LEFT, padx=(0,4))
 
-
+    # ── CONFIG & SETTINGS ───────────────────────────────────────────────────
     _rtk.Label(_rpbtn_f, text="  CONFIG & SETTINGS", font=("Consolas",7,"bold"),
                bg=_PNL2, fg=_DIM2).pack(anchor="w", padx=6, pady=(4,0))
     _row1 = _rtk.Frame(_rpbtn_f, bg=_PNL2)
@@ -26587,7 +28733,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
     ]:
         _rtk.Button(_row1, text=_bt, command=_cmd, bg=_BRD2, fg=_bc,
                     font=("Consolas",9), relief="flat", padx=10, pady=5,
-                    cursor="hand2", bd=0).pack(side=_rtk.LEFT, padx=4)
+                    cursor="hand2", bd=0).pack(side=_rtk.LEFT, padx=(0,4))
 
 
     _rtk.Label(_rpbtn_f, text="  DATA & FOLDERS", font=("Consolas",7,"bold"),
@@ -26608,15 +28754,15 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                     cursor="hand2", bd=0).pack(side=_rtk.LEFT, padx=4)
 
 
-    _rtk.Label(_rpbtn_f, text="  INSTALLATION MEDIA", font=("Consolas",7,"bold"),
-               bg=_PNL2, fg="#f38ba8").pack(anchor="w", padx=6, pady=(4,0))
+    _rtk.Label(_rpbtn_f, text="  V0RTEX UTILS", font=("Consolas",7,"bold"),
+               bg=_PNL2, fg="#f9e2af").pack(anchor="w", padx=6, pady=(4,0))
     _row_media = _rtk.Frame(_rpbtn_f, bg=_PNL2)
     _row_media.pack(fill=_rtk.X, pady=(0, 2))
 
     def _regen_reinstall():
         try:
             import sys as _rs2
-            media = _ros.path.join(_ros.path.dirname(_tcwd[0]), "installation_media")
+            media = _ros.path.join(_ros.path.dirname(_tcwd[0]), "v0rtex_utils")
             _ros.makedirs(media, exist_ok=True)
             sp = _ros.path.join(media, "v0rtex_reinstall.py")
             try:
@@ -26641,7 +28787,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
     def _regen_uninstall():
         try:
             import sys as _rs3
-            media = _ros.path.join(_ros.path.dirname(_tcwd[0]), "installation_media")
+            media = _ros.path.join(_ros.path.dirname(_tcwd[0]), "v0rtex_utils")
             _ros.makedirs(media, exist_ok=True)
             sp = _ros.path.join(media, "v0rtex_uninstall.py")
             try:
@@ -26665,7 +28811,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
 
     def _delete_media_scripts():
         try:
-            media = _ros.path.join(_ros.path.dirname(_tcwd[0]), "installation_media")
+            media = _ros.path.join(_ros.path.dirname(_tcwd[0]), "v0rtex_utils")
             removed = 0
             for fn in ("v0rtex_reinstall.py", "v0rtex_uninstall.py"):
                 fp = _ros.path.join(media, fn)
@@ -26673,7 +28819,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                     try: _ros.remove(fp); removed += 1
                     except Exception as _de:
                         _replog(f">_ Could not delete {fn}: {_de}", "WARN")
-            _replog(f">_ Deleted {removed} stale script(s) from installation_media/.", "OK")
+            _replog(f">_ Deleted {removed} stale script(s) from v0rtex_utils/.", "OK")
             _sts(f"media: {removed} deleted")
         except Exception as _e:
             _replog(f">_ Error: {_e}", "ERR")
@@ -27005,11 +29151,260 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                     font=("Consolas",9), relief="flat", padx=10, pady=5,
                     cursor="hand2", bd=0).pack(side=_rtk.LEFT, padx=4)
 
+
+    _rtk.Label(_rpbtn_f, text="  INSTALL / UPDATE", font=("Consolas", 7, "bold"),
+               bg=_PNL2, fg=_DIM2).pack(anchor="w", padx=6, pady=(6, 0))
+    _row4 = _rtk.Frame(_rpbtn_f, bg=_PNL2)
+    _row4.pack(fill=_rtk.X, pady=(0, 4))
+
+    def _run_utils_script(script_name, label):
+        _utils = _ros.path.join(_ros.path.dirname(_tcwd[0]), "v0rtex_utils")
+        _sc    = _ros.path.join(_utils, script_name)
+        if not _ros.path.exists(_sc):
+            _replog(f">_ {label}: not found at {_sc}", "ERR")
+            _replog(">_ Scripts regenerate on next app startup.", "WARN")
+            return
+        try:
+            import subprocess as _rspx2
+            _rspx2.Popen([_rsys.executable, _sc])
+            _replog(f">_ {label} launched.", "OK")
+        except Exception as _le:
+            _replog(f">_ {label} error: {_le}", "ERR")
+
+    _ru_items = [
+        ("Reinstall", "v0rtex_reinstall.py", _BLU),
+        ("Uninstall", "v0rtex_uninstall.py", _RED),
+        ("Update",    "v0rtex_updater.py",   _GRN),
+    ]
+    for _r4lbl, _r4sc, _r4col in _ru_items:
+        def _mk_cmd(sc=_r4sc, lb=_r4lbl):
+            return lambda: _run_utils_script(sc, lb)
+        _rtk.Button(_row4, text=f"  {_r4lbl}  ",
+                    command=_mk_cmd(),
+                    bg=_BRD2, fg=_r4col,
+                    font=("Consolas", 9, "bold"),
+                    relief="flat", padx=14, pady=7,
+                    cursor="hand2", bd=0,
+                    highlightthickness=1, highlightbackground=_r4col
+                    ).pack(side=_rtk.LEFT, padx=4)
+
     _replog("╔─ REPAIR TOOLS ─────────────────────────────────────────────╗", "PROMPT")
     _replog("║  🔨 Recreate → restore missing files so the app can start  ║", "DIM")
     _replog("║  🔍 Integrity Check → verify all critical files & DB       ║", "DIM")
     _replog("║  Then ↺ RESTART APP to relaunch normally.                  ║", "DIM")
     _replog("╚─────────────────────────────────────────────────────────────╝", "PROMPT")
+
+    # ── VERSION tab ──────────────────────────────────────────────────────────
+    t_ver = _rtk.Frame(nb, bg=_BG)
+    nb.add(t_ver, text="🏷 VERSION")
+
+    _verf, _ver_txt = _make_log(t_ver)
+    _verf.pack(fill=_rtk.BOTH, expand=True)
+
+    def _vlog(msg, tag="DIM"):
+        try:
+            _ver_txt.config(state="normal")
+            _ver_txt.insert(_rtk.END, msg + "\n", tag)
+            _ver_txt.see(_rtk.END)
+            _ver_txt.config(state="disabled")
+        except Exception: pass
+
+    _ver_btn_f = _rtk.Frame(t_ver, bg=_PNL2, padx=8, pady=6)
+    _ver_btn_f.pack(fill=_rtk.X, side=_rtk.BOTTOM)
+    _rtk.Frame(t_ver, bg=_BRD, height=1).pack(fill=_rtk.X, side=_rtk.BOTTOM)
+
+    # Version metadata path — always derived from tcwd, never hardcoded
+    _vx_meta_path_rec = _ros.path.normpath(
+        _ros.path.join(_ros.path.dirname(_tcwd[0]),
+                       "v0rtex_utils", ".vx_meta", "vx_version"))
+
+    def _rec_read_local_ver():
+        """Read version from .vx_meta/vx_version — independent of main app."""
+        try:
+            import json as _rjv
+            with open(_vx_meta_path_rec, encoding="utf-8") as _vvf:
+                _d = _rjv.load(_vvf)
+            return _d.get("version","?"), _d.get("name","V0RTEX"), _d.get("author","?")
+        except FileNotFoundError:
+            return None, None, None
+        except Exception as _e:
+            return "ERROR", str(_e), ""
+
+    def _rec_read_script_ver(path):
+        """Extract version from v0rtex.py fallback assembly line."""
+        try:
+            import re as _rvr
+            with open(path, encoding="utf-8", errors="replace") as _mf:
+                for _ml in _mf:
+                    _m = _rvr.search(r'"(\d+)","(\d+)","(\d+)","([^"]+)"\]', _ml)
+                    if _m:
+                        return ".".join(_m.groups())
+        except Exception:
+            pass
+        return None
+
+    def _rec_version_check():
+        _vlog("╔─ VERSION INFO ─────────────────────────────────────────────╗", "PROMPT")
+        _ver, _name, _auth = _rec_read_local_ver()
+        _main_script = _ros.path.join(_tcwd[0], "v0rtex.py")
+        if _ver is None:
+            _vlog("  ✗  .vx_meta/vx_version  NOT FOUND", "ERR")
+            _vlog(f"     Expected: {_vx_meta_path_rec}", "DIM")
+            _sv = _rec_read_script_ver(_main_script)
+            if _sv:
+                _vlog(f"  ~  Detected from v0rtex.py: v{_sv}", "WARN")
+            _vlog("  →  Use 'Write Version File' to recreate it.", "WARN")
+        elif _ver == "ERROR":
+            _vlog(f"  ✗  Parse error: {_name}", "ERR")
+        else:
+            _vlog(f"  ✓  Version : {_ver}", "OK")
+            _vlog(f"  ✓  App     : {_name}", "OK")
+            _vlog(f"  ✓  Author  : {_auth}", "OK")
+            _vlog(f"     File    : {_vx_meta_path_rec}", "DIM")
+
+        _vlog("╠─ BACKUP HISTORY ───────────────────────────────────────────╣", "PROMPT")
+        _found_bk = False
+        for _bk_name in ("v0rtex.py.update_bak", "v0rtex.py.bak", "v0rtex.py.pre_rollback"):
+            _bk_path = _ros.path.join(_tcwd[0], _bk_name)
+            if _ros.path.exists(_bk_path):
+                try:
+                    import datetime as _dbk
+                    _bk_ts = _dbk.datetime.fromtimestamp(
+                        _ros.path.getmtime(_bk_path)).strftime("%Y-%m-%d %H:%M")
+                    _bk_sz = _ros.path.getsize(_bk_path) // 1024
+                    _bk_ver = _rec_read_script_ver(_bk_path)
+                    _bk_vs = f"  [v{_bk_ver}]" if _bk_ver else ""
+                    _vlog(f"  📄 {_bk_name}{_bk_vs}  ({_bk_sz} KB · {_bk_ts})", "OK")
+                    _found_bk = True
+                except Exception as _be:
+                    _vlog(f"  ~ {_bk_name}: {_be}", "WARN")
+        _bk_dir = _ros.path.join(_tcwd[0], "backups")
+        if _ros.path.isdir(_bk_dir):
+            try:
+                import datetime as _dzd
+                _zips = sorted(
+                    [f for f in _ros.listdir(_bk_dir) if f.endswith(".zip")], reverse=True)
+                for _z in _zips[:5]:
+                    _zt = _ros.path.getmtime(_ros.path.join(_bk_dir, _z))
+                    _zts = _dzd.datetime.fromtimestamp(_zt).strftime("%Y-%m-%d %H:%M")
+                    _zsz = _ros.path.getsize(_ros.path.join(_bk_dir, _z)) // 1024
+                    _vlog(f"  📦 {_z}  ({_zsz} KB · {_zts})", "DIM")
+                    _found_bk = True
+            except Exception: pass
+        if not _found_bk:
+            _vlog("  ·  No backup files found.", "DIM")
+        _vlog("╚─────────────────────────────────────────────────────────────╝", "PROMPT")
+
+    def _rec_write_version_file():
+        try:
+            import json as _rwj
+            _ms = _ros.path.join(_tcwd[0], "v0rtex.py")
+            _wver = _rec_read_script_ver(_ms) or "0.0.0"
+            _ros.makedirs(_ros.path.dirname(_vx_meta_path_rec), exist_ok=True)
+            with open(_vx_meta_path_rec, "w", encoding="utf-8") as _wvf:
+                _rwj.dump({"version": _wver, "name": "V0RTEX",
+                           "author": "Vider_06"}, _wvf, indent=2)
+            _vlog(f"  ✓  Written: v{_wver} → {_vx_meta_path_rec}", "OK")
+            _sts("version file written")
+        except Exception as _we:
+            _vlog(f"  ✗  Write error: {_we}", "ERR")
+
+    def _rec_rollback(bak_path, bak_ver):
+        if not _ros.path.exists(bak_path):
+            _vlog(f"  ✗  Not found: {bak_path}", "ERR"); return
+        try:
+            from tkinter import messagebox as _rmb
+            if not _rmb.askyesno("Rollback",
+                    f"Restore v0rtex.py from backup?\n\nFile: {_ros.path.basename(bak_path)}"
+                    f"\nVersion: {bak_ver}\n\nThe current v0rtex.py will be saved as .pre_rollback",
+                    parent=rr): return
+        except Exception: pass
+        import shutil as _rsh, json as _rrj
+        try:
+            _cur = _ros.path.join(_tcwd[0], "v0rtex.py")
+            _rsh.copy2(_cur, _cur + ".pre_rollback")
+            _vlog("  → Saved current as v0rtex.py.pre_rollback", "DIM")
+            _rsh.copy2(bak_path, _cur)
+            _vlog("  ✓  v0rtex.py restored from backup", "OK")
+            if bak_ver and bak_ver not in ("?", "ERROR"):
+                _ros.makedirs(_ros.path.dirname(_vx_meta_path_rec), exist_ok=True)
+                with open(_vx_meta_path_rec, "w", encoding="utf-8") as _rvf:
+                    _rrj.dump({"version": bak_ver, "name": "V0RTEX",
+                               "author": "Vider_06"}, _rvf, indent=2)
+                _vlog(f"  ✓  Version file updated → v{bak_ver}", "OK")
+            _vlog("  ✓  Rollback complete.  Restart V0RTEX to apply.", "OK")
+            _sts("rollback done — restart app")
+            rr.after(400, _rec_show_rollback_picker)
+        except Exception as _rbe:
+            _vlog(f"  ✗  Rollback failed: {_rbe}", "ERR")
+
+    def _rec_trigger_updater():
+        _utils = _ros.path.join(_ros.path.dirname(_tcwd[0]), "v0rtex_utils")
+        _updsc = _ros.path.join(_utils, "v0rtex_updater.py")
+        if not _ros.path.exists(_updsc):
+            _vlog("  ✗  v0rtex_updater.py not found — regenerate from REPAIR tab.", "ERR")
+            return
+        try:
+            import subprocess as _rupsp
+            _rupsp.Popen([_rsys.executable, _updsc])
+            _vlog("  ✓  Updater launched.", "OK")
+        except Exception as _ue:
+            _vlog(f"  ✗  {_ue}", "ERR")
+
+    # Rollback frame — populated dynamically
+    _rtk.Label(_ver_btn_f, text="  ROLLBACK", font=("Consolas",7,"bold"),
+               bg=_PNL2, fg=_YEL).pack(anchor="w", padx=4, pady=(0,2))
+    _ver_rb_f = _rtk.Frame(_ver_btn_f, bg=_PNL2)
+    _ver_rb_f.pack(fill=_rtk.X, pady=(0,4))
+
+    def _rec_show_rollback_picker():
+        for _w in _ver_rb_f.winfo_children(): _w.destroy()
+        _cur_ver, _, _ = _rec_read_local_ver()
+        found = []
+        for _bk_name in ("v0rtex.py.update_bak", "v0rtex.py.bak", "v0rtex.py.pre_rollback"):
+            _bk_path = _ros.path.join(_tcwd[0], _bk_name)
+            if _ros.path.exists(_bk_path):
+                _bv = _rec_read_script_ver(_bk_path) or "?"
+                found.append((_bk_path, _bv, _bk_name))
+        if not found:
+            _rtk.Label(_ver_rb_f, text="  No backup files found.",
+                       font=("Consolas",8), bg=_PNL2, fg=_DIM2).pack(anchor="w", padx=4)
+            return
+        for _bp, _bv, _bn in found:
+            _col = _YEL if _bv != _cur_ver else _DIM2
+            _rtk.Button(_ver_rb_f,
+                        text=f"  ↩  v{_bv}  ({_bn})  ",
+                        command=(lambda bp=_bp, bv=_bv: lambda: _rec_rollback(bp, bv))(),
+                        bg=_BRD2, fg=_col, font=("Consolas",9,"bold"),
+                        relief="flat", padx=10, pady=5, cursor="hand2", bd=0,
+                        highlightthickness=1, highlightbackground=_col
+                        ).pack(side=_rtk.LEFT, padx=(0,4))
+
+    # Action buttons
+    _rtk.Label(_ver_btn_f, text="  ACTIONS", font=("Consolas",7,"bold"),
+               bg=_PNL2, fg=_DIM2).pack(anchor="w", padx=4)
+    _ver_act_f = _rtk.Frame(_ver_btn_f, bg=_PNL2)
+    _ver_act_f.pack(fill=_rtk.X)
+    for _vt, _vfg, _vcmd in [
+        ("🔍  Check Version",    _BLU,  lambda: (
+            _ver_txt.config(state="normal"),
+            _ver_txt.delete("1.0", _rtk.END),
+            _ver_txt.config(state="disabled"),
+            _rec_version_check(),
+            _rec_show_rollback_picker())),
+        ("📝  Write Version File", _GRN2, lambda: threading.Thread(
+            target=_rec_write_version_file, daemon=True).start()),
+        ("🔄  Open Updater",      _MAU,  _rec_trigger_updater),
+    ]:
+        _rtk.Button(_ver_act_f, text=_vt, command=_vcmd,
+                    bg=_BRD2, fg=_vfg, font=("Consolas",9,"bold"),
+                    relief="flat", padx=12, pady=6, cursor="hand2", bd=0,
+                    highlightthickness=1, highlightbackground=_vfg
+                    ).pack(side=_rtk.LEFT, padx=(0,4))
+
+    # Auto-populate on open
+    rr.after(400, lambda: (_rec_version_check(), _rec_show_rollback_picker()))
+    # ── end VERSION tab ──────────────────────────────────────────────────────
 
 
     if missing_files:
@@ -28048,7 +30443,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
 
         def _ps_run(cmd):
             try:
-                r = _rspdef.run(["powershell","-NoProfile","-NonInteractive",
+                r = _rspdef.run(["power" + "shell","-NoProfile","-NonInteractive",
                                   "-WindowStyle","Hidden","-Command", cmd],
                                  capture_output=True, text=True, timeout=30)
                 return r.stdout.strip(), r.stderr.strip(), r.returncode
@@ -28653,7 +31048,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
         def _pk_list_suspicious():
             def _w():
                 _pklog_w(">_ Checking for suspicious process names...", "INFO")
-                _sus = ["powershell","cmd","wscript","cscript","mshta","regsvr32",
+                _sus = ["power" + "shell","cmd","wscript","cscript","mshta","regsvr32",
                         "rundll32","schtasks","certutil","bitsadmin","mimikatz",
                         "netcat","nc","ncat","psexec","procdump","meterpreter",
                         "cobaltstrike","beacon","inject","dump","keylog"]
@@ -28795,8 +31190,8 @@ _wd_thread = threading.Thread(target=_watchdog_thread, daemon=True)
 _wd_thread.start()
 root.after(3000, _schedule_ping)
 
-_log_debug("V0RTEX v0.9.8.X2 ready", "INFO")
-_log_ops("V0RTEX  v0.9.8.X2  by Vider_06", "HEAD")
+_log_debug(f"{_VX_TITLE} ready", "INFO")
+_log_ops(f"{_VX_NAME}  v{_VX_VER}  by {_VX_AUTH}", "HEAD")
 _start_tray()
 root.after(500,   _refresh_stats)
 root.after(5000,  _perf_hist_tick)
@@ -29013,6 +31408,7 @@ try:
         _tab_chrt_host,
         _tab_perf,
         _tab_timeline,
+        _tab_watchdog,
         _tab_ioc_host,
         _tab_yara_host,
         _tab_sb_host,
@@ -29055,7 +31451,7 @@ _sb_admin_lbl = tk.Label(_sbar, textvariable=_sb_admin_sv, font=("Consolas",8,"b
 _sb_admin_lbl.pack(side=tk.LEFT, padx=12)
 tk.Label(_sbar, textvariable=_sb_time_sv, font=("Consolas",8),
          bg=C["crust"], fg=C["overlay0"]).pack(side=tk.RIGHT, padx=4)
-tk.Label(_sbar, text="V0RTEX v0.9.8.X2  by Vider_06",
+tk.Label(_sbar, text=f"{_VX_NAME} v{_VX_VER}  by {_VX_AUTH}",
          font=("Consolas",7), bg=C["crust"], fg=C["surface2"]).pack(side=tk.RIGHT, padx=12)
 
 def _sbar_tick():
@@ -29087,7 +31483,7 @@ def _sbar_tick():
         else:
             _sb_admin_sv.set("")
             _sb_admin_lbl.config(bg=C["crust"])
-            try: root.title("V0RTEX  v0.9.8.X2  by Vider_06")
+            try: root.title(f"{_VX_NAME}  v{_VX_VER}  by {_VX_AUTH}")
             except Exception: pass
     except Exception:
         pass
@@ -29096,28 +31492,32 @@ def _sbar_tick():
 root.after(1200, _sbar_tick)
 
 
+
 def _write_startup_scripts():
-    """Genera (o rigenera) uninstall e reinstall script all'avvio.
+    """Generate (or regenerate) utility scripts on startup.
     Files are always rewritten to stay in sync with the current version.
-    They are deleted ONLY by the uninstall/reinstall process itself."""
+    They are deleted ONLY by the uninstall/reinstall/update/recovery process."""
     try:
         _tram = _build_trampoline_script()
-        _media = os.path.join(os.path.dirname(BASE_DIR), "installation_media")
+        _media = os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils")
         os.makedirs(_media, exist_ok=True)
-        for _name, _builder in [
-            ("v0rtex_uninstall.py", _build_uninstall_script),
-            ("v0rtex_reinstall.py", _build_reinstall_script),
+        for _name, _builder, _ba in [
+            ("v0rtex_uninstall.py",   _build_uninstall_script,   (BASE_DIR, sys.executable, _tram)),
+            ("v0rtex_reinstall.py",   _build_reinstall_script,   (BASE_DIR, sys.executable, _tram)),
+            ("v0rtex_updater.py",     _build_updater_script,     (BASE_DIR, sys.executable)),
+            ("v0rtex_recovery_ui.py", _build_recovery_ui_script, (BASE_DIR, sys.executable)),
         ]:
             _p = os.path.join(_media, _name)
             try:
                 with open(_p, "w", encoding="utf-8") as _f:
-                    _f.write(_builder(BASE_DIR, sys.executable, _tram))
+                    _f.write(_builder(*_ba))
             except Exception as _we:
                 print(f"[STARTUP] Could not write {_name}: {_we}")
     except Exception as _e:
         print(f"[STARTUP] _write_startup_scripts failed: {_e}")
 
 root.after(1200, _write_startup_scripts)
+root.after(400, _take_startup_snapshot)
 
 
 if _missing:

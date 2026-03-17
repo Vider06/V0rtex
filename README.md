@@ -1,4 +1,4 @@
-# V0RTEX v0.9.8.X2
+# V0RTEX v0.9.9.X0
 
 **V0RTEX** is a self-contained Windows malware analysis platform built entirely in Python + Tkinter.  
 One file. No external launcher. No installer required beyond running `python v0rtex.py`.
@@ -8,7 +8,7 @@ One file. No external launcher. No installer required beyond running `python v0r
 **Author:** Vider_06  
 **Platform:** Windows 10 / 11 (64-bit) only  
 **Python:** 3.10 or higher — including 3.12, 3.13, 3.14  
-**License:** Copyright © 2024–2026 Vider_06 — All rights reserved. See [LICENSE](./LICENSE).
+**License:** Copyright © 2024–2026 Vider_06 — All rights reserved. See [LICENSE](https://github.com/Vider06/V0rtex/blob/main/LICENSE).
 
 ---
 
@@ -56,7 +56,7 @@ One file. No external launcher. No installer required beyond running `python v0r
 
 ## What is V0RTEX?
 
-V0RTEX is a complete malware analysis lab that lives inside a single Python script (~29,000 lines). It covers the full analysis workflow: from initial triage and static analysis (hashes, PE headers, strings, entropy, YARA) through dynamic monitoring (process tree, network connections, PCAP capture, sandbox) to post-analysis reporting (HTML/JSON/PDF exports, SQLite history, MITRE ATT&CK mapping). It also includes a self-protection layer, an auto-updater, and a full Windows system health checker — all built directly into the UI with no external tools required beyond Python.
+V0RTEX is a complete malware analysis lab that lives inside a single Python script (~31,500 lines). It covers the full analysis workflow: from initial triage and static analysis (hashes, PE headers, strings, entropy, YARA) through dynamic monitoring (process tree, network connections, PCAP capture, sandbox) to post-analysis reporting (HTML/JSON/PDF exports, SQLite history, MITRE ATT&CK mapping). It also includes a self-protection layer, an auto-updater, a full Windows system health checker, and a standalone Recovery UI — all built directly into the UI with no external tools required beyond Python.
 
 ---
 
@@ -77,9 +77,11 @@ V0RTEX is a complete malware analysis lab that lives inside a single Python scri
 | **Lookup** | Quick/Bulk hash · Strings · Diff · IOC extract · Regex · Archive · Macro · Bin pattern · Unicode · PE header |
 | **Notes** | Scratchpad · MITRE map · TODO list · Snippet library |
 | **Defense** | Real-time watchdog · Quarantine · Self-defense · App integrity · Folder protection · Auto-backup |
+| **Performance** | Throttle toggle · Max workers · Chunk size · Scan delay · Niceness slider · Background CPU/IO limiters |
 | **System Check** | Defender status · Quick malware scan · SFC file integrity · DISM image health · Disk SMART · Startup persistence · System Fixer |
 | **DB** | SQLite · Full scan history · Export CSV/JSON/HTML · Scan history browser |
-| **Updater** | Auto-update check · In-app updater · Dual-file update (external launcher support) · Full dep reinstall on update |
+| **Updater** | Auto-update check · In-app updater · Standalone updater script · Dual-file update · Full dep reinstall on update |
+| **Recovery** | Standalone Recovery UI · Version tab with rollback · Animated repair operations · Persistent recovery logs |
 
 **21 main tabs · 80+ sub-tabs**
 
@@ -131,6 +133,7 @@ The setup wizard handles everything automatically:
 ### 4. Configure API keys
 
 Go to **CFG** tab → **API KEYS** and enter your keys for:
+
 - VirusTotal, MalwareBazaar, AbuseIPDB, URLScan, AlienVault OTX, Shodan, GreyNoise, HybridAnalysis
 
 Keys are stored locally in `config.json`. None are required to use V0RTEX — they only unlock cloud lookup features.
@@ -145,7 +148,7 @@ Go to **YARA** tab → **LIBRARY** → select the rule repositories you want (Ne
 
 ```
 V0rtex_System/
-├── V0RTEX_v0.9.8.X2/               ← main install directory
+├── V0RTEX_v0.9.9.X0/               ← main install directory
 │   ├── v0rtex.py                   ← the entire application (single file)
 │   ├── config.json                 ← all user settings and API keys
 │   ├── scan_history.db             ← SQLite scan database
@@ -165,6 +168,8 @@ V0rtex_System/
 │   │   ├── wireshark.py
 │   │   └── __init__.py
 │   ├── debug_log/                  ← session logs and crash reports
+│   │   ├── recovery_ops/           ← persistent Recovery UI logs
+│   │   └── crash_log/
 │   ├── quarantine/                 ← isolated files
 │   ├── backups/                    ← auto-created backup ZIPs
 │   ├── _recovery/                  ← recovery system working directory
@@ -173,11 +178,14 @@ V0rtex_System/
 │   ├── threat_feeds/               ← imported threat feed files
 │   ├── pcap_dumps/                 ← packet capture output
 │   └── diff_workspace/             ← file diff temporary workspace
-├── installation_media/
+├── v0rtex_utils/
+│   ├── .vx_meta/
+│   │   └── vx_version              ← version JSON (read by app and Recovery UI)
+│   ├── debug_log/
+│   ├── v0rtex_updater.py           ← standalone updater
+│   ├── v0rtex_recovery_ui.py       ← standalone recovery UI
 │   ├── v0rtex_reinstall.py         ← reinstall wizard (auto-generated)
-│   ├── v0rtex_uninstall.py         ← uninstall wizard (auto-generated)
-│   ├── debug_log/                  ← installer logs
-│   └── backups/                    ← pre-reinstall/uninstall backups
+│   └── v0rtex_uninstall.py         ← uninstall wizard (auto-generated)
 └── V0rtex_backups/                 ← backup ZIPs (outside V0rtex_System)
 ```
 
@@ -186,21 +194,27 @@ V0rtex_System/
 ## Tab Reference
 
 ### 🏠 HOME
+
 The main dashboard. Displays live scan counters (total, malicious, clean, YARA hits, queue, active APIs), a threat level bar, and a recent scans table. Quick Actions panel: Add File, Add Folder, Scan URL, Sandbox, AutoScan, Watch Folder. Clicking any row in the scan table opens the full scan report popup.
 
 ### 📋 LOGS
+
 Two live log panels: **FILE OPERATIONS** (every scan with verdict and timing) and **DEBUG LOG** (internal checkpoints, background thread activity, errors). Logs are mirrored to `debug_log/` on disk. Supports clear and export to `.txt`.
 
 ### 📊 CHRT — Charts
+
 Three sub-tabs:
+
 - **Charts** — live bar/pie charts of scan results, updated after each scan.
 - **ENT** — entropy distribution histogram across all scanned files.
 - **HEAT** — heatmap of threat categories vs file types.
 
 ### 📁 REP — Reports
+
 Browse, open and delete scan reports. Supports HTML, JSON and plain text. Side-by-side diff view for comparing two reports.
 
 ### 🎯 IOC
+
 - **IOC** — auto-extracts IPs, domains, URLs, hashes, emails, CVEs, registry keys, Windows API names from any file.
 - **EXTRACT** — targeted extraction with regex filtering.
 - **MITRE** — maps IOCs to MITRE ATT&CK techniques.
@@ -209,6 +223,7 @@ Browse, open and delete scan reports. Supports HTML, JSON and plain text. Side-b
 - **Secrets** — detects API keys, tokens, credentials embedded in files.
 
 ### 🛡 YARA
+
 - **YARA** — run YARA rules against any file, view hits with rule name, namespace and matched strings.
 - **LIBRARY** — download community rule sets from GitHub. Tracks download state per repo.
 - **RULE EDITOR** — full YARA authoring with syntax highlighting, compile & test, and test-on-file.
@@ -216,22 +231,28 @@ Browse, open and delete scan reports. Supports HTML, JSON and plain text. Side-b
 - **SIGMA** — load and view Sigma `.yml` detection rules.
 
 ### ⚡ PERF
+
 System performance monitor: CPU%, RAM, disk I/O, network I/O, per-process breakdown. Refreshes every 5 seconds using a background thread.
 
 ### ⏱ TL — Timeline
+
 Chronological scan history chart plotted by verdict, file type and entropy over time.
 
 ### 🔬 SB — Sandbox
+
 - **Auto-Scan** — folder watcher with automatic scan queue. Drop a file in `sandbox_env/drop/` and it gets scanned automatically.
 - **Process** — live process list with right-click scan/kill/inspect.
 - **File Analyzer** — deep static analysis: magic bytes, entropy, PE info, strings, IOC extraction, YARA.
 - **Cuckoo/CAPE** — submit to and retrieve results from a local Cuckoo or CAPE instance.
 
 ### 🏗 SETUP
+
 The setup and reinstall wizard, accessible without restarting. Lets you reinstall dependencies, reconfigure paths, or fully reinstall V0RTEX in place.
 
 ### ⚙ CFG — Configuration
+
 Sub-tabs:
+
 - **API KEYS** — enter and manage API keys for all supported services.
 - **CONFIGURATION** — tshark path, proxy settings, request delay, auto-update toggle.
 - **WHITELIST** — SHA-256 hash exclusions for scan suppression.
@@ -242,9 +263,11 @@ Sub-tabs:
 - **UPDATER** — check for updates, configure auto-check, view update history.
 
 ### 🔎 LOOK — Lookup
+
 Hash · HEX viewer · REGEX tester · DOC inspector · SIG (signature) viewer · BATCH scanner · DIFF (side-by-side file diff) · ARCHIV (archive inspector) · MACRO (Office macro extractor) · B64 (Base64 encode/decode) · XOR (XOR brute-force) · BCONV (binary/hex converter) · JWT decoder · ROT cipher · PE-HDR (PE header dump) · UNICODE (string normalizer) · BINPAT (binary pattern search)
 
 ### 🖥 PROC — Processes
+
 - **Processes** — live process list with PID, name, CPU, RAM, path.
 - **Services** — Windows services browser with start/stop controls.
 - **Startup Items** — lists all `Win32_StartupCommand` entries.
@@ -254,6 +277,7 @@ Hash · HEX viewer · REGEX tester · DOC inspector · SIG (signature) viewer ·
 - **Registry** — registry key browser with search.
 
 ### 🌐 NET — Network
+
 - **Connections** — live TCP/UDP connections with remote IP, port and process.
 - **URL Tools** — URL encode/decode, expand shortened URLs.
 - **IP/Domain Rep.** — bulk reputation lookup.
@@ -265,15 +289,27 @@ Hash · HEX viewer · REGEX tester · DOC inspector · SIG (signature) viewer ·
 - **PCAP** — start/stop tshark capture, open in Wireshark.
 
 ### 📝 NOTES
+
 - **Notepad** — persistent scratchpad saved to `notes.txt`.
 - **MITRE ATT&CK** — searchable technique reference.
 - **TODO** — task list with checkboxes, saved to `todo_list.json`.
 - **Snippets** — code/IOC snippet library saved to `snippets.json`.
 
 ### ⚙ SET — Global Settings
-Interface · Scan · Privacy · Paths · Network · Defense · Notifications · Advanced · Automatic Actions
+
+Sub-tabs: Interface · Scan · Privacy · Paths · Network · Defense · Notifications · **Performance** (new) · Advanced · Automatic Actions
+
+The new **⚡ PERFORMANCE** sub-tab exposes:
+
+- Throttle scan threads toggle
+- Max background workers
+- Chunk size for large file processing
+- Scan thread delay (ms)
+- Niceness slider (background thread priority)
+- Cross-link to Advanced tab
 
 ### 🔒 PROT — App Protection
+
 - **Build/Destroy** — set up and tear down the protected environment.
 - **Protected Folders** — monitor folders for unauthorized changes.
 - **Integrity** — hash-based verification of all V0RTEX files.
@@ -284,6 +320,7 @@ Interface · Scan · Privacy · Paths · Network · Defense · Notifications · 
 - **Watchdog** — file system watcher with configurable alerts.
 
 #### System Check (PROT → System Check)
+
 A full Windows health scan that runs entirely inside V0RTEX without opening any external tools:
 
 | Step | Check | Tool used |
@@ -298,10 +335,13 @@ A full Windows health scan that runs entirely inside V0RTEX without opening any 
 Split-pane UI: **SCAN LOG** on the left (human-readable results), **RAW TERMINAL OUTPUT** on the right (exact command + `[ADMIN]`/`[no admin]` tag). Spinner + elapsed time + stall warning if a step hangs. Auto-prompts **System Fixer** on issues.
 
 #### System Fixer
+
 Standalone repair window accessible from System Check:
+
 - **Full Repair** — threat removal → SFC (`sfc /scannow`) → DISM (`dism /RestoreHealth`) in sequence.
 - **SFC Only** — run SFC independently.
 - **DISM Only** — run DISM independently.
+
 Progress bar uses `indeterminate` mode during long operations (SFC/DISM give no percentage output).
 
 ---
@@ -327,7 +367,7 @@ V0RTEX integrates with the following external services. All are optional — no 
 
 V0RTEX requires administrator rights for some features (System Check/Fixer, Defender interaction, process monitoring). It will work with limited rights, but some tabs will be restricted.
 
-Sensitive PowerShell/system commands are assembled at runtime from string fragments rather than stored as literals in the source. This reduces false positives from antivirus engines that flag static string patterns.
+Sensitive PowerShell/system commands are assembled at runtime from string fragments rather than stored as literals in the source. This reduces false positives from antivirus engines that flag static string patterns. The version string itself is also never stored as a literal — it is read from `.vx_meta/vx_version` or assembled at runtime.
 
 If Windows Defender flags V0RTEX, add the install folder to your Defender exclusion list. The setup wizard does this automatically.
 
@@ -336,24 +376,29 @@ If Windows Defender flags V0RTEX, add the install folder to your Defender exclus
 ## Crash Recovery
 
 If V0RTEX crashes on startup or mid-session, a **Recovery Terminal** launches automatically. From there you can:
+
 - View the crash report and session log
 - Clean TEMP files
 - Reinstall dependencies
-- Roll back to a previous backup
+- Roll back to a previous backup (version picker with timestamps)
 - Perform a full reinstall
 
-Crash reports are saved to `debug_log/` with timestamps.
+Crash reports are saved to `debug_log/` with timestamps. Recovery operations are logged persistently to `debug_log/recovery_ops/`.
+
+The standalone `v0rtex_recovery_ui.py` in `v0rtex_utils/` can be launched independently if the main app fails to start.
 
 ---
 
 ## Updating
 
-V0RTEX has a built-in updater (CFG → UPDATER). When an update is available:
+V0RTEX has a built-in updater (CFG → UPDATER) and a standalone updater script (`v0rtex_utils/v0rtex_updater.py`). When an update is available:
+
 1. Downloads the new `v0rtex.py` from GitHub
 2. Creates a timestamped backup ZIP of your current install (config, rules, reports, DB)
 3. Applies the update
 4. If you run V0RTEX from an external launcher outside `V0rtex_System/`, the updater auto-detects and updates that file too
-5. Reinstalls all dependencies using the multi-strategy pipeline
+5. Rebuilds any missing filesystem directories
+6. Reinstalls all dependencies using the multi-strategy pipeline
 
 Auto-update check can be toggled in CFG → CONFIGURATION.
 
@@ -364,11 +409,11 @@ Auto-update check can be toggled in CFG → CONFIGURATION.
 ```
 MAJOR . BIG_UPDATE . SMALL_UPDATE . X[BUGFIX]
 
-Example: 0.9.8.X2
+Example: 0.9.9.X0
   0       = major version
   9       = big update (significant feature batch)
-  8       = small update (incremental features)
-  X2      = second bugfix release on top of 0.9.8
+  9       = small update (incremental features)
+  X0      = first release on top of 0.9.9
 ```
 
 ---
@@ -376,6 +421,7 @@ Example: 0.9.8.X2
 ## Contributing
 
 Issues and pull requests are welcome. If you find a bug, open an issue with:
+
 - V0RTEX version (shown in the bottom status bar)
 - Python version (`python --version`)
 - Windows version
@@ -386,4 +432,4 @@ Issues and pull requests are welcome. If you find a bug, open an issue with:
 ## License
 
 Copyright © 2024–2026 Vider_06. All rights reserved.  
-See [LICENSE](./LICENSE) for full terms.
+See [LICENSE](https://github.com/Vider06/V0rtex/blob/main/LICENSE) for full terms.
