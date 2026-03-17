@@ -1835,7 +1835,7 @@ def _do_reinstall():
             _dlog('GitHub download enabled — fetching latest…')
             _log('  → Downloading latest from GitHub…', 'INFO')
             import urllib.request as _ur
-            _req2 = _ur.Request('https://raw.githubusercontent.com/Vider06/V0RTEX/main/v0rtex.py', headers={{'User-Agent': 'V0RTEX-Reinstall/1.0'}})
+            _req2 = _ur.Request('https://raw.githubusercontent.com/Vider06/V0rtex/main/v0rtex.py', headers={{'User-Agent': 'V0RTEX-Reinstall/1.0'}})
             with _ur.urlopen(_req2, timeout=30) as _resp:
                 _remote = _resp.read().decode('utf-8', 'replace')
             if len(_remote) < 10000:
@@ -2164,8 +2164,8 @@ def _build_updater_script(install_dir, python_exe):
         f"PYTHON_EXE  = {_py}\n"
         "MAIN_SCRIPT = os.path.join(INSTALL_DIR, 'v0rtex.py')\n"
         "UTILS_DIR   = os.path.join(os.path.dirname(INSTALL_DIR), 'v0rtex_utils')\n"
-        "GITHUB_API  = 'https://api.github.com/repos/Vider06/V0RTEX/releases/latest'\n"
-        "GITHUB_RAW  = 'https://raw.githubusercontent.com/Vider06/V0RTEX/main/v0rtex.py'\n\n"
+        "GITHUB_API  = 'https://api.github.com/repos/Vider06/V0rtex/releases/latest'\n"
+        "GITHUB_RAW  = 'https://raw.githubusercontent.com/Vider06/V0rtex/main/v0rtex.py'\n\n"
         "BG='#0d0d14'; PNL='#11111b'; BRD='#313244'\n"
         "BLU='#89b4fa'; GRN='#a6e3a1'; RED='#f38ba8'; TXT='#cdd6f4'; DIM='#585b70'\n"
         "YEL='#f9e2af'\n\n"
@@ -25868,9 +25868,9 @@ _bpan_pat_e.bind("<Return>", lambda e: _bpan_run())
 
 
 _VORTEX_VERSION      = _VX_VER   # synced from .vx_meta/vx_version
-_GITHUB_REPO_RAW     = "https://raw.githubusercontent.com/Vider06/V0RTEX/main"
-_GITHUB_PAGE_URL     = "https://github.com/Vider06/V0RTEX"
-_GITHUB_API_RELEASE  = "https://api.github.com/repos/Vider06/V0RTEX/releases/latest"
+_GITHUB_REPO_RAW     = "https://raw.githubusercontent.com/Vider06/V0rtex/main"
+_GITHUB_PAGE_URL     = "https://github.com/Vider06/V0rtex"
+_GITHUB_API_RELEASE  = "https://api.github.com/repos/Vider06/V0rtex/releases/latest"
 _GITHUB_VERSION_URL  = f"{_GITHUB_REPO_RAW}/version.txt"
 _GITHUB_SCRIPT_URL   = f"{_GITHUB_REPO_RAW}/v0rtex.py"
 _GITHUB_MANIFEST_URL = f"{_GITHUB_REPO_RAW}/update_manifest.json"
