@@ -59,9 +59,6 @@ V0RTEX spawns subprocesses for tshark, PowerShell, SFC, DISM, and pip. All subpr
 ### API keys
 API keys (VirusTotal, Shodan, AbuseIPDB, etc.) are stored in plain text in `config.json` inside the install directory. They are never transmitted anywhere other than their respective official API endpoints. Do not commit `config.json` to a public repository.
 
-### Splash screen
-The startup splash screen (the terminal-style boot sequence) is **cosmetic only** — it prints the check lines with artificial delays for visual effect. The actual module imports, database open, and config load happen before the splash is shown, during normal Python module initialization.
-
 ### Network traffic
 V0RTEX sends data externally only when you explicitly trigger a lookup (VirusTotal scan, IP reputation, WHOIS, etc.). There is no telemetry, no analytics, no automatic file upload. The auto-update check (`CFG → UPDATER`) only fetches `version.txt` and `update_manifest.json` from this repository — no executable code is fetched without your explicit confirmation.
 
