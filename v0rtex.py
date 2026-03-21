@@ -24,6 +24,21 @@ import os, sys, subprocess, traceback, threading, time as _time_crash
 
 _PRE_SL_BUF: list = []
 
+def _censor_log_msg(msg: str) -> str:
+    try:
+        if not globals().get("CONFIG", {}).get("auto_censor_logs", False):
+            return msg
+        import re as _clre
+        for _pat in [
+            r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
+            r"(?:Users|home)[/\\]([A-Za-z0-9_.-]+)",
+            r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b",
+        ]:
+            msg = _clre.sub(lambda m: "\u2588" * len(m.group(0)), msg)
+    except Exception:
+        pass
+    return msg
+
 def _pre_sl(msg: str, tag: str = "BOOT") -> None:
     import datetime as _pdt
     ts = _pdt.datetime.now().strftime("%H:%M:%S.%f")[:-3]
@@ -744,6 +759,7 @@ _EMBED = {
         "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0K"
     ),
 }
+_pre_sl("BOOT L354", "BOOT")
 _REQUIREMENTS = (
     "requests>=2.31.0\n"
     "pefile>=2023.2.7\n"
@@ -796,6 +812,7 @@ _DEFAULT_CONFIG = {
     "crash_zip_include_config": True,
     "crash_zip_include_admin_log": True,
     "log_ops_count": 30,
+    "auto_censor_logs": False,
 }
 _SUBDIRS = [
     "modules", "rules", "rules/external",
@@ -1099,8 +1116,29 @@ def _do_uninstall():
     else:
         _log('  ~ Build tools removal skipped', 'DIM')
 
-    _log(f'\\n[ {{n[0]}} / {{steps}} ]  Removing installation folders', 'HEAD')
-    _prog(70, 'Deleting folders…')
+    _log(f'\\n[ {{n[0]}} / {{steps}} ]  Cleaning TEMP files', 'HEAD'); n[0] += 1
+    _prog(65, 'Cleaning TEMP…')
+    _sprog(0, 'scanning…')
+    try:
+        import glob as _rgl
+        _tmp = _TEMP
+        _tmp_patterns = [
+            'v0rtex_fresh_install*.py', 'v0rtex_trampoline*.py',
+            'v0rtex_uninstall_trampoline*.py', 'v0rtex_reinstall_trampoline*.py',
+            'vs_buildtools_setup*.exe', 'get-pip*.py',
+            '*_v0rtex_update.py', '*_v0rtex_adapter.py', '_v0rtex_req_tmp.txt',
+        ]
+        _tmp_removed = 0
+        for _tp in _tmp_patterns:
+            for _tf in _rgl.glob(os.path.join(_tmp, _tp)):
+                try: os.remove(_tf); _tmp_removed += 1
+                except Exception: pass
+        _log(f'  {{\"✓\" if _tmp_removed else \"·\"}} TEMP: {{_tmp_removed}} V0RTEX file(s) removed', 'OK' if _tmp_removed else 'DIM')
+    except Exception as _te: _log(f'  ~ TEMP cleanup: {{_te}}', 'WARN')
+    _sprog(100, '')
+
+    _log(f'\\n[ {{n[0]}} / {{steps}} ]  Removing installation folders', 'HEAD'); n[0] += 1
+    _prog(80, 'Deleting folders…')
     _sprog(0, 'removing app folder…')
     _rmdir(INSTALL_DIR, 'app folder')
     _sprog(50, 'removing media folder…')
@@ -1128,6 +1166,7 @@ def _write_log(line):
 
 # ── Create the main window ────────────────────────────────────────────────────
 root = tk.Tk()
+_pre_sl("BOOT L1167", "BOOT")
 # Detach console AFTER Tk is ready — prevents silent crash on some Windows configs
 if sys.platform == "win32":
     try:
@@ -1529,6 +1568,7 @@ spinner_var   = tk.StringVar(value="")
 elapsed_var   = tk.StringVar(value="")
 heartbeat_var = tk.StringVar(value="")
 activity_var  = tk.StringVar(value="")
+_pre_sl("BOOT L1568", "BOOT")
 _anim_active  = [False]
 _anim_start_t = [0.0]
 _anim_frame   = [0]
@@ -1840,8 +1880,29 @@ def _do_reinstall():
             _dlog(f'ABORT: {{e}}'); _set_done(False)
             root.after(0, lambda: btn_start[0].config(state='normal', text='  ♻  REINSTALL  '))
             return
+    _log(f'\\n[ {{n[0]}} / {{steps}} ]  Cleaning TEMP files', 'HEAD'); n[0] += 1
+    _prog(58, 'Cleaning TEMP…')
+    _sprog(0, 'scanning…')
+    try:
+        import glob as _rgl2
+        _tmp2 = _TEMP
+        _tmp_patterns2 = [
+            'v0rtex_fresh_install*.py', 'v0rtex_trampoline*.py',
+            'v0rtex_uninstall_trampoline*.py', 'v0rtex_reinstall_trampoline*.py',
+            'vs_buildtools_setup*.exe', 'get-pip*.py',
+            '*_v0rtex_update.py', '*_v0rtex_adapter.py', '_v0rtex_req_tmp.txt',
+        ]
+        _tmp_removed2 = 0
+        for _tp2 in _tmp_patterns2:
+            for _tf2 in _rgl2.glob(os.path.join(_tmp2, _tp2)):
+                try: os.remove(_tf2); _tmp_removed2 += 1
+                except Exception: pass
+        _log(f'  {{\"✓\" if _tmp_removed2 else \"·\"}} TEMP: {{_tmp_removed2}} V0RTEX file(s) removed', 'OK' if _tmp_removed2 else 'DIM')
+    except Exception as _te2: _log(f'  ~ TEMP cleanup: {{_te2}}', 'WARN')
+    _sprog(100, '')
+
     _log(f'\\n[ {{n[0]}} / {{steps}} ]  Removing old installation', 'HEAD'); n[0] += 1
-    _prog(65, 'Removing folders…')
+    _prog(72, 'Removing folders…')
     _sprog(0, 'removing app folder…')
     _rmdir(INSTALL_DIR, 'app folder')
     _sprog(50, 'removing media folder…')
@@ -1930,6 +1991,7 @@ card_opts = tk.Frame(root, bg=C['card'], padx=16, pady=7); card_opts.pack(fill='
 tk.Label(card_opts, text='OPTIONS', font=('Consolas',7,'bold'), bg=C['card'], fg=C['muted']).pack(anchor='w')
 tk.Frame(card_opts, bg=C['border'], height=1).pack(fill='x', pady=(3,6))
 _opts_widgets = []
+_pre_sl("BOOT L1969", "BOOT")
 for _var, _txt in [
     (v_backup,          '  Backup ZIP  →  saved outside V0rtex_System/'),
     (v_packages,        '  pip uninstall requirements.txt packages'),
@@ -2598,6 +2660,7 @@ def _run_setup_ui():
 
     dir_var    = tk.StringVar()
     ws_var     = tk.BooleanVar(value=True)
+    auto_censor_var = tk.BooleanVar(value=False)
     pct_var    = tk.StringVar(value="")
     status_var = tk.StringVar(value="Ready")
     done_evt   = threading.Event()
@@ -3069,7 +3132,9 @@ def _run_setup_ui():
                 _log("  ~ config.json  (user config preserved)", "DIM")
                 _dlog("config.json kept (user data)", "DIM")
             else:
-                _cfg_str = json.dumps(_DEFAULT_CONFIG, indent=2)
+                _setup_cfg = dict(_DEFAULT_CONFIG)
+                _setup_cfg["auto_censor_logs"] = auto_censor_var.get()
+                _cfg_str = json.dumps(_setup_cfg, indent=2)
                 _wf_track(cfg_path, _cfg_str)
                 _log("  ✓ config.json  (factory defaults written)", "OK")
                 _dlog(f"config.json written ({len(_cfg_str)} bytes)", "OK")
@@ -4394,6 +4459,14 @@ def _run_setup_ui():
                    selectcolor=C["panel"], activebackground=C["card"],
                    relief="flat").pack(side="left")
 
+    censor_row = tk.Frame(card2, bg=C["card"])
+    censor_row.pack(anchor="w", pady=(4, 0))
+    tk.Checkbutton(censor_row, variable=auto_censor_var,
+                   text="  Auto-censor logs — redact usernames, IPs and paths from all log files",
+                   font=("Consolas", 9), bg=C["card"], fg=C["text"],
+                   selectcolor=C["panel"], activebackground=C["card"],
+                   relief="flat").pack(side="left")
+
     card_bk = tk.Frame(root, bg=C["card"], padx=16, pady=7)
     card_bk.pack(fill="x", padx=16, pady=(5, 0))
     tk.Label(card_bk, text="IMPORT BACKUP  (optional)", font=("Consolas", 7, "bold"),
@@ -5419,6 +5492,7 @@ def _check_first_run():
     sys.exit(0)
 
 _check_first_run()
+_pre_sl("BOOT L5469", "BOOT")
 
 
 _APP_DYING = [False]
@@ -6278,6 +6352,7 @@ def _install_crash_handler():
     globals()["_crash_theater_fn"] = _show_crash_theater
 
 _install_crash_handler()
+_pre_sl("BOOT L6328", "BOOT")
 
 
 _REQUIRED = {
@@ -6679,6 +6754,7 @@ except Exception:
     pass
 
 CRASH_REPORT_DIR = os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils", "Crash_Full_Report")
+_pre_sl("BOOT L6729", "BOOT")
 os.makedirs(CRASH_REPORT_DIR, exist_ok=True)
 
 
@@ -6698,6 +6774,7 @@ def _sl_init() -> None:
         if _SILENT_LOG_READY:
             return
     try:
+        import datetime as _sldt
         _sl_dir_local = os.environ.get("LOCALAPPDATA") or os.environ.get("TEMP") or os.path.dirname(DEBUG_DIR)
         _sl_dir_local = os.path.join(_sl_dir_local, "V0RTEX", "silent_log")
         os.makedirs(_sl_dir_local, exist_ok=True)
@@ -6708,11 +6785,15 @@ def _sl_init() -> None:
                     f"_session{_SESSION_NUMBER:04d}_pid{os.getpid()}.txt")
         _SILENT_LOG_PATH = os.path.join(_sl_dir, _sl_name)
         _header = (
-            "# ═══════════════════════════════════════════════════════════════════════════════\n# V0RTEX_LOG_SYSTEM: THIS FILE POTENTIALLY CONTAINS PERSONAL INFORMATION.\n# It is necessary to identify bugs. Run v0rtex_utils/v0rtex_log_censor.py\n# to censor private data before sharing, or enable AUTO-CENSOR in Settings > Privacy.\n# ═══════════════════════════════════════════════════════════════════════════════\n\n"
-            "=" * 78 + "\n"
+            "# ═══════════════════════════════════════════════════════════════════════════════\n"
+            "# V0RTEX_LOG_SYSTEM: THIS FILE POTENTIALLY CONTAINS PERSONAL INFORMATION.\n"
+            "# It is necessary to identify bugs. Run v0rtex_utils/v0rtex_log_censor.py\n"
+            "# to censor private data before sharing, or enable AUTO-CENSOR in Settings > Privacy.\n"
+            "# ═══════════════════════════════════════════════════════════════════════════════\n\n"
+            + "=" * 78 + "\n"
             f"  V0RTEX  {_VX_VER}  —  SILENT SESSION LOG\n"
             f"  Session #{_SESSION_NUMBER:04d}   Started: "
-            f"{_dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"{_sldt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"  Python:   {sys.version.split()[0]}\n"
             f"  Platform: {sys.platform}\n"
             f"  PID:      {os.getpid()}\n"
@@ -6723,8 +6804,8 @@ def _sl_init() -> None:
         _PRE_SL_BUF.clear()
         with open(_SILENT_LOG_PATH, "w", encoding="utf-8") as _slf:
             _slf.write(_header)
-            if _buf_snap:
-                _slf.write("\n".join(_buf_snap) + "\n")
+            for _buf_line in _buf_snap:
+                _slf.write(_buf_line.rstrip("\n") + "\n")
         _sl_mirror = os.path.join(_sl_dir_debug, os.path.basename(_SILENT_LOG_PATH))
         globals()["_SILENT_LOG_MIRROR"] = _sl_mirror
         _SILENT_LOG_READY = True
@@ -6754,26 +6835,26 @@ def _sl(msg: str, tag: str = "EVT") -> None:
         _pre_sl(msg, tag)
         return
     try:
-        if globals().get("CONFIG", {}).get("auto_censor_logs", False):
-            import re as _slre
-            for _pat in [
-                r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
-                r"(?:Users|home)[/\\]([A-Za-z0-9_.-]+)",
-                r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b",
-            ]:
-                msg = _slre.sub(lambda m: "\u2588" * len(m.group(0)), msg)
+        _sl_do_censor = globals().get("CONFIG", {}).get("auto_censor_logs", False)
         ts = _dt.datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        line = f"[{ts}] [{tag:<8}] {msg}\n"
+        raw_line = f"[{ts}] [{tag:<8}] {msg}\n"
+        out_line = f"[{ts}] [{tag:<8}] {_censor_log_msg(msg)}\n" if _sl_do_censor else raw_line
         with _SILENT_LOG_LOCK:
             with open(_SILENT_LOG_PATH, "a", encoding="utf-8", errors="replace") as _slw:
-                _slw.write(line)
+                _slw.write(out_line)
         _mir = globals().get("_SILENT_LOG_MIRROR", "")
         if _mir:
             try:
                 with open(_mir, "a", encoding="utf-8", errors="replace") as _slm:
-                    _slm.write(line)
-            except Exception:
-                pass
+                    _slm.write(out_line)
+            except Exception: pass
+        if _sl_do_censor:
+            _unc = globals().get("_SILENT_LOG_UNCENSORED_PATH", "")
+            if _unc:
+                try:
+                    with open(_unc, "a", encoding="utf-8", errors="replace") as _slu:
+                        _slu.write(raw_line)
+                except Exception: pass
     except Exception:
         pass
 
@@ -6798,6 +6879,7 @@ def _get_session_number()-> int:
         return 1
 
 _SESSION_NUMBER   = _get_session_number()
+_sl("BOOT: L6853", "BOOT")
 _SESSION_START_TS = _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 _SESSION_LOG_NAME = f"log_{_SESSION_START_TS}_session{_SESSION_NUMBER:04d}.txt"
 _SESSION_LOG_PATH = os.path.join(DEBUG_DIR, "session_log", _SESSION_LOG_NAME)
@@ -6811,10 +6893,19 @@ def _session_log(msg: str, level: str = "INFO"):
     except Exception:
         pass
     try:
+        _slog_censor = globals().get("CONFIG", {}).get("auto_censor_logs", False)
         ts = _dt.datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        line = f"[{ts}] [{level:<7}] {msg}\n"
+        raw_line = f"[{ts}] [{level:<7}] {msg}\n"
+        out_line = f"[{ts}] [{level:<7}] {_censor_log_msg(msg)}\n" if _slog_censor else raw_line
+        if _slog_censor:
+            _unc_dir = os.path.join(os.path.dirname(_SESSION_LOG_PATH), "UNCENSORED")
+            os.makedirs(_unc_dir, exist_ok=True)
+            try:
+                with open(os.path.join(_unc_dir, os.path.basename(_SESSION_LOG_PATH)), "a", encoding="utf-8") as _slu:
+                    _slu.write(raw_line)
+            except Exception: pass
         with open(_SESSION_LOG_PATH, "a", encoding="utf-8") as _slf:
-            _slf.write(line)
+            _slf.write(out_line)
         if level not in ("OP", "SYSINFO", "CHKPT") and msg.strip():
             try:
                 with _OP_RING_LOCK:
@@ -7142,6 +7233,7 @@ _checkpoint("INIT", f"Runtime params set — VT keys: {len(API_KEYS)}, delay: {R
 
 
 import gc as _gc
+_sl("BOOT: L7206", "BOOT")
 
 _gc_last_run   = [0.0]
 _gc_run_count  = [0]
@@ -11454,6 +11546,7 @@ def _ye_update_nums():
 def _ye_sync_scroll(*args):
     _ye_ed.yview(*args); _ye_nums.yview(*args)
 _ye_nums_sc.config(command=_ye_sync_scroll)
+_sl("BOOT: L11518", "BOOT")
 
 _ye_ed.bind("<KeyRelease>", _ye_highlight)
 _ye_ed.bind("<ButtonRelease>", _ye_highlight)
@@ -11961,6 +12054,7 @@ def _sandbox_dialog():
 
 
 _q       = queue.Queue()
+_sl("BOOT: L12025", "BOOT")
 _q_items = []; _q_lk = threading.Lock()
 
 def _sidebar_add(n):
@@ -12542,6 +12636,7 @@ def _worker():
         _auto_gc("scan_worker")
 
 threading.Thread(target=_worker, daemon=True).start()
+_sl("BOOT: L12606", "BOOT")
 _sl("[DBG] CP1 worker thread started", "BOOT")
 
 
@@ -12923,6 +13018,7 @@ def _ye_do_highlight():
         _ye_editor.tag_add("rule_name", s, e)
 
 _ye_editor.tag_configure("kw",        foreground=C["mauve"],   font=("Consolas",10,"bold"))
+_sl("BOOT: L12987", "BOOT")
 _ye_editor.tag_configure("mod",       foreground=C["peach"])
 _ye_editor.tag_configure("str_tag",   foreground=C["green"])
 _ye_editor.tag_configure("hex_str",   foreground=C["teal"])
@@ -13274,6 +13370,7 @@ _sb_nb = ttk.Notebook(_tab_sandbox); _sb_nb.pack(fill=tk.BOTH, expand=True, padx
 _sb_watch_tab = tk.Frame(_sb_nb, bg=C["base"]); _sb_nb.add(_sb_watch_tab, text=" AUTO-SCAN ")
 _sw_top = tk.Frame(_sb_watch_tab, bg=C["surface0"], pady=10, padx=16); _sw_top.pack(fill=tk.X)
 tk.Label(_sw_top, text="AUTO-SCAN WATCHER", font=FB, bg=C["surface0"], fg=C["teal"]).pack(anchor="w")
+_sl("BOOT: L13338", "BOOT")
 tk.Label(_sw_top, text="Automatically scan new files dropped into a folder",
          font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
 tk.Frame(_sb_watch_tab, bg=C["surface2"], height=1).pack(fill=tk.X)
@@ -13728,6 +13825,7 @@ def _net_snapshot():
     return result
 
 _mkbtn(_sp_run_btn_frame, "\u25ba Run & Monitor", _sp_run, C["mauve"], C["base"])
+_sl("BOOT: L13792", "BOOT")
 _mkbtn(_sp_kill_btn_f,   "\u23f9 Kill Process",   _sp_kill, C["red"],   C["base"])
 
 
@@ -14151,6 +14249,7 @@ def _sandbox_start_drop_watch(drop_folder):
     _sb_log(f"Drop watch active: {drop_folder}", "OK")
 
 _mkbtn(_sbs_act, "🔨 Build Sandbox",    _sandbox_build,    C["green"])
+_sl("BOOT: L14215", "BOOT")
 _mkbtn(_sbs_act, "💥 Dismantle",         _sandbox_dismantle, C["red"])
 
 tk.Frame(_sbs_left, bg=C["surface2"], height=1).pack(fill=tk.X)
@@ -14502,6 +14601,7 @@ _sk_vscroll = tk.Scrollbar(_stg_keys_tab, orient="vertical",
                             bg=C["surface1"], troughcolor=C["mantle"], relief="flat", bd=0, width=8)
 _sk_vscroll.pack(side=tk.RIGHT, fill=tk.Y)
 _sk_canvas = tk.Canvas(_stg_keys_tab, bg=C["base"], highlightthickness=0)
+_sl("BOOT: L14566", "BOOT")
 _sk_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 _sk_canvas.configure(yscrollcommand=_sk_vscroll.set)
 _sk_vscroll.configure(command=_sk_canvas.yview)
@@ -14993,6 +15093,7 @@ def _sk_clear_all():
     _sk_result_sv.set("Form cleared. Press 💾 Save to apply.")
 
 _sk_btns = tk.Frame(_sk_action_bar, bg=C["surface0"]); _sk_btns.pack(anchor="w")
+_sl("BOOT: L15057", "BOOT")
 _mkbtn(_sk_btns, "💾 Save All",   _sk_save,      C["green"])
 _mkbtn(_sk_btns, "🔌 Test All",   _sk_test_all,  C["blue"])
 _mkbtn(_sk_btns, "🗑 Clear Form",    _sk_clear_all, C["red"])
@@ -15345,6 +15446,7 @@ _dbl_lb = tk.Listbox(_dbl_left, bg=C["mantle"], fg=C["text"],
                       font=("Consolas", 8), relief="flat", bd=0,
                       selectbackground=C["surface2"], activestyle="none",
                       yscrollcommand=_dbl_lb_sc.set)
+_sl("BOOT: L15406", "BOOT")
 _dbl_lb_sc.config(command=_dbl_lb.yview)
 _dbl_lb_sc.pack(side=tk.RIGHT, fill=tk.Y)
 _dbl_lb.pack(fill=tk.BOTH, expand=True)
@@ -15696,6 +15798,7 @@ _ls_txt.config(xscrollcommand=_ls_hsc.set)
 _ls_sc.config(command=_ls_txt.yview)
 _ls_hsc.pack(side=tk.BOTTOM, fill=tk.X)
 _ls_sc.pack(side=tk.RIGHT, fill=tk.Y)
+_sl("BOOT: L15760", "BOOT")
 _ls_txt.pack(fill=tk.BOTH, expand=True)
 _ls_txt.tag_configure("url", foreground=C["blue"])
 _ls_txt.tag_configure("ip",  foreground=C["red"])
@@ -16058,6 +16161,7 @@ _IOC_PATTERNS = {
     "File Paths":  (r'[A-Za-z]:\\(?:[^\\\/:*?"<>|\r\n]+\\)*[^\\\/:*?"<>|\r\n]*', "PATH"),
     "BTC Wallets": (r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b|\bbc1[a-z0-9]{6,87}\b', "BTC"),
 }
+_sl("BOOT: L16112", "BOOT")
 
 def _li_extract():
     import re as _re
@@ -16426,6 +16530,7 @@ def _nc_export():
         messagebox.showerror("Export", str(e))
 
 _mkbtn(_nc_ctrl, "🔄 Refresh", _nc_refresh, C["sapphire"])
+_sl("BOOT: L16490", "BOOT")
 _mkbtn(_nc_ctrl, "🔍 Lookup IP", _nc_lookup_sel, C["blue"])
 _mkbtn(_nc_ctrl, "📋 Copy", _nc_copy_sel, C["surface2"], C["text"])
 _mkbtn(_nc_ctrl, "💾 Export", _nc_export, C["surface2"], C["text"])
@@ -16844,6 +16949,7 @@ def _quar_list() -> list:
 
 
 _DEFENSE_ACTIVE  = threading.Event()
+_sl("BOOT: L16908", "BOOT")
 _defense_results = []
 _defense_lock    = threading.Lock()
 
@@ -17202,6 +17308,7 @@ def _defense_clear_log():
     _def_log_txt.config(state="disabled")
 
 _mkbtn(_def_ctrl_f, "🛡 ARM",             _defense_arm,          C["green"])
+_sl("BOOT: L17266", "BOOT")
 _mkbtn(_def_ctrl_f, "⏹ Disarm",           _defense_disarm,       C["overlay0"])
 _mkbtn(_def_ctrl_f, "🔍 Scan Folder",_defense_scan_now,     C["blue"])
 _mkbtn(_def_ctrl_f, "🖥 Scan Processes",_defense_scan_running,  C["mauve"])
@@ -17556,6 +17663,7 @@ def _priv_autocensor_toggle():
     _gs_save_all()
     _sl(f"Auto-censor logs: {CONFIG['auto_censor_logs']}", "CFG")
 _sp3 = _gs_section(_gs_pv_inner, "CRASH & SESSION LOGS", C["blue"])
+_sl("BOOT: L17620", "BOOT")
 
 _autocensor_row = tk.Frame(_gs_pv_inner, bg=C["base"]); _autocensor_row.pack(fill=tk.X, pady=2)
 tk.Label(_autocensor_row, text="Auto-censor logs before writing",
@@ -17914,6 +18022,7 @@ for _gv, _gl in [("gen0","⚡ gen0  (fast — young only)"),
 
 _gs_row(sa1b, "Cooldown minimo tra raccolte (sec):", _gs_v_gc_cooldown,
         "evita esecuzioni troppo frequenti  —  default: 2", 5)
+_sl("BOOT: L17977", "BOOT")
 
 tk.Label(_gsa,
          text="  ⓘ  gen0 is sufficient for normal use. full frees more memory but is slower.\n"
@@ -18335,6 +18444,7 @@ def _global_exc_hook(exc_type, exc_val, exc_tb):
         pass
 
 sys.excepthook = _global_exc_hook
+_sl("BOOT: L18399", "BOOT")
 
 
 import ctypes as _ctypes
@@ -18697,6 +18807,7 @@ def _ap_open_folder():
     else: subprocess.Popen(["xdg-open", folder])
 
 _mkbtn(_ap_fold_ctrl, "➕ Add Folder", _ap_add_folder,    C["green"])
+_sl("BOOT: L18761", "BOOT")
 _mkbtn(_ap_fold_ctrl, "➖ Remove",           _ap_remove_folder, C["red"])
 _mkbtn(_ap_fold_ctrl, "📂 Open",              _ap_open_folder,   C["blue"])
 
@@ -19048,6 +19159,7 @@ _ap_sd_canvas = tk.Canvas(_ap_self_tab, bg=C["base"], highlightthickness=0)
 _ap_sd_canvas.pack(fill=tk.BOTH, expand=True)
 _ap_sd_sb = tk.Scrollbar(_ap_self_tab, orient="vertical", command=_ap_sd_canvas.yview,
                            bg=C["surface1"], troughcolor=C["mantle"], relief="flat", bd=0, width=7)
+_sl("BOOT: L19111", "BOOT")
 _ap_sd_sb.pack(side=tk.RIGHT, fill=tk.Y); _ap_sd_canvas.configure(yscrollcommand=_ap_sd_sb.set)
 _ap_sd_inner = tk.Frame(_ap_sd_canvas, bg=C["base"])
 _ap_sd_win = _ap_sd_canvas.create_window((0,0), window=_ap_sd_inner, anchor="nw")
@@ -19512,6 +19624,7 @@ def _dsc_run():
     threading.Thread(target=_worker, daemon=True).start()
 
 _mkbtn(_dsc_ctrl, "🧬  Start Deep Scan", _dsc_run, C["red"])
+_sl("BOOT: L19576", "BOOT")
 _mkbtn(_dsc_ctrl, "🔧  System Fixer", lambda: _launch_system_fixer(), C["yellow"], C["base"])
 _mkbtn(_dsc_ctrl, "🗑  Clear",
        lambda: (_dsc_log.config(state="normal"),
@@ -20558,6 +20671,7 @@ def _open_system_fixer_ui(is_admin=False):
 
 
 _mkbtn(_ap_syschk_ctrl, "🔍 Start System Scan",   _syschk_run,            C["red"])
+_sl("BOOT: L20622", "BOOT")
 _mkbtn(_ap_syschk_ctrl, "🔧 Open System Fixer",   _launch_system_fixer,   C["yellow"], C["base"])
 _mkbtn(_ap_syschk_ctrl, "🗑 Clear Log",
        lambda: (_ap_syschk_log.config(state="normal"),
@@ -20951,6 +21065,7 @@ def _cr_validate(target_path, pw_var, pw2_var=None, mode="encrypt"):
 
 
 _cr_enc_tab = tk.Frame(_cr_nb, bg=C["base"]); _cr_nb.add(_cr_enc_tab, text=" 🔒 ENCRYPT ")
+_sl("BOOT: L21015", "BOOT")
 
 
 _cr_enc_canvas = tk.Canvas(_cr_enc_tab, bg=C["surface0"], highlightthickness=0)
@@ -21303,6 +21418,7 @@ def _dz_vacuum_db():
         messagebox.showinfo("VACUUM", f"DB compacted — {size:.1f} KB")
     except Exception as e: messagebox.showerror("Error", str(e))
 _dz_btn(_dzs1, "Reset DB",            "Delete all scan history",            _reset_db)
+_sl("BOOT: L21367", "BOOT")
 _dz_btn(_dzs1, "Delete All Reports",  "Delete all report folders",          _reset_reports)
 _dz_btn(_dzs1, "Clear Logs",          "Clear debug and operation logs",            _reset_logs, C["yellow"])
 _dz_btn(_dzs1, "VACUUM DB",           "Compact SQLite — recover space",         _dz_vacuum_db, C["blue"])
@@ -21654,6 +21770,7 @@ def _dz_restore_backup():
 
 _dz_btn(_dzs8, "💾 Full Backup (ZIP)",  "Save config, DB, whitelist, rules state",  _dz_full_backup,  C["green"])
 _dz_btn(_dzs8, "📥 Restore from Backup",    "Restore from previous ZIP file",             lambda: _dz_restore_backup(), C["blue"])
+_sl("BOOT: L21718", "BOOT")
 _dz_btn(_dzs8, "💾 Export Config",         "Save config.json only",                     lambda: _export_full_config(), C["surface2"])
 
 
@@ -22026,6 +22143,7 @@ def _hex_find():
 
 
 _tab_regex = tk.Frame(_look_nb, bg=C["base"]); _look_nb.add(_tab_regex, text="🔎REGEX")
+_sl("BOOT: L22090", "BOOT")
 _rx_head = tk.Frame(_tab_regex, bg=C["surface0"], padx=16, pady=10); _rx_head.pack(fill=tk.X)
 tk.Label(_rx_head, text="IOC REGEX EXTRACTOR", font=FB, bg=C["surface0"], fg=C["sky"]).pack(anchor="w")
 tk.Label(_rx_head, text="Paste text or load a file — extract IPs, domains, URLs, hashes, emails, CVEs, registry keys and more",
@@ -22372,7 +22490,6 @@ def _doc_analyze():
     threading.Thread(target=_do,daemon=True).start()
 
 
-
 _crash_log_path = os.path.join(DEBUG_DIR, "crash_log", "crash_log.txt")
 
 SOC_ERROR_CODES = {
@@ -22432,6 +22549,7 @@ SOC_ERROR_CODES = {
     105: "RECOVERY_LAUNCH_FAIL — Recovery UI error",
     106: "VERSION_MISSING — Missing vx_version",
 }
+_sl("BOOT: L22439", "BOOT")
 
 _dzs9 = _dz_section("🖥 SYSTEM", C["sapphire"])
 
@@ -22449,10 +22567,17 @@ def _restart_app():
         python = sys.executable
         script = os.path.abspath(__file__)
         def _do_exec():
+            try:
+                import subprocess as _rsp
+                _rsp.Popen(
+                    [python, script],
+                    creationflags=0x00000008 if sys.platform == "win32" else 0,
+                    close_fds=True,
+                )
+            except Exception as _re:
+                _sl(f"Restart launch failed: {_re}", "ERR")
             try: root.destroy()
             except Exception: pass
-            import time as _rt; _rt.sleep(0.2)
-            os.execv(python, [python, script])
         root.after(150, _do_exec)
     except Exception as e:
         messagebox.showerror("Error", f"Cannot restart: {e}")
@@ -22784,6 +22909,7 @@ def _open_crash_log():
     else: subprocess.Popen(["xdg-open", _crash_log_path])
 
 _dz_btn(_dzs13, "📄 Open crash_log.txt",   "Open crash log",           _open_crash_log,   C["surface2"])
+_sl("BOOT: L22854", "BOOT")
 _dz_btn(_dzs13, "🗑 Delete crash_log.txt","Delete crash log file", _clear_crash_log,  C["yellow"])
 
 
@@ -23137,6 +23263,7 @@ _ck_left.pack_propagate(False)
 
 tk.Label(_ck_left, text="  🛠  QUICK INSTALL GUIDE", font=("Consolas",9,"bold"),
          bg=C["surface0"], fg=C["peach"]).pack(anchor="w", pady=(10,4), padx=10)
+_sl("BOOT: L23206", "BOOT")
 _ck_guide = tk.Text(_ck_left, font=("Consolas",8), bg=C["mantle"], fg=C["text"],
                     relief="flat", bd=0, padx=10, pady=8, wrap="word", state="normal")
 _ck_guide.pack(fill=tk.BOTH, expand=True, padx=6, pady=(0,6))
@@ -32057,3 +32184,4 @@ if _RECOVERY_REQUESTED[0] and not _APP_DYING[0]:
     except Exception: pass
     import time as _t_rec; _t_rec.sleep(0.15)
     _unified_recovery_ui(tb_str="Launched manually from Settings")
+_sl("BOOT: L23486", "BOOT")
