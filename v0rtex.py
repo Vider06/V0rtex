@@ -6697,7 +6697,6 @@ def _sl_init() -> None:
     with _SL_INIT_LOCK:
         if _SILENT_LOG_READY:
             return
-        _SILENT_LOG_READY = True
     try:
         _sl_dir_local = os.environ.get("LOCALAPPDATA") or os.environ.get("TEMP") or os.path.dirname(DEBUG_DIR)
         _sl_dir_local = os.path.join(_sl_dir_local, "V0RTEX", "silent_log")
@@ -6728,6 +6727,7 @@ def _sl_init() -> None:
                 _slf.write("\n".join(_buf_snap) + "\n")
         _sl_mirror = os.path.join(_sl_dir_debug, os.path.basename(_SILENT_LOG_PATH))
         globals()["_SILENT_LOG_MIRROR"] = _sl_mirror
+        _SILENT_LOG_READY = True
     except Exception as _sle:
         try:
             _fb = os.path.join(DEBUG_DIR, "silent_log_INIT_FAIL.txt")
@@ -8294,7 +8294,6 @@ def _early_crash_hook(exc_type, exc_val, exc_tb):
     try: _session_log(f"CRASH: {exc_type.__name__}: {exc_val}", "ERR")
     except Exception: pass
 
-sys.excepthook = _early_crash_hook
 
 _pre_sl("main window init", "BOOT")
 root.title(f"{_VX_NAME} v{_VX_VER} by {_VX_AUTH}")
@@ -11773,6 +11772,22 @@ _log_debug("YARA compiling in background...", "INFO")
 _checkpoint("INIT", "UI ready — main window built, worker thread started, background YARA compiling")
 _sl("UI ready — main window built, worker thread started, background YARA compiling", "INIT")
 
+def _vx_debug_excepthook(exc_type, exc_val, exc_tb):
+    import traceback as _tbe2
+    tb = "".join(_tbe2.format_exception(exc_type, exc_val, exc_tb))
+    try: _sl(f"[CRASH] MODULE-LEVEL EXCEPTION: {exc_type.__name__}: {exc_val}", "CRASH")
+    except Exception: pass
+    try: _sl(f"[CRASH] TRACEBACK:\n{tb}", "CRASH")
+    except Exception: pass
+    try:
+        import os as _oe
+        _ef = _oe.path.join(_oe.path.dirname(_oe.path.abspath(__file__)), "vx_crash_dump.txt")
+        with open(_ef, "w", encoding="utf-8") as _f: _f.write(tb)
+    except Exception: pass
+sys.excepthook = _vx_debug_excepthook
+
+_sl("[DBG] INIT done — sys.excepthook armed, starting tab builds", "BOOT")
+
 
 _TI_TIMEOUT = 12
 
@@ -12527,6 +12542,7 @@ def _worker():
         _auto_gc("scan_worker")
 
 threading.Thread(target=_worker, daemon=True).start()
+_sl("[DBG] CP1 worker thread started", "BOOT")
 
 
 def _enqueue(path, base=None):
@@ -12682,8 +12698,9 @@ if _MATPLOTLIB_OK:
     _perf_canvas = FigureCanvasTkAgg(_perf_fig, master=_tab_perf)
 else:
     _perf_fig = None; _perf_canvas = None
-_perf_canvas.get_tk_widget().configure(bg=C["base"])
-_perf_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
+if _perf_canvas:
+    _perf_canvas.get_tk_widget().configure(bg=C["base"])
+    _perf_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
 
 def _update_perf_chart():
     with _perf_hist_lock:
@@ -12762,8 +12779,9 @@ if _MATPLOTLIB_OK:
     _tl_canvas = FigureCanvasTkAgg(_tl_fig, master=_tab_timeline)
 else:
     _tl_fig = None; _tl_canvas = None
-_tl_canvas.get_tk_widget().configure(bg=C["base"])
-_tl_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=8, pady=(4,0))
+if _tl_canvas:
+    _tl_canvas.get_tk_widget().configure(bg=C["base"])
+    _tl_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=8, pady=(4,0))
 
 
 _tl_list_frame = tk.Frame(_tab_timeline, bg=C["surface0"], height=140)
@@ -12925,6 +12943,7 @@ _ye_editor.insert(tk.END, """rule My_Rule {
 }
 """)
 _ye_do_highlight()
+_sl("[DBG] CP2 YARA editor ready", "BOOT")
 
 
 tk.Label(_ye_right, text="AZIONI", font=FB, bg=C["surface0"],
@@ -13243,6 +13262,7 @@ def _watcher_start():
 
 
 _tab_sb_host = tk.Frame(_nb, bg=C["base"]); _nb.add(_tab_sb_host, text="🔬SB")
+_sl("[DBG] CP3 sandbox tab starting", "BOOT")
 _sb_host_nb = ttk.Notebook(_tab_sb_host); _sb_host_nb.pack(fill=tk.BOTH, expand=True)
 
 _tab_sandbox = tk.Frame(_sb_host_nb, bg=C["base"])
@@ -18405,6 +18425,7 @@ def _schedule_ping():
     try: root.after(2000, _schedule_ping)
     except Exception: pass
 
+_sl("[DBG] CP4 watchdog+approt tab done", "BOOT")
 
 _tab_approt = tk.Frame(_nb, bg=C["base"]); _nb.add(_tab_approt, text="🔒PROT")
 
@@ -22240,9 +22261,9 @@ _doc_out = tk.Text(_doc_wrap, bg="#0a0005", fg=C["text"], font=("Consolas",9),
                    yscrollcommand=_doc_sc.set, relief="flat", bd=0, padx=12, pady=8, wrap="word", state="disabled")
 _doc_sc.config(command=_doc_out.yview)
 _doc_sc.pack(side=tk.RIGHT, fill=tk.Y); _doc_out.pack(fill=tk.BOTH, expand=True)
-for _dt, _dc in [("CRIT",C["red"]),("WARN",C["yellow"]),("OK",C["green"]),
+for _dtag, _dc in [("CRIT",C["red"]),("WARN",C["yellow"]),("OK",C["green"]),
                   ("HEAD",C["maroon"]),("INFO",C["sapphire"]),("DIM",C["overlay0"])]:
-    _doc_out.tag_configure(_dt, foreground=_dc)
+    _doc_out.tag_configure(_dtag, foreground=_dc)
 
 def _doc_log(msg, tag="DIM"):
     _doc_out.config(state="normal"); _doc_out.insert(tk.END, msg+"\n", tag)
@@ -22350,6 +22371,67 @@ def _doc_analyze():
             root.after(0,lambda err=str(e): _doc_log(f"Analysis error: {err}","CRIT"))
     threading.Thread(target=_do,daemon=True).start()
 
+
+
+_crash_log_path = os.path.join(DEBUG_DIR, "crash_log", "crash_log.txt")
+
+SOC_ERROR_CODES = {
+    0:   "UNKNOWN_CRASH — Unclassified error",
+    1:   "DB_CORRUPTION — SQLite failure",
+    2:   "YARA_COMPILE_FATAL — Ruleset failure",
+    3:   "VT_AUTH_FAILURE — 401 Unauthorized",
+    4:   "WORKER_THREAD_DEAD — Worker exit",
+    5:   "CONFIG_MISSING — Missing config.json",
+    6:   "REPORT_WRITE_FAIL — Write permission error",
+    7:   "TSHARK_NOT_FOUND — Missing binary",
+    8:   "QUARANTINE_LOCKED — Locked folder",
+    9:   "WATCHER_CRASH — Watcher thread death",
+    10:  "SANDBOX_TIMEOUT — Sandbox hang",
+    14:  "PERF_MONITOR_DEAD — psutil thread stop",
+    16:  "DEFENSE_ENGINE_FAIL — Defense crash",
+    17:  "GUI_RENDER_ERROR — Tkinter bad state",
+    18:  "IMPORT_ERROR — Module import failure",
+    19:  "NETWORK_UNAVAILABLE — No interface",
+    20:  "FILE_ACCESS_DENIED — PermissionError",
+    21:  "MEMORY_OVERFLOW — MemoryError",
+    22:  "HASH_COMPUTE_FAIL — File hash error",
+    23:  "IOC_EXTRACT_FAIL — IOC exception",
+    24:  "RULE_STATE_CORRUPT — Bad JSON",
+    25:  "QUARANTINE_MOVE_FAIL — Move failure",
+    27:  "API_RATE_LIMIT — 429 Too Many Requests",
+    28:  "SCAN_QUEUE_OVERFLOW — Queue overflow",
+    29:  "THREAD_DEADLOCK — Pipeline deadlock",
+    30:  "REINSTALL_SCRIPT_FAIL — Reinstall write error",
+    31:  "UNINSTALL_SCRIPT_FAIL — Uninstall write error",
+    32:  "BACKUP_WRITE_FAIL — Backup ZIP error",
+    35:  "YARA_SCAN_HANG — YARA timeout",
+    38:  "PE_PARSE_FAIL — pefile exception",
+    40:  "ENTROPY_COMPUTE_ERROR — Entropy error",
+    42:  "PCAP_OPEN_FAIL — tshark capture fail",
+    44:  "DNS_RESOLVE_FAIL — DNS thread error",
+    47:  "SSL_CHECK_FAIL — TLS inspect error",
+    48:  "PORT_SCAN_CRASH — Port scanner death",
+    50:  "PROC_ENUM_FAIL — psutil enum error",
+    53:  "REGISTRY_READ_FAIL — Registry scan error",
+    57:  "PROC_KILL_FAIL — Kill non-zero exit",
+    58:  "SANDBOX_BUILD_FAIL — Sandbox create fail",
+    61:  "IOC_FEED_FAIL — Feed timeout",
+    63:  "VT_UPLOAD_FAIL — VT upload error",
+    71:  "HEX_PARSE_FAIL — Hex viewer error",
+    72:  "MACRO_EXTRACT_FAIL — Macro extract fail",
+    73:  "ARCHIVE_OPEN_FAIL — Archive open fail",
+    78:  "CRYPT_ENCRYPT_FAIL — AES encrypt error",
+    79:  "CRYPT_DECRYPT_FAIL — Wrong key decrypt",
+    84:  "TRAY_ICON_FAIL — Tray icon error",
+    88:  "DB_SCHEMA_MISMATCH — Schema version error",
+    89:  "DB_LOCKED — SQLite locked",
+    94:  "UPDATE_DOWNLOAD_FAIL — Updater error",
+    99:  "TK_CALLBACK_CRASH — Tkinter callback exception",
+    103: "MEDIA_SCRIPT_STALE — Stale install script",
+    104: "MEDIA_SCRIPT_SYNTERR — SyntaxError in script",
+    105: "RECOVERY_LAUNCH_FAIL — Recovery UI error",
+    106: "VERSION_MISSING — Missing vx_version",
+}
 
 _dzs9 = _dz_section("🖥 SYSTEM", C["sapphire"])
 
@@ -26010,6 +26092,7 @@ _dlog_out = tk.Text(_tab_debuglog, bg="#0a0a10", fg=C["subtext"], font=("Consola
 _dlog_sc.config(command=_dlog_out.yview)
 _dlog_sc.pack(side=tk.RIGHT, fill=tk.Y); _dlog_out.pack(fill=tk.BOTH, expand=True, padx=8, pady=(4,8))
 _dlog_populate()
+_sl("[DBG] CP5 dlog_populate done", "BOOT")
 
 _tab_binpat = tk.Frame(_look_nb, bg=C["base"])
 _look_nb.add(_tab_binpat, text="🔎BINPAT")
@@ -27603,6 +27686,7 @@ def _upd_auto_changed(*_):
         with open(CONFIG_PATH,"w",encoding="utf-8") as f: json.dump(CONFIG,f,indent=2)
     except: pass
 _upd_auto_v.trace_add("write", _upd_auto_changed)
+_sl("[DBG] CP6 updater trace added", "BOOT")
 
 
 def _unified_recovery_ui(
@@ -31541,12 +31625,14 @@ def _start_recovery_ui(exc_type=None, exc_val=None, exc_tb=None, tb_str=""):
 
 
 _wd_thread = threading.Thread(target=_watchdog_thread, daemon=True)
+_sl("[DBG] CP7 watchdog thread starting", "BOOT")
 _wd_thread.start()
 root.after(3000, _schedule_ping)
 
 _log_debug(f"{_VX_TITLE} ready", "INFO")
 _log_ops(f"{_VX_NAME}  v{_VX_VER}  by {_VX_AUTH}", "HEAD")
 _start_tray()
+_sl("[DBG] CP8 _start_tray done", "BOOT")
 root.after(500,   _refresh_stats)
 root.after(5000,  _perf_hist_tick)
 root.after(60000, _perf_tick)
@@ -31555,6 +31641,7 @@ _log_ops(f"API keys: {len(API_KEYS)}" if API_KEYS else "No API keys loaded — e
 _log_ops(f"YARA: {'active (' + str(len(os.listdir(RULES_DIR)) + len(os.listdir(RULES_EXTERN_DIR))) + ' files)' if _yara_rules else 'unavailable'}", "NORM")
 _log_ops("Ready — drop files to scan or use YARA Manager to update rules.", "DIM")
 _update_charts()
+_sl("[DBG] CP9 _update_charts done", "BOOT")
 
 
 _MATPLOTLIB_CANVAS_IDS = set()
@@ -31781,6 +31868,7 @@ try:
         _nb.insert(i, tab)
 except Exception as _tro:
     print(f"[TAB ORDER] Tab reorder failed: {_tro}")
+_sl("[DBG] CP10 tab reorder done", "BOOT")
 
 
 _sbar = tk.Frame(root, bg=C["crust"], pady=3, padx=10)
@@ -31808,6 +31896,7 @@ tk.Label(_sbar, textvariable=_sb_time_sv, font=("Consolas",8),
 tk.Label(_sbar, text=f"{_VX_NAME} v{_VX_VER}  by {_VX_AUTH}",
          font=("Consolas",7), bg=C["crust"], fg=C["surface2"]).pack(side=tk.RIGHT, padx=12)
 
+_sl("[DBG] CP11 statusbar packed", "BOOT")
 def _sbar_tick():
     try:
         import datetime as _dtsb
@@ -31876,6 +31965,7 @@ def _write_startup_scripts():
 
 _sl("Scheduled: write startup scripts at +1200ms", "BOOT"); root.after(1200, _write_startup_scripts)
 root.after(400, _take_startup_snapshot)
+_sl("[DBG] CP12 startup scripts scheduled", "BOOT")
 
 
 if _missing:
@@ -31891,6 +31981,7 @@ if _missing:
             pass
 
 
+_sl(f"[DBG] CP13 RECOVERY_MODE={_RECOVERY_MODE}", "BOOT")
 if _RECOVERY_MODE:
     _sentinel_data = {}
     try:
@@ -31935,6 +32026,28 @@ if _RECOVERY_MODE:
     sys.exit(0)
 
 
+
+def _tk_callback_exception_handler(exc_type, exc_val, exc_tb):
+    import traceback as _tbe
+    tb = "".join(_tbe.format_exception(exc_type, exc_val, exc_tb))
+    _sl(f"[TK_CALLBACK_CRASH] {exc_type.__name__}: {exc_val}", "CRASH")
+    _sl(f"[TK_CALLBACK_CRASH] TRACEBACK:\n{tb}", "CRASH")
+    try: _write_crash_log(99, f"{exc_type.__name__}: {exc_val}", tb)
+    except Exception: pass
+root.report_callback_exception = _tk_callback_exception_handler
+
+_sl("[DBG] PRE-MAINLOOP: entering mainloop now", "BOOT")
+
+def _tk_callback_exception_handler(exc_type, exc_val, exc_tb):
+    import traceback as _tbe
+    tb = "".join(_tbe.format_exception(exc_type, exc_val, exc_tb))
+    _sl(f"[TK_CALLBACK_CRASH] {exc_type.__name__}: {exc_val}", "CRASH")
+    _sl(f"[TK_CALLBACK_CRASH] TRACEBACK:\n{tb}", "CRASH")
+    try: _write_crash_log(99, f"{exc_type.__name__}: {exc_val}", tb)
+    except Exception: pass
+root.report_callback_exception = _tk_callback_exception_handler
+
+_sl("[DBG] PRE-MAINLOOP: all module-level code done, entering mainloop", "BOOT")
 root.mainloop()
 _sl("Mainloop returned — clean exit or window closed", "EXIT")
 _sl_copy_to_final()
