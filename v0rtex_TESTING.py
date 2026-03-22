@@ -29337,14 +29337,21 @@ def _launch_update_ui(clear_install=False):
                 import ctypes as _ct_adm, subprocess as _sp_uac
                 _ulog("⚡  Requesting administrator privileges...", "WARN")
                 try:
-                    params = _sp_uac.list2cmdline(sys.argv)
+
+
+
+                    _base_args = [a for a in sys.argv if a != "--auto-update"]
+                    _elev_args = _base_args + ["--auto-update"]
+                    params = _sp_uac.list2cmdline(_elev_args)
                     ret = _ct_adm.windll.shell32.ShellExecuteW(
                         None, "runas", sys.executable, params, None, 1)
                     if ret > 32:
-                        _ulog("✓  Admin granted — V0RTEX relaunching as administrator.", "OK")
-                        _ulog("   Please click START UPDATE again in the new window.", "DIM")
-                        rr.after(1500, rr.destroy)
-                        rr.after(1600, root.destroy)
+                        _ulog("✓  Admin granted — relaunching updater as administrator...", "OK")
+                        _ulog("   This window will close now.", "DIM")
+
+
+                        rr.after(800, rr.destroy)
+                        rr.after(900, root.destroy)
                         return
                     else:
                         _ulog("✗  Administrator privileges denied (UAC declined).", "ERR")
@@ -34929,6 +34936,17 @@ def _tk_callback_exception_handler(exc_type, exc_val, exc_tb):
 root.report_callback_exception = _tk_callback_exception_handler
 
 _sl("[DBG] PRE-MAINLOOP: all module-level code done, entering mainloop", "BOOT")
+
+
+
+
+if "--auto-update" in sys.argv:
+    _sl("[AUTO-UPDATE] flag detected — auto-opening updater UI", "BOOT")
+    try:
+        root.after(600, lambda: _launch_update_ui(clear_install=False))
+    except Exception as _au_e:
+        _sl(f"[AUTO-UPDATE] failed to schedule _launch_update_ui: {_au_e}", "WARN")
+
 root.mainloop()
 _sl("Mainloop returned — clean exit or window closed", "EXIT")
 _sl_copy_to_final()
