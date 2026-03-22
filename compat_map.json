@@ -1,11 +1,15 @@
 {
+  "_comment": "V0RTEX compatibility map — TESTING-GENERAL branch. Add a new entry each time a version is released. raw_url must point to the exact commit/tag raw URL of v0rtex.py for that version. max_direct_hops: if the user is more than this many steps behind, the TRAMPOLINE method is used instead of a direct jump.",
+
   "latest_version": "0.9.9.X0",
+
   "max_direct_hops": 5,
+
   "chain": [
     {
       "version": "0.9.9.X0",
       "raw_url": "https://raw.githubusercontent.com/Vider06/V0rtex/TESTING-GENERAL/v0rtex.py",
-      "notes": "First TESTING-GENERAL release \u2014 0.9.9.X0"
+      "notes": "First TESTING-GENERAL release — 0.9.9.X0"
     }
   ]
 }
