@@ -1,5 +1,4 @@
-
-import os, sys, json, subprocess, time, threading, re as _re
+import os, sys, json, subprocess, time, threading, re as _re, queue as _queue
 
 _WIN = sys.platform == "win32"
 _MAC = sys.platform == "darwin"
@@ -20,14 +19,29 @@ NEW_VER:     str = meta.get("new_version", "?")
 BRANCH:      str = meta.get("branch", "TESTING-GENERAL")
 MANIFEST:    dict = meta.get("manifest", {})
 
-UTILS_DIR   = os.path.join(os.path.dirname(INSTALL_DIR), "v0rtex_utils")
+VX_SYSTEM_DIR: str = meta.get("vx_system_dir") or os.path.dirname(INSTALL_DIR)
+FRESH_INSTALL: bool = bool(meta.get("fresh_install", False))
+UTILS_DIR   = os.path.join(VX_SYSTEM_DIR, "v0rtex_utils")
 META_DIR    = os.path.join(UTILS_DIR, ".vx_meta")
 MAIN_SCRIPT = os.path.join(INSTALL_DIR, "v0rtex.py")
 DEPS_REMOVE = os.path.join(META_DIR, ".deps_to_remove")
 LOG_DIR     = os.path.join(UTILS_DIR, "debug_log", "update_log")
 
+_BG    = "#06060f"
+_PNL   = "#0b0b1a"
+_BRD   = "#16162a"
+_ACC   = "#cba6f7"
+_GRN   = "#a6e3a1"
+_RED   = "#f38ba8"
+_YEL   = "#f9e2af"
+_BLU   = "#89b4fa"
+_DIM   = "#45475a"
+_SUB   = "#6c7086"
+_TXT   = "#cdd6f4"
+_BAR_C = "#a6e3a1"
 
-def _run(cmd: list, timeout: int = 30, text: bool = False) -> "subprocess.CompletedProcess[str]":
+
+def _run(cmd: list, timeout: int = 30, text: bool = False):
     kw: dict = {"capture_output": True, "timeout": timeout}
     if text:
         kw["text"] = True
@@ -36,11 +50,40 @@ def _run(cmd: list, timeout: int = 30, text: bool = False) -> "subprocess.Comple
     return subprocess.run(cmd, **kw)
 
 
-def _popen(cmd: list) -> "subprocess.Popen[bytes]":
+def _popen(cmd: list, **extra):
     kw: dict = {}
     if _WIN:
         kw["creationflags"] = 0x08000000
+    kw.update(extra)
     return subprocess.Popen(cmd, **kw)
+
+
+_splash_ready  = threading.Event()
+_splash_closed = threading.Event()
+_splash_q: _queue.Queue = _queue.Queue()
+
+
+def _sq(item) -> None:
+    try:
+        _splash_q.put_nowait(item)
+    except Exception:
+        pass
+
+
+def _splash_progress(pct: int, step: str = "") -> None:
+    _sq(("progress", pct, step))
+
+
+def _splash_log(msg: str, tag: str = "dim") -> None:
+    _sq(("log", msg, tag))
+
+
+def _splash_pkg(name: str, done: bool = False) -> None:
+    _sq(("pkg", name, done))
+
+
+def _splash_finalizing() -> None:
+    _sq(("finalizing",))
 
 
 def log(msg: str) -> None:
@@ -54,132 +97,278 @@ def log(msg: str) -> None:
             _lf.write(line + "\n")
     except Exception:
         pass
+    _splash_log(msg, "ok" if "\u2713" in msg else ("err" if "\u2717" in msg else "dim"))
 
 
 def _detect_version_from_script(script_path: str) -> str:
-    """
-    Auto-detect the version embedded in v0rtex.py when new_version is unknown.
-    Tries multiple patterns in order:
-      1. The obfuscated join pattern:  ["0","9","9","X0"]
-      2. The ADM_BADGE_W line:        "0.9.9",".X0  by
-      3. Any dotted version literal:  "0.9.9.X0"
-    Returns the detected version string, or "?" on failure.
-    """
     try:
         with open(script_path, "r", encoding="utf-8", errors="replace") as _sf:
-
             _src = _sf.read(120_000)
-
-
         _m1 = _re.search(r'\["(\d+)","(\d+)","(\d+)","(X\d+)"\]', _src)
         if _m1:
             return f"{_m1.group(1)}.{_m1.group(2)}.{_m1.group(3)}.{_m1.group(4)}"
-
-
         _m2 = _re.search(r'"(\d+\.\d+\.\d+)","(\.[Xx]\d+)\s', _src)
         if _m2:
             return _m2.group(1) + _m2.group(2).strip()
-
-
         _m3 = _re.search(r'"(0\.\d+\.\d+\.X\d+)"', _src)
         if _m3:
             return _m3.group(1)
-
-    except Exception as _de:
-        log(f"  ~ version detect error: {_de}")
-
+    except Exception:
+        pass
     return "?"
-
 
 
 _ver_source = "meta"
 if NEW_VER in ("?", "", None):
-    log("  ~ new_version missing from meta — auto-detecting from v0rtex.py...")
     if os.path.isfile(MAIN_SCRIPT):
         NEW_VER = _detect_version_from_script(MAIN_SCRIPT)
         _ver_source = "script_autodetect"
         if NEW_VER == "?":
-
             NEW_VER = OLD_VER
             _ver_source = "fallback_old_ver"
     else:
         NEW_VER = OLD_VER
         _ver_source = "fallback_old_ver (no script)"
 
-log(f"  ℹ  NEW_VER={NEW_VER}  (source: {_ver_source})")
-log(f"  ℹ  OLD_VER={OLD_VER}  BRANCH={BRANCH}")
-
-
-
-_splash_ready  = threading.Event()
-_splash_closed = threading.Event()
-_splash_tk: list = [None]
-
 
 def _run_splash() -> None:
     try:
         import tkinter as tk
+        import tkinter.ttk as ttk
 
         r = tk.Tk()
         r.overrideredirect(True)
-        r.configure(bg="#0d0d14")
+        r.configure(bg=_BG)
         r.attributes("-topmost", True)
 
         sw = r.winfo_screenwidth()
         sh = r.winfo_screenheight()
-        W, H = 520, 170
+        W, H = 640, 360
         r.geometry(f"{W}x{H}+{(sw - W) // 2}+{(sh - H) // 2}")
 
-        tk.Frame(r, bg="#cba6f7", height=3).pack(fill="x")
-        tk.Label(
-            r, text="V 0 R T E X",
-            font=("Consolas", 22, "bold"),
-            bg="#0d0d14", fg="#cba6f7",
-        ).pack(pady=(18, 4))
+        tk.Frame(r, bg=_ACC, height=3).pack(fill="x")
 
-        lbl = tk.Label(
-            r, text="\u26a1  IS UPDATING...  \u26a1",
-            font=("Consolas", 12, "bold"),
-            bg="#0d0d14", fg="#a6e3a1",
-        )
-        lbl.pack()
+        tbar = tk.Frame(r, bg=_PNL, height=38)
+        tbar.pack(fill="x")
+        tbar.pack_propagate(False)
+        tk.Label(tbar, text="  \u26a1  V0RTEX", font=("Consolas", 11, "bold"),
+                 bg=_PNL, fg=_BLU).pack(side="left", padx=8)
+        tk.Label(tbar, text=f"v{OLD_VER}", font=("Consolas", 8),
+                 bg=_PNL, fg=_SUB).pack(side="left", pady=(8, 0))
+        _mode_lbl = tk.Label(tbar, text="  \u2014  IS UPDATING...",
+                             font=("Consolas", 9, "bold"), bg=_PNL, fg=_GRN)
+        _mode_lbl.pack(side="left", padx=8)
+        tk.Label(tbar, text=f"Branch: {BRANCH}",
+                 font=("Consolas", 8), bg=_PNL, fg=_SUB).pack(side="right", padx=14)
+        tk.Frame(r, bg=_BLU, height=2).pack(fill="x")
 
-        tk.Label(
-            r, text=f"v{OLD_VER}  \u2192  v{NEW_VER}  \u00b7  {BRANCH}",
-            font=("Consolas", 9),
-            bg="#0d0d14", fg="#585b70",
-        ).pack(pady=4)
+        body = tk.Frame(r, bg=_BG)
+        body.pack(fill="both", expand=True, padx=16, pady=10)
 
-        _splash_tk[0] = r
+        left = tk.Frame(body, bg=_PNL, width=200, padx=12, pady=10)
+        left.pack(side="left", fill="y", padx=(0, 10))
+        left.pack_propagate(False)
 
+        tk.Label(left, text="UPDATE INFO", font=("Consolas", 7, "bold"),
+                 bg=_PNL, fg=_DIM).pack(anchor="w")
+        tk.Frame(left, bg=_BRD, height=1).pack(fill="x", pady=(3, 6))
 
-        _frames = [
-            "\u26a1  IS UPDATING...  \u26a1",
-            "\u2726  IS UPDATING...  \u2726",
-            "\u25c8  IS UPDATING...  \u25c8",
+        for lbl, val, col in [
+            ("From",   f"v{OLD_VER}", _YEL),
+            ("To",     f"v{NEW_VER}", _GRN),
+            ("Branch", BRANCH,        _BLU),
+        ]:
+            row = tk.Frame(left, bg=_PNL)
+            row.pack(fill="x", pady=2)
+            tk.Label(row, text=f"{lbl:<8}", font=("Consolas", 8),
+                     bg=_PNL, fg=_SUB).pack(side="left")
+            tk.Label(row, text=val, font=("Consolas", 8, "bold"),
+                     bg=_PNL, fg=col).pack(side="left")
+
+        tk.Frame(left, bg=_BRD, height=1).pack(fill="x", pady=(8, 6))
+        tk.Label(left, text="STEPS", font=("Consolas", 7, "bold"),
+                 bg=_PNL, fg=_DIM).pack(anchor="w")
+        tk.Frame(left, bg=_BRD, height=1).pack(fill="x", pady=(3, 4))
+
+        _step_labels = {}
+        _steps_def = [
+            ("kill",   "Kill processes"),
+            ("deps",   "Check old deps"),
+            ("pip",    "Install packages"),
+            ("dirs",   "Rebuild dirs"),
+            ("meta",   "Write metadata"),
+            ("launch", "Launch V0RTEX"),
         ]
-        _fi = [0]
+        for key, label in _steps_def:
+            row = tk.Frame(left, bg=_PNL)
+            row.pack(fill="x", pady=1)
+            dot = tk.Label(row, text="\u25cb", font=("Consolas", 9),
+                           bg=_PNL, fg=_DIM, width=2)
+            dot.pack(side="left")
+            tk.Label(row, text=label, font=("Consolas", 8),
+                     bg=_PNL, fg=_SUB).pack(side="left")
+            _step_labels[key] = dot
 
-        def _tick() -> None:
+        right = tk.Frame(body, bg=_BG)
+        right.pack(side="left", fill="both", expand=True)
+
+        log_hdr = tk.Frame(right, bg=_PNL, padx=10, pady=4)
+        log_hdr.pack(fill="x")
+        tk.Label(log_hdr, text="  \u25cf \u25cf \u25cf",
+                 font=("Consolas", 8), bg=_PNL, fg=_DIM).pack(side="left")
+        tk.Label(log_hdr, text="  UPDATE TERMINAL",
+                 font=("Consolas", 9, "bold"), bg=_PNL, fg=_BLU).pack(side="left", padx=6)
+        tk.Frame(right, bg=_BLU, height=1).pack(fill="x")
+
+        log_frame = tk.Frame(right, bg="#050510")
+        log_frame.pack(fill="both", expand=True)
+        log_sc = tk.Scrollbar(log_frame, orient="vertical", bg=_BRD,
+                              troughcolor="#050510", relief="flat", width=6)
+        _log_box = tk.Text(log_frame, bg="#050510", fg=_TXT, font=("Consolas", 8),
+                           relief="flat", bd=0, padx=10, pady=6,
+                           state="disabled", wrap="none",
+                           yscrollcommand=log_sc.set)
+        log_sc.config(command=_log_box.yview)
+        log_sc.pack(side="right", fill="y")
+        _log_box.pack(fill="both", expand=True)
+        _log_box.tag_configure("ok",   foreground=_GRN)
+        _log_box.tag_configure("err",  foreground=_RED)
+        _log_box.tag_configure("warn", foreground=_YEL)
+        _log_box.tag_configure("dim",  foreground=_SUB)
+        _log_box.tag_configure("pkg",  foreground=_BLU)
+
+        prog_row = tk.Frame(right, bg=_PNL, padx=10, pady=4)
+        prog_row.pack(fill="x")
+
+        _step_sv = tk.StringVar(value="starting...")
+        _pct_sv  = tk.StringVar(value="0%")
+        _pkg_sv  = tk.StringVar(value="")
+
+        tk.Label(prog_row, textvariable=_step_sv, font=("Consolas", 8),
+                 bg=_PNL, fg=_SUB, anchor="w").pack(side="left", fill="x", expand=True)
+        tk.Label(prog_row, textvariable=_pct_sv, font=("Consolas", 8, "bold"),
+                 bg=_PNL, fg=_ACC).pack(side="right")
+
+        sty = ttk.Style(r)
+        sty.theme_use("default")
+        sty.configure("Adp.Horizontal.TProgressbar",
+                       troughcolor=_BRD, background=_BAR_C,
+                       borderwidth=0, thickness=10,
+                       lightcolor=_BAR_C, darkcolor=_BAR_C)
+
+        _pbar_var = tk.IntVar(value=0)
+        ttk.Progressbar(right, variable=_pbar_var, maximum=100,
+                        orient="horizontal", mode="determinate",
+                        style="Adp.Horizontal.TProgressbar").pack(fill="x")
+
+        pkg_row = tk.Frame(right, bg=_BG, padx=10, pady=3)
+        pkg_row.pack(fill="x")
+        tk.Label(pkg_row, textvariable=_pkg_sv, font=("Consolas", 8),
+                 bg=_BG, fg=_BLU, anchor="w").pack(side="left")
+
+        _active_step = [None]
+
+        def _mark_step(key: str, done: bool = False, error: bool = False) -> None:
+            dot = _step_labels.get(key)
+            if not dot:
+                return
+            if error:
+                dot.config(text="\u2717", fg=_RED)
+            elif done:
+                dot.config(text="\u2713", fg=_GRN)
+            else:
+                dot.config(text="\u25cf", fg=_YEL)
+            prev = _active_step[0]
+            if prev and prev != key:
+                pd = _step_labels.get(prev)
+                if pd and pd.cget("text") == "\u25cf":
+                    pd.config(text="\u2713", fg=_GRN)
+            _active_step[0] = key
+
+        _KEY_MAP = {
+            "kill":   "kill",
+            "deps":   "deps",
+            "pip":    "pip",
+            "dirs":   "dirs",
+            "meta":   "meta",
+            "launch": "launch",
+        }
+
+        def _pump() -> None:
+            try:
+                while True:
+                    item = _splash_q.get_nowait()
+                    cmd = item[0]
+
+                    if cmd == "progress":
+                        pct = item[1]
+                        _pbar_var.set(pct)
+                        _pct_sv.set(f"{pct}%")
+                        if len(item) > 2 and item[2]:
+                            _step_sv.set(item[2])
+                            for k in _KEY_MAP:
+                                if k in item[2].lower():
+                                    _mark_step(k)
+                                    break
+
+                    elif cmd == "log":
+                        msg = item[1].strip()
+                        tag = item[2] if len(item) > 2 else "dim"
+                        if msg:
+                            _log_box.config(state="normal")
+                            _log_box.insert("end", msg + "\n", tag)
+                            _log_box.see("end")
+                            _log_box.config(state="disabled")
+                            for k in _KEY_MAP:
+                                if k in msg.lower():
+                                    _mark_step(k, done=("\u2713" in msg))
+                                    break
+
+                    elif cmd == "pkg":
+                        pkg_name = item[1]
+                        done     = item[2]
+                        if done:
+                            _pkg_sv.set(f"\u2713 {pkg_name}")
+                            _log_box.config(state="normal")
+                            _log_box.insert("end", f"  \u2713 {pkg_name}\n", "ok")
+                            _log_box.see("end")
+                            _log_box.config(state="disabled")
+                        else:
+                            _pkg_sv.set(f"\u25ba Installing {pkg_name}...")
+                            _log_box.config(state="normal")
+                            _log_box.insert("end", f"  \u25ba {pkg_name}...\n", "pkg")
+                            _log_box.see("end")
+                            _log_box.config(state="disabled")
+
+                    elif cmd == "finalizing":
+                        _mode_lbl.config(text="  \u2014  FINALIZING...", fg=_ACC)
+                        _step_sv.set("launching V0RTEX...")
+                        _pbar_var.set(100)
+                        _pct_sv.set("100%")
+                        _pkg_sv.set("")
+                        for k in _step_labels:
+                            d = _step_labels[k]
+                            if d.cget("text") != "\u2717":
+                                d.config(text="\u2713", fg=_GRN)
+
+            except _queue.Empty:
+                pass
+
             if _splash_closed.is_set():
                 try:
                     r.destroy()
                 except Exception:
                     pass
                 return
-            _fi[0] = (_fi[0] + 1) % len(_frames)
-            try:
-                lbl.config(text=_frames[_fi[0]])
-            except Exception:
-                pass
-            r.after(500, _tick)
+
+            r.after(150, _pump)
 
         r.after(0, _splash_ready.set)
-        r.after(500, _tick)
+        r.after(150, _pump)
         r.mainloop()
 
     except Exception as _se:
-        log(f"  ~ Splash error: {_se}")
+        print(f"[ADAPTER] Splash error: {_se}")
     finally:
         _splash_ready.set()
         _splash_closed.set()
@@ -187,12 +376,14 @@ def _run_splash() -> None:
 
 _splash_thread = threading.Thread(target=_run_splash, daemon=True)
 _splash_thread.start()
-_splash_ready.wait(timeout=2.0)
+_splash_ready.wait(timeout=2.5)
 time.sleep(0.2)
+_splash_progress(2, "starting...")
 
-
+log(f"  new={NEW_VER}  old={OLD_VER}  branch={BRANCH}  src={_ver_source}")
 
 log("[ 1/6 ]  Killing V0RTEX processes...")
+_splash_progress(5, "kill — stopping V0RTEX processes...")
 _SCRIPTS = [
     "v0rtex.py", "v0rtex_reinstall.py", "v0rtex_uninstall.py",
     "v0rtex_updater.py", "v0rtex_recovery_ui.py",
@@ -260,14 +451,29 @@ except ImportError:
     log(f"  ~ psutil unavailable \u2014 killed {_killed} process(es) via fallback")
 
 time.sleep(0.8)
+_splash_progress(18, "kill — processes cleared")
 
+if FRESH_INSTALL:
+    log("  [ FRESH INSTALL ]  Removing V0rtex_System directory...")
+    _splash_progress(20, "fresh install — wiping V0rtex_System...")
+    import shutil as _shu_fresh
+    try:
+        if os.path.isdir(VX_SYSTEM_DIR):
+            _shu_fresh.rmtree(VX_SYSTEM_DIR, ignore_errors=True)
+            log(f"  \u2713 Removed: {VX_SYSTEM_DIR}")
+        else:
+            log("  ~ VX_SYSTEM_DIR not found, skipping wipe")
+    except Exception as _fe:
+        log(f"  ~ Fresh install wipe error: {_fe}")
+    time.sleep(0.5)
 
 
 log("[ 2/6 ]  Checking obsolete dependencies...")
+_splash_progress(22, "deps — checking obsolete packages...")
 if os.path.isfile(DEPS_REMOVE):
     try:
         with open(DEPS_REMOVE, "r", encoding="utf-8") as _f:
-            _to_remove = [_l.strip() for _l in _f if _l.strip() and not _l.startswith("#")]
+            _to_remove = [_l.strip() for _l in _f if _l.strip()]
         for _pkg in _to_remove:
             try:
                 _r = _run([PYTHON_EXE, "-m", "pip", "uninstall", "-y", _pkg], timeout=60, text=True)
@@ -282,29 +488,72 @@ else:
     log("  ~ No .deps_to_remove \u2014 skipping")
 
 
-
 log("[ 3/6 ]  Installing/upgrading dependencies...")
+_splash_progress(28, "pip — reading requirements...")
+
 _req_path = os.path.join(INSTALL_DIR, "requirements.txt")
 if os.path.isfile(_req_path):
     try:
-        _r = _run(
-            [PYTHON_EXE, "-m", "pip", "install", "-r", _req_path,
-             "--upgrade", "--prefer-binary", "-q", "--no-cache-dir",
-             "--progress-bar", "off"],
-            timeout=300, text=True,
-        )
-        if _r.returncode == 0:
+        with open(_req_path, "r", encoding="utf-8") as _rqf:
+            _req_lines = [l.strip() for l in _rqf if l.strip()]
+        _total_pkgs = max(len(_req_lines), 1)
+        _done_pkgs  = [0]
+
+        _pip_cmd = [
+            PYTHON_EXE, "-m", "pip", "install",
+            "-r", _req_path,
+            "--upgrade", "--prefer-binary",
+            "--no-cache-dir", "--progress-bar", "off",
+        ]
+        kw_pip: dict = {
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.STDOUT,
+            "text": True,
+            "bufsize": 1,
+        }
+        if _WIN:
+            kw_pip["creationflags"] = 0x08000000
+
+        _pip_proc = subprocess.Popen(_pip_cmd, **kw_pip)
+
+        for _pip_line in _pip_proc.stdout:
+            _pip_line = _pip_line.rstrip()
+            if not _pip_line:
+                continue
+
+            if _re.match(r"Collecting\s+", _pip_line, _re.I):
+                _pkg_name = _pip_line.split()[1].split("[")[0]
+                _splash_pkg(_pkg_name, done=False)
+                _pct_now = 28 + int((_done_pkgs[0] / _total_pkgs) * 30)
+                _splash_progress(min(_pct_now, 57), f"pip — installing {_pkg_name}...")
+
+            elif _re.match(r"Successfully installed\s+", _pip_line, _re.I):
+                for _p in _pip_line.split()[2:]:
+                    _done_pkgs[0] += 1
+                    _splash_pkg(_re.sub(r"-[\d\.].*", "", _p), done=True)
+                _splash_progress(58, "pip — packages installed")
+
+            elif "already satisfied" in _pip_line.lower():
+                _done_pkgs[0] += 1
+                _pct_now = 28 + int((_done_pkgs[0] / _total_pkgs) * 30)
+                _splash_progress(min(_pct_now, 57), "pip — verifying...")
+
+        _pip_proc.wait(timeout=300)
+        if _pip_proc.returncode == 0:
             log("  \u2713 All dependencies installed/upgraded")
         else:
-            log(f"  ~ pip warnings: {_r.stderr[:120]}")
+            log(f"  ~ pip exit code: {_pip_proc.returncode}")
+
     except Exception as _e:
         log(f"  ~ pip error: {_e}")
 else:
     log("  ~ requirements.txt not found \u2014 skipping")
 
+_splash_progress(62, "pip — done")
 
 
 log("[ 4/6 ]  Rebuilding directory structure...")
+_splash_progress(66, "dirs — rebuilding directories...")
 _REQUIRED_DIRS = [
     os.path.join(INSTALL_DIR, "rules"),
     os.path.join(INSTALL_DIR, "rules", "external"),
@@ -333,17 +582,15 @@ for _d in _REQUIRED_DIRS:
     except Exception as _e:
         log(f"  ~ {os.path.basename(_d)}: {_e}")
 log("  \u2713 Directories OK")
-
+_splash_progress(74, "dirs — OK")
 
 
 log("[ 5/6 ]  Writing version metadata...")
+_splash_progress(82, "meta — writing version file...")
 try:
     _vx_version_path = os.path.join(META_DIR, "vx_version")
-
-
-
     if NEW_VER in ("?", "", None):
-        log("  ~ NEW_VER still unknown — preserving existing vx_version (no overwrite)")
+        log("  ~ NEW_VER unknown \u2014 preserving existing vx_version")
     else:
         with open(_vx_version_path, "w", encoding="utf-8") as _vf:
             json.dump({"version": NEW_VER, "name": "V0RTEX", "author": "Vider_06"}, _vf, indent=2)
@@ -351,22 +598,25 @@ try:
 except Exception as _e:
     log(f"  ~ version write failed: {_e}")
 
+_splash_progress(90, "meta — done")
 
 
 log("[ 6/6 ]  Launching V0RTEX...")
-time.sleep(0.5)
+_splash_progress(96, "launch — starting V0RTEX...")
+time.sleep(0.4)
+_splash_finalizing()
+time.sleep(1.0)
 _splash_closed.set()
 time.sleep(0.3)
 
 try:
     if os.path.isfile(MAIN_SCRIPT):
-        _popen([PYTHON_EXE, MAIN_SCRIPT])
-        log(f"  \u2713 V0RTEX v{NEW_VER} launched")
+        _popen([PYTHON_EXE, MAIN_SCRIPT, "--just-updated", OLD_VER])
+        log(f"  \u2713 V0RTEX v{NEW_VER} launched  (--just-updated {OLD_VER})")
     else:
         log(f"  \u2717 v0rtex.py not found: {MAIN_SCRIPT}")
 except Exception as _e:
     log(f"  \u2717 Launch failed: {_e}")
-
 
 
 time.sleep(2.0)
