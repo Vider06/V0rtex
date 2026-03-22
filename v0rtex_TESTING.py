@@ -28937,7 +28937,14 @@ _VORTEX_VERSION      = _VX_VER
 
 
 def _detect_platform_branch():
-    return "TESTING-GENERAL"
+    _override = CONFIG.get("update_branch", "").strip()
+    if _override:
+        return _override
+    if sys.platform == "win32":
+        return "Windows_Release"
+    if sys.platform == "darwin":
+        return "MacOS_Release"
+    return "Linux_Release"
 _PLATFORM_BRANCH     = _detect_platform_branch()
 _GITHUB_BASE         = "https://raw.githubusercontent.com/Vider06/V0rtex"
 _GITHUB_REPO_RAW     = f"{_GITHUB_BASE}/{_PLATFORM_BRANCH}"
@@ -29350,8 +29357,8 @@ def _launch_update_ui(clear_install=False):
                         _ulog("   This window will close now.", "DIM")
 
 
-                        rr.after(800, rr.destroy)
-                        rr.after(900, root.destroy)
+                        root.after(800, rr.destroy)
+                        root.after(1000, root.destroy)
                         return
                     else:
                         _ulog("✗  Administrator privileges denied (UAC declined).", "ERR")
@@ -29389,7 +29396,8 @@ def _launch_update_ui(clear_install=False):
         _ulog("\n[ 2/3 ]  Writing update_settings.json...", "HEAD"); _uprog(10, "settings")
         script_path    = os.path.abspath(__file__)
         script_dir     = os.path.dirname(script_path)
-        _settings_dir  = os.path.dirname(script_dir)
+        _vx_system_dir = os.path.dirname(script_dir)
+        _settings_dir  = os.path.dirname(_vx_system_dir)
         _settings_path = os.path.join(_settings_dir, "update_settings.json")
         ts             = time.strftime("%Y%m%d_%H%M%S")
 
@@ -29397,8 +29405,10 @@ def _launch_update_ui(clear_install=False):
 
         _update_settings = {
             "install_dir":                  script_dir,
+            "vx_system_dir":                _vx_system_dir,
             "python_exe":                   sys.executable,
             "old_version":                  _VORTEX_VERSION,
+            "new_version":                  _UPDATE_STATE.get("remote_version", "?"),
             "target_version":               "latest",
             "branch":                       _PLATFORM_BRANCH,
             "backup_before":                _upd_opt_bk.get(),
@@ -29410,7 +29420,7 @@ def _launch_update_ui(clear_install=False):
             "v0rtex_pids":                  _update_pids,
             "adapter_pid":                  0,
             "backup_path":                  "",
-            "log_dir":                      os.path.join(os.path.dirname(script_dir), "v0rtex_utils",
+            "log_dir":                      os.path.join(_vx_system_dir, "v0rtex_utils",
                                                          "debug_log", "update_log"),
             "started_ts":                   ts,
             "status":                       "pending",
@@ -34946,6 +34956,90 @@ if "--auto-update" in sys.argv:
         root.after(600, lambda: _launch_update_ui(clear_install=False))
     except Exception as _au_e:
         _sl(f"[AUTO-UPDATE] failed to schedule _launch_update_ui: {_au_e}", "WARN")
+
+if "--just-updated" in sys.argv:
+    try:
+        _ju_idx = sys.argv.index("--just-updated")
+        _ju_old = sys.argv[_ju_idx + 1] if _ju_idx + 1 < len(sys.argv) else "?"
+    except Exception:
+        _ju_old = "?"
+    _sl(f"[JUST-UPDATED] flag detected — old={_ju_old}  new={_VX_VER}", "BOOT")
+
+    def _show_updated_popup():
+        try:
+            import tkinter as tk
+            _BG2  = "#0d0d14"
+            _PNL2 = "#12121e"
+            _ACC2 = "#cba6f7"
+            _GRN2 = "#a6e3a1"
+            _DIM2 = "#45475a"
+            _TXT2 = "#cdd6f4"
+            _SUB2 = "#6c7086"
+
+            pu = tk.Toplevel(root)
+            pu.title("V0RTEX Updated")
+            pu.configure(bg=_BG2)
+            pu.overrideredirect(True)
+            pu.attributes("-topmost", True)
+
+            W, H = 420, 190
+            sw = pu.winfo_screenwidth()
+            sh = pu.winfo_screenheight()
+            pu.geometry(f"{W}x{H}+{(sw - W) // 2}+{(sh - H) // 2}")
+
+            tk.Frame(pu, bg=_GRN2, height=3).pack(fill="x")
+
+            hdr = tk.Frame(pu, bg=_PNL2, padx=18, pady=12)
+            hdr.pack(fill="x")
+            tk.Label(hdr, text="\u2713  V0RTEX UPDATED",
+                     font=("Consolas", 14, "bold"), bg=_PNL2, fg=_GRN2).pack(anchor="w")
+            tk.Label(hdr, text="Update applied successfully",
+                     font=("Consolas", 8), bg=_PNL2, fg=_SUB2).pack(anchor="w")
+
+            tk.Frame(pu, bg=_DIM2, height=1).pack(fill="x")
+
+            body = tk.Frame(pu, bg=_BG2, padx=18, pady=14)
+            body.pack(fill="x")
+
+            ver_row = tk.Frame(body, bg=_BG2)
+            ver_row.pack(fill="x", pady=(0, 8))
+            tk.Label(ver_row, text=f"v{_ju_old}", font=("Consolas", 13),
+                     bg=_BG2, fg=_SUB2).pack(side="left")
+            tk.Label(ver_row, text="  \u2192  ", font=("Consolas", 13),
+                     bg=_BG2, fg=_DIM2).pack(side="left")
+            tk.Label(ver_row, text=f"v{_VX_VER}", font=("Consolas", 13, "bold"),
+                     bg=_BG2, fg=_GRN2).pack(side="left")
+
+            _countdown = [6]
+            _btn_sv = tk.StringVar(value="OK  (6)")
+
+            def _close_popup():
+                try:
+                    pu.destroy()
+                except Exception:
+                    pass
+
+            def _tick_countdown():
+                _countdown[0] -= 1
+                if _countdown[0] <= 0:
+                    _close_popup()
+                    return
+                _btn_sv.set(f"OK  ({_countdown[0]})")
+                pu.after(1000, _tick_countdown)
+
+            btn_row = tk.Frame(body, bg=_BG2)
+            btn_row.pack(fill="x")
+            tk.Button(btn_row, textvariable=_btn_sv, font=("Consolas", 9, "bold"),
+                      bg=_GRN2, fg="#000", relief="flat", bd=0,
+                      padx=20, pady=6, cursor="hand2",
+                      command=_close_popup).pack(side="right")
+
+            pu.after(1000, _tick_countdown)
+
+        except Exception as _pu_e:
+            _sl(f"[JUST-UPDATED] popup error: {_pu_e}", "WARN")
+
+    root.after(1200, _show_updated_popup)
 
 root.mainloop()
 _sl("Mainloop returned — clean exit or window closed", "EXIT")
