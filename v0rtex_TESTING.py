@@ -29271,7 +29271,7 @@ _ul_out.tag_configure("ERR",  foreground=C["red"])
 _ul_out.tag_configure("DIM",  foreground=C["overlay0"])
 _ul_out.tag_configure("VER",  foreground=C["mauve"], font=("Consolas",9,"bold"))
 
-_UL_LOG_PATH = os.path.join(UTILS_DIR, "debug_log", "update_log")
+_UL_LOG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "v0rtex_utils", "debug_log", "update_log")
 
 def _ul_load():
     _ul_out.config(state="normal"); _ul_out.delete("1.0", tk.END)
