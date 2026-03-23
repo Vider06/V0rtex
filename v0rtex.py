@@ -20,10 +20,427 @@ def _fix_encoding_self():
 _fix_encoding_self()
 del _fix_encoding_self, _os_enc, _sys_enc
 
+if "--trampoline-update" in __import__("sys").argv:
+    def _trampoline_update_main():
+        import os, sys, json, subprocess, shutil, time, tempfile, urllib.request, ast
+
+        _SELF_PATH = os.path.abspath(__file__)
+        _args      = sys.argv
+        try:
+            _si = _args.index("--trampoline-update") + 1
+            _settings_path = _args[_si] if _si < len(_args) and _args[_si] else None
+        except (ValueError, IndexError):
+            _settings_path = None
+
+        _settings = {}
+        if _settings_path and os.path.isfile(_settings_path):
+            try:
+                with open(_settings_path, encoding="utf-8") as _f:
+                    _settings = json.load(_f)
+            except Exception as _e:
+                print(f"[TRAMPOLINE] settings load error: {_e}")
+
+        INSTALL_DIR = _settings.get("install_dir", os.path.join(os.path.dirname(_SELF_PATH), "v0rtex_system"))
+        PYTHON_EXE  = _settings.get("python_exe", sys.executable)
+        BRANCH      = _settings.get("branch", "Windows_Release")
+        CUR_VER     = _settings.get("trampoline_current_version", _settings.get("old_version", "?"))
+        GITHUB_BASE = "https://raw.githubusercontent.com/Vider06/V0rtex"
+        COMPAT_URL  = f"{GITHUB_BASE}/{BRANCH}/compat_map.json"
+        ADAPTER_DIR = f"{GITHUB_BASE}/{BRANCH}/Adapter"
+        UTILS_DIR   = os.path.join(os.path.dirname(INSTALL_DIR), "v0rtex_utils")
+        LOG_DIR     = _settings.get("log_dir") or os.path.join(UTILS_DIR, "debug_log", "update_log")
+
+        def _log(msg, tag="INFO"):
+            ts   = time.strftime("%H:%M:%S")
+            line = f"[{ts}] [{tag:<5}] [TRAMPOLINE v{CUR_VER}] {msg}"
+            print(line)
+            try:
+                os.makedirs(LOG_DIR, exist_ok=True)
+                day = time.strftime("%Y%m%d")
+                with open(os.path.join(LOG_DIR, f"trampoline_chain_{day}.log"), "a", encoding="utf-8") as lf:
+                    lf.write(line + "\n")
+            except Exception:
+                pass
+
+        def _fetch(url, timeout=30):
+            req = urllib.request.Request(url, headers={"User-Agent": "V0RTEX-Trampoline/2.0"})
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.read().decode("utf-8")
+
+        def _parse_ver(v):
+            v = str(v).strip().lstrip("v")
+            parts = []
+            for p in v.split("."):
+                p = p.upper().replace("X", "")
+                if p.isdigit():
+                    parts.append(int(p))
+            while len(parts) < 4:
+                parts.append(0)
+            return tuple(parts[:4])
+
+        def _save_settings():
+            if _settings_path:
+                try:
+                    with open(_settings_path, "w", encoding="utf-8") as sf:
+                        json.dump(_settings, sf, indent=2)
+                except Exception as e:
+                    _log(f"settings save error: {e}", "WARN")
+
+        _log(f"Trampoline hop started — install_dir={INSTALL_DIR}", "BOOT")
+
+        _log("[ 1/4 ] Installing current version...")
+        try:
+            os.makedirs(INSTALL_DIR, exist_ok=True)
+            for _sd in ["rules", os.path.join("rules", "external"), "quarantine", "reports",
+                        "reports_pdf", "backups", "_recovery", "sandbox_env",
+                        os.path.join("sandbox_env", "drop"), "threat_feeds", "pcap_dumps"]:
+                os.makedirs(os.path.join(INSTALL_DIR, _sd), exist_ok=True)
+            META_DIR = os.path.join(UTILS_DIR, ".vx_meta")
+            os.makedirs(META_DIR, exist_ok=True)
+            target = os.path.join(INSTALL_DIR, "v0rtex.py")
+            if os.path.abspath(_SELF_PATH) != os.path.abspath(target):
+                shutil.copy2(_SELF_PATH, target)
+                _log(f"  v0rtex.py installed → {target}", "OK")
+            else:
+                _log("  already in install dir", "INFO")
+            with open(os.path.join(META_DIR, "vx_version"), "w", encoding="utf-8") as vf:
+                json.dump({"version": CUR_VER, "name": "V0RTEX", "author": "Vider_06"}, vf, indent=2)
+            _log(f"  vx_version → {CUR_VER}", "OK")
+        except Exception as e:
+            _log(f"  install error: {e}", "ERR")
+
+        _log("[ 2/4 ] Installing dependencies...")
+        _req = os.path.join(INSTALL_DIR, "requirements.txt")
+        if os.path.isfile(_req):
+            try:
+                r = subprocess.run(
+                    [PYTHON_EXE, "-m", "pip", "install", "-r", _req,
+                     "--prefer-binary", "--no-cache-dir", "-q", "--progress-bar", "off"],
+                    capture_output=True, text=True, timeout=300)
+                _log(f"  pip done (rc={r.returncode})", "OK" if r.returncode == 0 else "WARN")
+            except Exception as e:
+                _log(f"  deps error: {e}", "WARN")
+        else:
+            _log("  no requirements.txt, skipping", "WARN")
+
+        _log("[ 3/4 ] Fetching compat_map...")
+        _compat = {}
+        try:
+            _compat = json.loads(_fetch(COMPAT_URL, timeout=15))
+            _log(f"  compat_map loaded — {len(_compat.get('chain', []))} entries", "OK")
+        except Exception as e:
+            _log(f"  compat_map error: {e}", "ERR")
+
+        _log("[ 4/4 ] Finding next hop...")
+        _chain   = _compat.get("chain", [])
+        _cur_t   = _parse_ver(CUR_VER)
+        _cur_idx = -1
+        _is_final = False
+
+        for _i, _entry in enumerate(_chain):
+            if _parse_ver(_entry["version"]) == _cur_t:
+                _cur_idx = _i
+                break
+        if _cur_idx == -1:
+            for _i, _entry in enumerate(_chain):
+                if _parse_ver(_entry["version"]) <= _cur_t:
+                    _cur_idx = _i
+            _log(f"  version {CUR_VER} not in chain, using index {_cur_idx}", "WARN")
+
+        if _cur_idx >= 0 and _cur_idx + 1 < len(_chain):
+            _next = _chain[_cur_idx + 1]
+        else:
+            _next     = None
+            _is_final = True
+
+        if _next and not _is_final:
+            _next_ver = _next["version"]
+            _next_url = _next.get("raw_url", f"{GITHUB_BASE}/{BRANCH}/v0rtex.py")
+            _log(f"  next hop: v{_next_ver}", "INFO")
+            try:
+                _code = _fetch(_next_url, timeout=60)
+                ast.parse(_code)
+                _tmp = os.path.join(tempfile.gettempdir(),
+                                    f"_v0rtex_tramp_{_next_ver.replace('.', '_')}.py")
+                with open(_tmp, "w", encoding="utf-8") as nf:
+                    nf.write(_code)
+                _log(f"  downloaded → {_tmp}", "OK")
+                _bk = _settings.get("backup_path", "")
+                if _bk and os.path.isfile(_bk):
+                    _bk2 = os.path.join(tempfile.gettempdir(), os.path.basename(_bk))
+                    try:
+                        shutil.copy2(_bk, _bk2)
+                        _settings["backup_path"] = _bk2
+                    except Exception:
+                        pass
+                _settings["trampoline_current_version"] = _next_ver
+                _settings["old_version"] = _next_ver
+                _save_settings()
+                shutil.rmtree(INSTALL_DIR, ignore_errors=True)
+                _log("  v0rtex_system deleted", "OK")
+                time.sleep(0.3)
+                kw = {}
+                if sys.platform == "win32":
+                    kw["creationflags"] = 0x08000000
+                subprocess.Popen([PYTHON_EXE, _tmp, "--trampoline-update",
+                                  _settings_path or ""], **kw)
+                _log("  next hop launched", "OK")
+            except Exception as e:
+                _log(f"  hop failed: {e} — falling back to silent_update", "ERR")
+                _is_final = True
+
+        if _is_final:
+            _log("  final hop — installing and relaunching V0RTEX", "INFO")
+
+            _splash_root_t  = [None]
+            _splash_sv_t    = [None]
+            _splash_done_t  = threading.Event()
+            def _run_final_splash():
+                try:
+                    import tkinter as _tk2
+                    _r2 = _tk2.Tk()
+                    _r2.overrideredirect(True)
+                    _r2.configure(bg="#0d0d14")
+                    _r2.attributes("-topmost", True)
+                    _r2.geometry("360x90+16+16")
+                    _tk2.Frame(_r2, bg="#cba6f7", height=2).pack(fill="x")
+                    _inner = _tk2.Frame(_r2, bg="#0d0d14", padx=12, pady=10); _inner.pack(fill="both", expand=True)
+                    _tk2.Label(_inner, text="V0RTEX", font=("Consolas",11,"bold"), bg="#0d0d14", fg="#cba6f7").pack(anchor="w")
+                    _sv2 = _tk2.StringVar(value="FINALIZING UPDATE...")
+                    _splash_sv_t[0] = _sv2
+                    _tk2.Label(_inner, textvariable=_sv2, font=("Consolas",9), bg="#0d0d14", fg="#a6e3a1").pack(anchor="w")
+                    _splash_root_t[0] = _r2
+                    def _watch():
+                        if _splash_done_t.is_set():
+                            try: _r2.destroy()
+                            except Exception: pass
+                            return
+                        _r2.after(300, _watch)
+                    _r2.after(300, _watch)
+                    _r2.mainloop()
+                except Exception: pass
+            threading.Thread(target=_run_final_splash, daemon=True).start()
+            time.sleep(0.3)
+
+            def _set_final_status(msg):
+                try:
+                    if _splash_sv_t[0] and _splash_root_t[0]:
+                        _splash_root_t[0].after(0, lambda m=msg: _splash_sv_t[0].set(m))
+                except Exception: pass
+
+            _set_final_status("Rebuilding directories...")
+            _REQUIRED_DIRS = [
+                INSTALL_DIR,
+                os.path.join(INSTALL_DIR,"rules"), os.path.join(INSTALL_DIR,"rules","external"),
+                os.path.join(INSTALL_DIR,"quarantine"), os.path.join(INSTALL_DIR,"reports"),
+                os.path.join(INSTALL_DIR,"reports_pdf"), os.path.join(INSTALL_DIR,"backups"),
+                os.path.join(INSTALL_DIR,"_recovery"), os.path.join(INSTALL_DIR,"sandbox_env"),
+                os.path.join(INSTALL_DIR,"sandbox_env","drop"), os.path.join(INSTALL_DIR,"threat_feeds"),
+                os.path.join(INSTALL_DIR,"pcap_dumps"), UTILS_DIR,
+                os.path.join(UTILS_DIR,".vx_meta"),
+                os.path.join(UTILS_DIR,"debug_log","crash_log"),
+                os.path.join(UTILS_DIR,"debug_log","session_log"),
+                os.path.join(UTILS_DIR,"debug_log","trampoline_log"),
+                os.path.join(UTILS_DIR,"debug_log","admin_log"),
+                os.path.join(UTILS_DIR,"debug_log","update_log"),
+                os.path.join(UTILS_DIR,"debug_log","setup_log"),
+                os.path.join(UTILS_DIR,"debug_log","recovery_ops"),
+                os.path.join(UTILS_DIR,"Crash_Full_Report"),
+            ]
+            for _d3 in _REQUIRED_DIRS:
+                try: os.makedirs(_d3, exist_ok=True)
+                except Exception: pass
+            _log("  ✓ directories OK", "OK")
+
+            _set_final_status("Installing V0RTEX...")
+            _target_py = os.path.join(INSTALL_DIR, "v0rtex.py")
+            if os.path.abspath(_SELF_PATH) != os.path.abspath(_target_py):
+                try:
+                    shutil.copy2(_SELF_PATH, _target_py)
+                    _log(f"  ✓ v0rtex.py installed", "OK")
+                except Exception as _ie: _log(f"  ✗ install: {_ie}", "ERR")
+            else:
+                _log("  · already in install dir", "INFO")
+
+            _set_final_status("Installing dependencies...")
+            _req2 = os.path.join(INSTALL_DIR, "requirements.txt")
+            if os.path.isfile(_req2):
+                try:
+                    _rr2 = subprocess.run([PYTHON_EXE,"-m","pip","install","-r",_req2,
+                                           "--upgrade","--prefer-binary","-q","--no-cache-dir","--progress-bar","off"],
+                                          capture_output=True, text=True, timeout=360)
+                    _log(f"  {'✓' if _rr2.returncode==0 else '~'} pip (rc={_rr2.returncode})",
+                         "OK" if _rr2.returncode==0 else "WARN")
+                except Exception as _pe: _log(f"  ~ pip: {_pe}", "WARN")
+            else:
+                _log("  ~ no requirements.txt", "WARN")
+
+            _set_final_status("Restoring user data...")
+            _preserve2   = _settings.get("preserve_config", True)
+            _data_reset2 = _settings.get("data_reset", False)
+            _bk2         = _settings.get("backup_path", "")
+            if _bk2 and os.path.isfile(_bk2) and _preserve2 and not _data_reset2:
+                try:
+                    import zipfile as _zf2
+                    with _zf2.ZipFile(_bk2,"r") as _zr2:
+                        _names2 = _zr2.namelist()
+                        for _fn2 in ["config.json","whitelist.txt","notes.txt","todo_list.json",
+                                     "snippets.json","rules_state.json","scan_history.db","scan_results.db"]:
+                            if _fn2 in _names2:
+                                try: _zr2.extract(_fn2, INSTALL_DIR); _log(f"  ✓ restored {_fn2}", "OK")
+                                except Exception: pass
+                        for _zn2 in _names2:
+                            if _zn2.startswith(("reports/","reports_pdf/","rules/")):
+                                try: _zr2.extract(_zn2, INSTALL_DIR)
+                                except Exception: pass
+                    _log("  ✓ backup restore complete", "OK")
+                except Exception as _ze: _log(f"  ✗ backup restore: {_ze}", "ERR")
+            else:
+                _log("  ~ restore skipped", "INFO")
+
+            _META_DIR2 = os.path.join(UTILS_DIR, ".vx_meta")
+            try:
+                with open(os.path.join(_META_DIR2,"vx_version"),"w",encoding="utf-8") as _vf2:
+                    json.dump({"version": CUR_VER, "name": "V0RTEX", "author": "Vider_06"}, _vf2, indent=2)
+                _log(f"  ✓ vx_version → {CUR_VER}", "OK")
+            except Exception: pass
+
+            _RESTART_LVL = _settings.get("restart_level", "user")
+            _set_final_status(f"UPDATE COMPLETED!  RESTARTING AT {_RESTART_LVL.upper()} LEVEL...")
+            _log(f"  → restart_level: {_RESTART_LVL}", "INFO")
+            time.sleep(1.2)
+
+            _need_admin2  = (_RESTART_LVL == "admin")
+            _cur_pid2     = os.getpid()
+            _tram2_path   = os.path.join(UTILS_DIR, "_vx_post_update_relaunch.py")
+            _tram2_log    = os.path.join(UTILS_DIR,"debug_log","trampoline_log","_post_update_relaunch.log")
+
+            if sys.platform == "win32":
+                _pyw2 = PYTHON_EXE.replace("python.exe","pythonw.exe")
+                if not os.path.isfile(_pyw2): _pyw2 = PYTHON_EXE
+                _tram2_code = (
+                    f"import os,sys,time,subprocess,ctypes\n"
+                    f"_PID={_cur_pid2}\n_TARGET=r\"{_target_py}\"\n_PYTHON=r\"{_pyw2}\"\n"
+                    f"_SELF=r\"{_tram2_path}\"\n_TASK=\"V0RTEXPostUpdateRelaunch\"\n"
+                    f"_LOG=r\"{_tram2_log}\"\n_ADMIN={_need_admin2}\n"
+                    "def _log(m):\n import datetime\n try:\n  with open(_LOG,'a',encoding='utf-8') as f: f.write(f'[{datetime.datetime.now().strftime(\"%H:%M:%S\")}] {m}\\n')\n except: pass\n"
+                    "_log('trampoline started')\nk32=ctypes.windll.kernel32\ntime.sleep(0.5)\n"
+                    "try:\n h=k32.OpenProcess(0x0001|0x1000,False,_PID)\n if h: k32.TerminateProcess(h,0);k32.CloseHandle(h);_log('killed')\nexcept Exception as e: _log(f'err: {e}')\n"
+                    "for _ in range(30):\n h2=k32.OpenProcess(0x1000,False,_PID)\n if not h2: break\n k32.CloseHandle(h2);time.sleep(0.2)\n"
+                    "time.sleep(0.4)\n"
+                    "subprocess.run(['schtasks','/delete','/tn',_TASK,'/f'],capture_output=True)\n"
+                    "if _ADMIN:\n import ctypes as _c2;_c2.windll.shell32.ShellExecuteW(None,'runas',_PYTHON,f'\"{_TARGET}\"',None,1)\nelse:\n subprocess.Popen([_PYTHON,_TARGET],creationflags=0x08000000)\n"
+                    "_log('launched')\ntime.sleep(1)\ntry: os.remove(_SELF)\nexcept: pass\n"
+                )
+                try:
+                    os.makedirs(os.path.dirname(_tram2_log), exist_ok=True)
+                    with open(_tram2_path,"w",encoding="utf-8") as _tf2: _tf2.write(_tram2_code)
+                    subprocess.run(["schtasks","/delete","/tn","V0RTEXPostUpdateRelaunch","/f"],capture_output=True)
+                    _ret2 = subprocess.run([
+                        "schtasks","/create","/tn","V0RTEXPostUpdateRelaunch",
+                        "/tr",f'"{_pyw2}" "{_tram2_path}"',"/sc","ONCE","/st","00:00","/f","/RL","LIMITED"
+                    ], capture_output=True, text=True)
+                    if _ret2.returncode == 0:
+                        subprocess.run(["schtasks","/run","/tn","V0RTEXPostUpdateRelaunch"],capture_output=True)
+                        _log("  ✓ relaunch trampoline triggered", "OK")
+                    else:
+                        raise RuntimeError(_ret2.stderr.strip())
+                except Exception as _ste2:
+                    _log(f"  ✗ schtasks: {_ste2} — direct launch", "WARN")
+                    subprocess.Popen([PYTHON_EXE, _target_py], creationflags=0x08000000)
+            else:
+                _real_user2 = os.environ.get("SUDO_USER","")
+                _tram2_code = (
+                    f"import os,sys,time,subprocess,signal\n_PID={_cur_pid2}\n_TARGET=r\"{_target_py}\"\n"
+                    f"_PYTHON=r\"{PYTHON_EXE}\"\n_SELF=r\"{_tram2_path}\"\n_REAL_USER=\"{_real_user2}\"\n_ADMIN={_need_admin2}\n"
+                    "time.sleep(0.4)\ntry: os.kill(_PID,signal.SIGTERM)\nexcept: pass\n"
+                    "for _ in range(25):\n try: os.kill(_PID,0)\n except OSError: break\n time.sleep(0.2)\n"
+                    "if _ADMIN: subprocess.Popen(['sudo',_PYTHON,_TARGET])\n"
+                    "elif _REAL_USER and os.geteuid()==0: subprocess.Popen(['sudo','-u',_REAL_USER,_PYTHON,_TARGET])\n"
+                    "else: subprocess.Popen([_PYTHON,_TARGET])\n"
+                    "time.sleep(1)\ntry: os.remove(_SELF)\nexcept: pass\n"
+                )
+                try:
+                    with open(_tram2_path,"w",encoding="utf-8") as _tf2: _tf2.write(_tram2_code)
+                    subprocess.Popen([PYTHON_EXE,_tram2_path], start_new_session=True, close_fds=True)
+                    _log("  ✓ unix relaunch trampoline launched", "OK")
+                except Exception as _ule2:
+                    _log(f"  ✗ unix trampoline: {_ule2}", "WARN")
+                    subprocess.Popen([PYTHON_EXE, _target_py])
+
+            _splash_done_t.set()
+
+        _log("Trampoline hop done, self-deleting", "INFO")
+        try:
+            _me = os.path.abspath(__file__)
+            if sys.platform == "win32":
+                _d = _me + ".del"
+                os.rename(_me, _d)
+                _si_del = subprocess.STARTUPINFO()
+                _si_del.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                _si_del.wShowWindow = 0
+                subprocess.Popen(["cmd", "/c", f'ping 127.0.0.1 -n 3 >nul && del /f /q "{_d}"'],
+                                 creationflags=0x08000000, startupinfo=_si_del, close_fds=True)
+            else:
+                os.remove(_me)
+        except Exception:
+            pass
+
+    _trampoline_update_main()
+    import sys as _tsys; _tsys.exit(0)
+
 import os, sys, subprocess, traceback, threading, time as _time_crash
 
+_PRE_SL_BUF: list = []
+_CENSOR_ENABLED_CACHE: list = [None]
 
-# ── version loader (runs immediately — needed by setup, crash handler, etc.) ──
+def _censor_log_msg(msg: str) -> str:
+    try:
+        if _CENSOR_ENABLED_CACHE[0] is None:
+            _cfg_c = globals().get("CONFIG")
+            if _cfg_c is not None:
+                _CENSOR_ENABLED_CACHE[0] = bool(_cfg_c.get("auto_censor_logs", False))
+            else:
+                try:
+                    import json as _cmj, os as _cmos
+                    _ccp = globals().get("CONFIG_PATH", "")
+                    if _ccp and _cmos.path.isfile(_ccp):
+                        with open(_ccp, encoding="utf-8") as _ccf:
+                            _CENSOR_ENABLED_CACHE[0] = bool(_cmj.load(_ccf).get("auto_censor_logs", False))
+                    else:
+                        _CENSOR_ENABLED_CACHE[0] = False
+                except Exception:
+                    _CENSOR_ENABLED_CACHE[0] = False
+        if not _CENSOR_ENABLED_CACHE[0]:
+            return msg
+        import re as _clre
+        for _pat in [
+            r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
+            r"(?:Users|home)[/\\]([A-Za-z0-9_.-]+)",
+            r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b",
+            r"(?i)(?:hostname|host|computer)\s*[:=\s]+([A-Za-z0-9_\-\.]+)",
+            r"(?i)^(\s*hostname\s{2,})(\S+)",
+            r"\b(?:[0-9A-Fa-f]{2}[:\-]){5}[0-9A-Fa-f]{2}\b",
+            r"\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b",
+            r"[A-Za-z]:\\(?:[^\s\\/:*?\"<>|\r\n]+\\)+[^\s\\/:*?\"<>|\r\n]*",
+        ]:
+            msg = _clre.sub(lambda m: "\u2588" * len(m.group(0)), msg)
+    except Exception:
+        pass
+    return msg
+
+def _pre_sl(msg: str, tag: str = "BOOT") -> None:
+    import datetime as _pdt
+    ts = _pdt.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+    _PRE_SL_BUF.append(f"[{ts}] [{tag:<8}] {msg}")
+
+_pre_sl("interpreter started", "BOOT")
+_pre_sl(f"python {__import__('sys').version.split()[0]}  pid={__import__('os').getpid()}", "BOOT")
+_pre_sl(f"script: {__import__('os').path.abspath(__file__)}", "BOOT")
+
+
+
+
 def _vx_load_ver():
     import os as _ov, json as _oj
     _vf = _ov.path.normpath(_ov.path.join(
@@ -38,21 +455,35 @@ def _vx_load_ver():
                 str(_d.get("author","Vider_06")).strip())
     except Exception:
         _vx_load_ver._from_file = False
-        return (".".join(["0","9","9","X0"]), "V"+"0RTEX", "Vider"+"_06")
+        return (".".join(["1","0","0","X0"]), "V"+"0RTEX", "Vider"+"_06")
 
 _VX_VER, _VX_NAME, _VX_AUTH = _vx_load_ver()
+_pre_sl(f"version loaded: {_VX_VER}  from_file={_vx_load_ver._from_file}", "BOOT")
 _VX_FULL    = f"{_VX_NAME}  v{_VX_VER}  by {_VX_AUTH}"
 _VX_DIRNAME = f"V0RTEX_v{_VX_VER}"
 _VX_TITLE   = f"{_VX_NAME}  v{_VX_VER}"
-# ─────────────────────────────────────────────────────────────────────────────
 
 
+
+import warnings as _vx_warnings
+_vx_warnings.filterwarnings("ignore", message=".*PyPDF.*", category=UserWarning)
+_vx_warnings.filterwarnings("ignore", message=".*fpdf2.*", category=UserWarning)
+try:
+    import importlib.util as _ilu
+    if _ilu.find_spec("pypdf") and _ilu.find_spec("fpdf"):
+        import subprocess as _pip_fix
+        _pip_fix.run([__import__("sys").executable, "-m", "pip", "uninstall", "-y", "pypdf"],
+                     capture_output=True, timeout=30)
+        del _pip_fix
+    del _ilu
+except Exception:
+    pass
 _T = "".join  
 
 
 _ADM_BADGE   = _T(["⚠ ELEV", "ATED ·", " ADMIN"])
-_ADM_BADGE_W = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX v","0.9.9",".X0  by Vider_06"])
-_ADM_BADGE_R = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX RECOVERY TERMINAL  v","0.9.9",".X0"])
+_ADM_BADGE_W = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX v","1.0.0",".X0  by Vider_06"])
+_ADM_BADGE_R = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX RECOVERY TERMINAL  v","1.0.0",".X0"])
 _ADM_BADGE_S = _T(["⚡ ELEV", "ATED — ", "ADMIN"])   
 
 
@@ -517,207 +948,168 @@ _EMBED = {
     ),
     "INSTRUCTIONS.txt":        (
         "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT0KICBWMFJURVggdjEuMCAgLSAgTWFsd2FyZSBBbmFseXNpcyBQbGF0Zm9ybQog"
-        "IGJ5IFZpZGVyXzA2Cj09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09CgogIFYwUlRFWCBpcyBhIGxvY2FsIG1hbHdhcmUgYW5h"
-        "bHlzaXMgYW5kIHRocmVhdCBpbnRlbGxpZ2VuY2UgcGxhdGZvcm0uCiAgSXQgaW50ZWdyYXRlcyBz"
-        "dGF0aWMgYW5hbHlzaXMsIFlBUkEgc2Nhbm5pbmcsIFBFIGluc3BlY3Rpb24sIGVudHJvcHkKICBh"
-        "bmFseXNpcywgbmV0d29yayBjYXB0dXJlLCBzYW5kYm94IG1vbml0b3JpbmcsIElPQyBleHRyYWN0"
-        "aW9uLCBhbmQgbGl2ZQogIHRocmVhdCBpbnRlbCBsb29rdXBzIGZyb20gVmlydXNUb3RhbCwgTWFs"
-        "d2FyZUJhemFhciwgQWJ1c2VJUERCLCBTaG9kYW4sCiAgQWxpZW5WYXVsdCBPVFgsIEdyZXlOb2lz"
-        "ZSwgVVJMU2Nhbi5pbywgYW5kIEh5YnJpZCBBbmFseXNpcy4KCj09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgUVVJQ0sg"
-        "U1RBUlQKPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT0KCiAgMS4gUnVuIHNldHVwX3dpbi5iYXQgYXMgQWRtaW5pc3RyYXRv"
-        "ciAocmlnaHQtY2xpY2sgPiBSdW4gYXMgYWRtaW5pc3RyYXRvcikKICAyLiBXYWl0IGZvciBhbGwg"
-        "cGFja2FnZXMgdG8gaW5zdGFsbAogIDMuIEFkZCB5b3VyIFZpcnVzVG90YWwgQVBJIGtleSB0byBj"
-        "b25maWcuanNvbiAgKHNlZSBzZWN0aW9uIFszXSBiZWxvdykKICA0LiBSdW46ICBweXRob24gdjBy"
-        "dGV4LnB5Cgo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PQogIFsxXSAgU1lTVEVNIFJFUVVJUkVNRU5UUwo9PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT0KICBWMFJURVggdjEuMC4wICAtICBNYWx3YXJlIEFuYWx5"
+        "c2lzIFBsYXRmb3JtCiAgYnkgVmlkZXJfMDYgIHwgIGh0dHBzOi8vZ2l0aHViLmNvbS9WaWRlcjA2"
+        "L1YwcnRleAo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKICBWMFJURVggaXMgYSBsb2NhbCBtYWx3"
+        "YXJlIGFuYWx5c2lzIGFuZCB0aHJlYXQgaW50ZWxsaWdlbmNlIHBsYXRmb3JtLgogIEl0IGludGVn"
+        "cmF0ZXMgc3RhdGljIGFuYWx5c2lzLCBZQVJBIHNjYW5uaW5nLCBQRSBpbnNwZWN0aW9uLCBlbnRy"
+        "b3B5CiAgYW5hbHlzaXMsIG5ldHdvcmsgY2FwdHVyZSwgc2FuZGJveCBtb25pdG9yaW5nLCBJT0Mg"
+        "ZXh0cmFjdGlvbiwgYW5kIGxpdmUKICB0aHJlYXQgaW50ZWwgbG9va3VwcyBmcm9tIFZpcnVzVG90"
+        "YWwsIE1hbHdhcmVCYXphYXIsIEFidXNlSVBEQiwgU2hvZGFuLAogIEFsaWVuVmF1bHQgT1RYLCBH"
+        "cmV5Tm9pc2UsIFVSTFNjYW4uaW8sIGFuZCBIeWJyaWQgQW5hbHlzaXMuCgo9PT09PT09PT09PT09"
         "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PQoKICAtIFdpbmRvd3MgMTAvMTEgICg2NC1iaXQgcmVjb21tZW5kZWQpIG9yIExpbnV4L21hY09T"
-        "CiAgLSBQeXRob24gMy4xMCBvciBoaWdoZXIgIC0tPiAgaHR0cHM6Ly93d3cucHl0aG9uLm9yZy9k"
-        "b3dubG9hZHMvCiAgICAqIER1cmluZyBpbnN0YWxsOiBjaGVjayAiQWRkIFB5dGhvbiB0byBQQVRI"
-        "IgogIC0gSW50ZXJuZXQgY29ubmVjdGlvbiAoZm9yIHRocmVhdCBpbnRlbCBsb29rdXBzKQogIC0g"
-        "T3B0aW9uYWw6IFdpcmVzaGFyay90c2hhcmsgZm9yIG5ldHdvcmsgY2FwdHVyZSBmZWF0dXJlcwog"
-        "ICAgLS0+ICBodHRwczovL3d3dy53aXJlc2hhcmsub3JnL2Rvd25sb2FkLmh0bWwKICAgICAgICAg"
-        "RHVyaW5nIFdpcmVzaGFyayBpbnN0YWxsOiBjaGVjayAiQWRkIHRzaGFyayB0byBQQVRIIgoKPT09"
+        "PT09PT09PT09PQogIFFVSUNLIFNUQVJUCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CgogIDEuIFJ1"
+        "biB2MHJ0ZXgucHkgLS0gdGhlIHNldHVwIHdpemFyZCBvcGVucyBhdXRvbWF0aWNhbGx5IG9uIGZp"
+        "cnN0IGxhdW5jaC4KICAyLiBGb2xsb3cgdGhlIHdpemFyZDogaXQgaW5zdGFsbHMgYWxsIHBhY2th"
+        "Z2VzLCBjcmVhdGVzIGZvbGRlcnMsIGNvbmZpZy5qc29uLgogIDMuIEFkZCB5b3VyIEFQSSBrZXlz"
+        "IGluIENGRyA+IEFQSSBLRVlTIChhdCBtaW5pbXVtOiBWaXJ1c1RvdGFsKS4KICA0LiBEb3dubG9h"
+        "ZCBZQVJBIHJ1bGVzIHZpYSBZQVJBID4gTElCUkFSWS4KCiAgVG8gbGF1bmNoIG1hbnVhbGx5Ogog"
+        "ICAgIHB5dGhvbiB2MHJ0ZXgucHkKCiAgT3IgZG91YmxlLWNsaWNrIGxhdW5jaC5iYXQgKFdpbmRv"
+        "d3MpIC8gcnVuIGxhdW5jaC5zaCAoTGludXgvbWFjT1MpLgoKPT09PT09PT09PT09PT09PT09PT09"
         "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT0KICBbMl0gIElOU1RBTExBVElPTgo9PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKICBPUFRJT04gQSDigJQg"
-        "QXV0b21hdGljIChyZWNvbW1lbmRlZCk6CiAgICBSaWdodC1jbGljayBzZXR1cF93aW4uYmF0ID4g"
-        "UnVuIGFzIGFkbWluaXN0cmF0b3IKICAgIFRoZSBzY3JpcHQgd2lsbDoKICAgICAgLSBDaGVjay9p"
-        "bnN0YWxsIFB5dGhvbiAzLjEyIGlmIG1pc3NpbmcgKHZpYSB3aW5nZXQgb3IgcHl0aG9uLm9yZykK"
-        "ICAgICAgLSBVcGdyYWRlIHBpcAogICAgICAtIEluc3RhbGwgYWxsIHJlcXVpcmVkIHBhY2thZ2Vz"
-        "IGZyb20gcmVxdWlyZW1lbnRzLnR4dAogICAgICAtIENoZWNrIGZvciB0c2hhcmsgYW5kIG9mZmVy"
-        "IHRvIGluc3RhbGwgV2lyZXNoYXJrCiAgICAgIC0gQ3JlYXRlIGFsbCBuZWVkZWQgZm9sZGVycwog"
-        "ICAgICAtIENyZWF0ZSBhIGRlZmF1bHQgY29uZmlnLmpzb24KICAgICAgLSBDcmVhdGUgYSBkZWZh"
-        "dWx0IFlBUkEgcnVsZSBmaWxlCiAgICAgIC0gT2ZmZXIgdG8gbGF1bmNoIFYwUlRFWCBpbW1lZGlh"
-        "dGVseQoKICBPUFRJT04gQiDigJQgTWFudWFsOgogICAgT3BlbiBhIHRlcm1pbmFsIGluIHRoZSBW"
-        "MFJURVggZm9sZGVyIGFuZCBydW46CiAgICAgIHB5dGhvbiAtbSBwaXAgaW5zdGFsbCAtciByZXF1"
-        "aXJlbWVudHMudHh0CgogIElmIHlvdSBnZXQgImV4dGVybmFsbHkgbWFuYWdlZCBlbnZpcm9ubWVu"
-        "dCIgb24gc29tZSBzeXN0ZW1zOgogICAgICBweXRob24gLW0gcGlwIGluc3RhbGwgLXIgcmVxdWly"
-        "ZW1lbnRzLnR4dCAtLWJyZWFrLXN5c3RlbS1wYWNrYWdlcwoKPT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KICBbM10gIEFQ"
-        "SSBLRVkgQ09ORklHVVJBVElPTiAgKGNvbmZpZy5qc29uKQo9PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKICBPcGVuIGNv"
-        "bmZpZy5qc29uIGluIGEgdGV4dCBlZGl0b3IuIEl0IGxvb2tzIGxpa2UgdGhpczoKCiAgewogICAg"
-        "ImFwaV9rZXlzIjogW10sCiAgICAibWFsd2FyZWJhemFhcl9rZXkiOiAiIiwKICAgICJhYnVzZWlw"
-        "ZGJfa2V5IjogIiIsCiAgICAidXJsc2Nhbl9rZXkiOiAiIiwKICAgICJvdHhfa2V5IjogIiIsCiAg"
-        "ICAic2hvZGFuX2tleSI6ICIiLAogICAgImdyZXlub2lzZV9rZXkiOiAiIiwKICAgICJoeWJyaWRf"
-        "YW5hbHlzaXNfa2V5IjogIiIsCiAgICAicmVxdWVzdF9kZWxheSI6IDE1LAogICAgInRzaGFya19w"
-        "YXRoIjogInRzaGFyayIsCiAgICAiY3Vja29vX3VybCI6ICJodHRwOi8vMTI3LjAuMC4xOjgwOTAi"
-        "LAogICAgImN1Y2tvb19lbmFibGVkIjogZmFsc2UKICB9CgogIC0tIFZpcnVzVG90YWwgKHN1cHBv"
-        "cnRzIG11bHRpcGxlIGtleXMgZm9yIHJvdGF0aW9uKToKICAgICBHZXQgYSBmcmVlIGtleSBhdDog"
-        "aHR0cHM6Ly93d3cudmlydXN0b3RhbC5jb20vZ3VpL2pvaW4tdXMKICAgICBGcmVlIHRpZXI6IDUw"
-        "MCByZXF1ZXN0cy9kYXksIDQgcmVxL21pbgogIC0tIE1hbHdhcmVCYXphYXI6IGh0dHBzOi8vYmF6"
-        "YWFyLmFidXNlLmNoLwogIC0tIEFidXNlSVBEQjogaHR0cHM6Ly93d3cuYWJ1c2VpcGRiLmNvbS9h"
-        "Y2NvdW50L2FwaSAgKEZyZWU6IDEwMDAvZGF5KQogIC0tIFVSTFNjYW4uaW86IGh0dHBzOi8vdXJs"
-        "c2Nhbi5pby91c2VyL3Byb2ZpbGUvI2FwaUtleQogIC0tIEFsaWVuVmF1bHQgT1RYOiBodHRwczov"
-        "L290eC5hbGllbnZhdWx0LmNvbS9hcGkKICAtLSBTaG9kYW46IGh0dHBzOi8vYWNjb3VudC5zaG9k"
-        "YW4uaW8KICAtLSBHcmV5Tm9pc2U6IGh0dHBzOi8vdml6LmdyZXlub2lzZS5pby9zaWdudXAKICAt"
-        "LSBIeWJyaWQgQW5hbHlzaXM6IGh0dHBzOi8vd3d3Lmh5YnJpZC1hbmFseXNpcy5jb20vbXktYWNj"
-        "b3VudD90YWI9YXBpLWtleQoKICBBZnRlciBlZGl0aW5nIGNvbmZpZy5qc29uLCB1c2UgdGhlIEFQ"
-        "SSBBbmFseXplciAoU2V0dGluZ3MgPiBBUEkgS2V5cyA+IFRlc3QgQWxsKQogIHRvIHZlcmlmeSBh"
-        "bGwgeW91ciBrZXlzIGFyZSB3b3JraW5nIGNvcnJlY3RseS4KCj09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgWzRdICBG"
-        "RUFUVVJFUyBPVkVSVklFVwo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKICBTQ0FOIFRBQgogICAgLSBEcmFnICYgZHJv"
-        "cCBvciBicm93c2UgdG8gc2VsZWN0IGEgZmlsZQogICAgLSBIYXNoIGNvbXB1dGF0aW9uOiBNRDUs"
-        "IFNIQTEsIFNIQTI1NiwgU1NERUVQCiAgICAtIFZpcnVzVG90YWwgbG9va3VwIHdpdGggZGV0ZWN0"
-        "aW9uIHJhdGlvIGFuZCBlbmdpbmUgYnJlYWtkb3duCiAgICAtIFlBUkEgc2NhbiBhZ2FpbnN0IGFs"
-        "bCBsb2FkZWQgcnVsZXMKICAgIC0gRW50cm9weSBhbmFseXNpcyB3aXRoIHNlY3Rpb24tbGV2ZWwg"
-        "Y2hhcnQKICAgIC0gUEUgaGVhZGVyIGFuYWx5c2lzIChpbXBvcnRzLCBleHBvcnRzLCBzZWN0aW9u"
-        "cywgcGFja2VyIGRldGVjdGlvbikKICAgIC0gSU9DIGV4dHJhY3Rpb24gKElQcywgZG9tYWlucywg"
-        "VVJMcywgcmVnaXN0cnkga2V5cywgZmlsZSBwYXRocykKICAgIC0gRmlsZSB0eXBlIGRldGVjdGlv"
-        "biBhbmQgbWFnaWMgYnl0ZXMKCiAgRk9MREVSIFNDQU4gVEFCCiAgICAtIFJlY3Vyc2l2ZSBmb2xk"
-        "ZXIgc2Nhbm5pbmcgd2l0aCBwcm9ncmVzcyBiYXIKICAgIC0gQnVsayBWaXJ1c1RvdGFsIGxvb2t1"
-        "cHMgd2l0aCByYXRlLWxpbWl0IGhhbmRsaW5nCiAgICAtIEV4cG9ydGFibGUgcmVzdWx0cyB0byBI"
-        "VE1MIGFuZCBQREYKCiAgTkVUV09SSyBUQUIKICAgIC0gTGl2ZSB0cmFmZmljIGNhcHR1cmUgdmlh"
-        "IHRzaGFyawogICAgLSBETlMgcXVlcnkgZXh0cmFjdGlvbgogICAgLSBDb25uZWN0aW9uIGxvZyB3"
-        "aXRoIElQL3BvcnQvcHJvdG9jb2wKICAgIC0gU3VzcGljaW91cyBjb25uZWN0aW9uIGZsYWdnaW5n"
-        "CgogIFNBTkRCT1ggVEFCCiAgICAtIE1vbml0b3IgZmlsZSBkcm9wcyBpbiBzYW5kYm94X2Vudi9k"
-        "cm9wLwogICAgLSBQcm9jZXNzIGFuZCBmaWxlIHN5c3RlbSBhY3Rpdml0eSBsb2dnaW5nCiAgICAt"
-        "IEF1dG8tc2NhbiBkcm9wcGVkIGZpbGVzCgogIFRIUkVBVCBJTlRFTCBUQUIKICAgIC0gSVAvZG9t"
-        "YWluL1VSTCByZXB1dGF0aW9uIGxvb2t1cAogICAgLSBBYnVzZUlQREIgY29uZmlkZW5jZSBzY29y"
-        "ZQogICAgLSBTaG9kYW4gaG9zdCBpbmZvIChwb3J0cywgYmFubmVycywgQ1ZFcykKICAgIC0gT1RY"
-        "IHB1bHNlIGxvb2t1cAogICAgLSBHcmV5Tm9pc2UgY2xhc3NpZmljYXRpb24gKHNjYW5uZXIvbm9p"
-        "c2UvbWFsaWNpb3VzKQogICAgLSBVUkxTY2FuLmlvIHNjcmVlbnNob3QgYW5kIERPTSBhbmFseXNp"
-        "cwoKICBZQVJBIE1BTkFHRVIgVEFCCiAgICAtIExvYWQgbG9jYWwgLnlhci8ueWFyYSBydWxlIGZp"
-        "bGVzCiAgICAtIERvd25sb2FkIGNvbW11bml0eSBydWxlc2V0cyBmcm9tIEdpdEh1YgogICAgLSBS"
-        "dWxlIGVkaXRvciB3aXRoIHN5bnRheCBoaWdobGlnaHRpbmcKICAgIC0gUnVsZSB2YWxpZGF0aW9u"
-        "IGFuZCB0ZXN0LXNjYW4KCiAg4pSA4pSAIE5FVyBJTiB2MS4wIOKUgOKUgOKUgOKUgOKUgOKUgOKU"
-        "gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU"
-        "gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU"
-        "gOKUgOKUgOKUgOKUgOKUgAoKICDwn5CmIENVQ0tPTyBUQUIKICAgIC0gT25lLWNsaWNrIGNvbm5l"
-        "Y3Rpb24gdG8gQ3Vja29vIG9yIENBUEUgc2FuZGJveAogICAgLSBTdWJtaXQgc2FtcGxlcyBkaXJl"
-        "Y3RseSBmcm9tIFYwUlRFWCBVSQogICAgLSBMaXZlIHBvbGxpbmcgb2YgdGFzayBzdGF0dXMgYW5k"
-        "IHJlcG9ydCBwYXJzaW5nCiAgICAtIEJ1aWx0LWluIHNldHVwIGd1aWRlIGZvciBDQVBFLCBEb2Nr"
-        "ZXIsIGFuZCBDdWNrb28gMi54CgogIPCfp6wgREVPQkZVU0NBVE9SIFRBQgogICAgLSBEZWNvZGUg"
-        "QmFzZTY0LCBIZXgsIFJPVDEzLCBVUkwtZW5jb2RlZCwgcmV2ZXJzZWQgc3RyaW5ncwogICAgLSBY"
-        "T1IgYnJ1dGUgZm9yY2UgKHNpbmdsZSBieXRlLCBzaG93cyBwcmludGFibGUgcmVzdWx0cykKICAg"
-        "IC0gRmluZCBhbmQgZGVjb2RlIGFsbCBlbWJlZGRlZCBCYXNlNjQgYmxvYnMgaW4gYSBmaWxlCiAg"
-        "ICAtIExvYWQgZmlsZXMgZGlyZWN0bHkgb3IgcGFzdGUgdGV4dAoKICDwn46vIE1JVFJFIEFUVCZD"
-        "SyBUQUIKICAgIC0gQXV0b21hdGljYWxseSBtYXAgc2NhbiBvdXRwdXQgdG8gQVRUJkNLIHRlY2hu"
-        "aXF1ZXMKICAgIC0gMjQgYnVpbHQtaW4gdGVjaG5pcXVlIG1hdGNoZXJzIGFjcm9zcyBhbGwgdGFj"
-        "dGljcwogICAgLSBFeHBvcnQgbWF0Y2hlZCB0ZWNobmlxdWVzIHRvIENTVgogICAgLSBDb3ZlcnMg"
-        "RXhlY3V0aW9uLCBQZXJzaXN0ZW5jZSwgRGVmZW5zZSBFdmFzaW9uLCBDJkMsIEltcGFjdCwgZXRj"
-        "LgoKICDwn5OmIEJBVENIIEhBU0ggTE9PS1VQIFRBQgogICAgLSBJbXBvcnQgQ1NWL1RYVCBsaXN0"
-        "IG9mIE1ENS9TSEExL1NIQTI1NiBoYXNoZXMKICAgIC0gQnVsayBWaXJ1c1RvdGFsIGxvb2t1cCB3"
-        "aXRoIHJhdGUtbGltaXQgaGFuZGxpbmcKICAgIC0gTXVsdGkta2V5IHJvdGF0aW9uIHN1cHBvcnQK"
-        "ICAgIC0gRXhwb3J0IHJlc3VsdHMgdG8gQ1NWCgogIPCflIAgRklMRSBESUZGIFRBQgogICAgLSBT"
-        "aWRlLWJ5LXNpZGUgY29tcGFyaXNvbiBvZiB0d28gZmlsZXMKICAgIC0gQ29sb3ItY29kZWQgdW5p"
-        "ZmllZCBkaWZmIChhZGRlZC9yZW1vdmVkIGxpbmVzKQogICAgLSBFeHBvcnQgSFRNTCBkaWZmIHJl"
-        "cG9ydAogICAgLSBEZXRlY3QgbWFsaWNpb3VzIG1vZGlmaWNhdGlvbnMgYmV0d2VlbiBjbGVhbiBh"
-        "bmQgaW5mZWN0ZWQgdmVyc2lvbnMKCiAg8J+UjCBQT1JUIFNDQU5ORVIgVEFCCiAgICAtIFRDUCBw"
-        "b3J0IHNjYW4gb24gYW55IGhvc3QgKGxvY2FsIG9yIHJlbW90ZSkKICAgIC0gUmFuZ2Ugb3IgbGlz"
-        "dCBzeW50YXggKGUuZy4gMS0xMDI0IG9yIDIyLDgwLDQ0MykKICAgIC0gUmlzayBjbGFzc2lmaWNh"
-        "dGlvbiBwZXIgcG9ydAogICAgLSBObyBleHRlcm5hbCBkZXBlbmRlbmNpZXMgbmVlZGVkCgogIPCf"
-        "lJEgU0VDUkVUIFNDQU5ORVIgVEFCCiAgICAtIFNjYW4gZmlsZXMgb3IgZW50aXJlIGRpcmVjdG9y"
-        "aWVzCiAgICAtIERldGVjdHM6IEFXUyBrZXlzLCBHaXRIdWIgdG9rZW5zLCBKV1QsIEFQSSBrZXlz"
-        "LCBwYXNzd29yZHMsCiAgICAgIGNvbm5lY3Rpb24gc3RyaW5ncywgcHJpdmF0ZSBrZXlzLCBiZWFy"
-        "ZXIgdG9rZW5zLCBhbmQgbW9yZQogICAgLSBTdXBwb3J0czogLnB5LCAuanMsIC50cywgLnBocCwg"
-        "LmphdmEsIC5nbywgLmVudiwgLmpzb24sIC55YW1sLAogICAgICAuc2gsIC5iYXQsIC5wczEsIC5j"
-        "b25maWcsIC5pbmksIC54bWwsIC5sb2csIC50eHQKICAgIC0gRXhwb3J0IGZpbmRpbmdzIHRvIENT"
-        "VgoKICDwn5OmIEFSQ0hJVkUgVU5QQUNLRVIgVEFCCiAgICAtIFRyeSB0byB1bnBhY2sgcGFzc3dv"
-        "cmQtcHJvdGVjdGVkIFpJUCBhcmNoaXZlcwogICAgLSBCdWlsdC1pbiB3b3JkbGlzdCBvZiAzMCsg"
-        "bWFsd2FyZS1jb21tb24gcGFzc3dvcmRzCiAgICAtIExvYWQgY3VzdG9tIHdvcmRsaXN0IGZpbGUg"
-        "KFRYVCwgb25lIHBhc3N3b3JkIHBlciBsaW5lKQogICAgLSBFeHRyYWN0cyB0byBkaWZmX3dvcmtz"
-        "cGFjZS9leHRyYWN0ZWQvIGluIHRoZSBWMFJURVggZm9sZGVyCgogIPCfk6EgVEhSRUFUIEZFRUQg"
-        "TU9OSVRPUiBUQUIKICAgIC0gRG93bmxvYWQgYW5kIGNhY2hlIDYgZnJlZSB0aHJlYXQgaW50ZWxs"
-        "aWdlbmNlIGZlZWRzOgogICAgICAgIOKAoiBGZW9kbyBUcmFja2VyIChDMiBJUHMgZnJvbSBhYnVz"
-        "ZS5jaCkKICAgICAgICDigKIgVVJMaGF1cyAobWFsd2FyZSBVUkxzKQogICAgICAgIOKAoiBDSU5T"
-        "c2NvcmUgKGJhZCBJUHMpCiAgICAgICAg4oCiIEVtZXJnaW5nIFRocmVhdHMgY29tcHJvbWlzZWQg"
-        "SVBzCiAgICAgICAg4oCiIFNwYW1oYXVzIERST1AgbGlzdAogICAgICAgIOKAoiBBYnVzZS5jaCBT"
-        "U0wgQmxhY2tsaXN0CiAgICAtIENoZWNrIGFueSBJUC9kb21haW4vVVJMIGFnYWluc3QgYWxsIGNh"
-        "Y2hlZCBmZWVkcyBpbnN0YW50bHkKICAgIC0gTm8gQVBJIGtleSByZXF1aXJlZAoKICDwn5OEIE1B"
-        "Q1JPIEFOQUxZWkVSIFRBQgogICAgLSBBbmFseXplIE9mZmljZSBkb2N1bWVudHMgKC5kb2MvLmRv"
-        "Y3gvLnhscy8ueGxzeC8ueGxzbSBldGMuKQogICAgLSBEZXRlY3QgVkJBIG1hY3JvcywgT0xFIHN0"
-        "cmVhbXMsIGVtYmVkZGVkIG9iamVjdHMKICAgIC0gU2NhbiBmb3IgMjArIHN1c3BpY2lvdXMga2V5"
-        "d29yZHMgKEF1dG9PcGVuLCBTaGVsbCwgV1NjcmlwdCwgZXRjLikKICAgIC0gRXh0cmFjdCBlbWJl"
-        "ZGRlZCBVUkxzCiAgICAtIFNhdmUgYW5hbHlzaXMgcmVwb3J0IHRvIHRleHQgZmlsZQoKICDwn5Oh"
-        "IFBDQVAgQU5BTFlaRVIgVEFCCiAgICAtIFBhcnNlIC5wY2FwIGFuZCAucGNhcG5nIGZpbGVzIHdp"
-        "dGhvdXQgdHNoYXJrCiAgICAtIEV4dHJhY3Q6IHVuaXF1ZSBjb25uZWN0aW9ucywgRE5TIHF1ZXJp"
-        "ZXMsIEhUVFAgcmVxdWVzdHMKICAgIC0gSWRlbnRpZnkgZXh0ZXJuYWwgKG5vbi1SRkMxOTE4KSBJ"
-        "UHMgYXV0b21hdGljYWxseQogICAgLSBFeHBvcnQgSU9DcyAoSVBzLCBETlMsIFVSTHMpIHRvIENT"
-        "VgoKPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT0KICBbNV0gIFlBUkEgUlVMRVMKPT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KCiAgVjBSVEVYIGxv"
-        "YWRzIGFsbCAueWFyIC8gLnlhcmEgZmlsZXMgZnJvbSB0aGUgcnVsZXMvIGRpcmVjdG9yeS4KICBU"
-        "byBhZGQgcnVsZXM6CiAgICAtIERyb3AgLnlhciBmaWxlcyBpbnRvIHJ1bGVzLyBhbmQgdXNlIFlB"
-        "UkEgTWFuYWdlciA+IFJlbG9hZAogICAgLSBVc2UgWUFSQSBNYW5hZ2VyID4gRG93bmxvYWQgdG8g"
-        "Z2V0IGNvbW11bml0eSBydWxlc2V0cyBmcm9tIEdpdEh1YgogIFlBUkEgZG9jdW1lbnRhdGlvbjog"
-        "aHR0cHM6Ly95YXJhLnJlYWR0aGVkb2NzLmlvL2VuL3N0YWJsZS8KCj09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgWzZd"
-        "ICBDVUNLT08gU0FOREJPWCAoRUFTWSBTRVRVUCkKPT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KCiAgVXNlIHRoZSDwn5Cm"
-        "IENVQ0tPTyB0YWIgZm9yIGd1aWRlZCBzZXR1cC4gUXVpY2sgcmVmZXJlbmNlOgoKICBDQVBFIFNh"
-        "bmRib3ggKHJlY29tbWVuZGVkIOKAlCBhY3RpdmVseSBtYWludGFpbmVkIGZvcmspOgogICAgZ2l0"
-        "IGNsb25lIGh0dHBzOi8vZ2l0aHViLmNvbS9rZXZvcmVpbGx5L0NBUEV2MgogICAgY2QgQ0FQRXYy"
-        "ICYmIHN1ZG8gYmFzaCBjYXBlMi5zaCBiYXNlCiAgICBzdWRvIHN5c3RlbWN0bCBzdGFydCBjYXBl"
-        "LXdlYgogICAgU2V0IFVSTDogaHR0cDovLzxWTV9JUD46ODAwMAoKICBEb2NrZXIgKGZhc3Rlc3Qg"
-        "c3RhcnQpOgogICAgZG9ja2VyIHB1bGwgYmxhY2t0b3AvY3Vja29vCiAgICBkb2NrZXIgcnVuIC1k"
-        "IC1wIDgwOTA6ODA5MCBibGFja3RvcC9jdWNrb28KICAgIFNldCBVUkw6IGh0dHA6Ly8xMjcuMC4w"
-        "LjE6ODA5MAoKICDimqAgIElNUE9SVEFOVDogQWx3YXlzIHJ1biBtYWx3YXJlIGluIGFuIGlzb2xh"
-        "dGVkIFZNLCBuZXZlciBvbiB5b3VyCiAgICAgaG9zdCBtYWNoaW5lLiBVc2Ugc25hcHNob3RzIHRv"
-        "IHJlc3RvcmUgYWZ0ZXIgZWFjaCBhbmFseXNpcy4KICAgICBDQVBFOiBodHRwczovL2dpdGh1Yi5j"
-        "b20va2V2b3JlaWxseS9DQVBFdjIKCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgWzddICBUUk9VQkxFU0hPT1RJTkcK"
+        "PT0KICBbMV0gIFNZU1RFTSBSRVFVSVJFTUVOVFMKPT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KCiAg"
+        "LSBXaW5kb3dzIDEwLzExICg2NC1iaXQpCiAgLSBQeXRob24gMy4xMCBvciBoaWdoZXIgIC0tPiAg"
+        "aHR0cHM6Ly93d3cucHl0aG9uLm9yZy9kb3dubG9hZHMvCiAgICAqIER1cmluZyBpbnN0YWxsOiBj"
+        "aGVjayAiQWRkIFB5dGhvbiB0byBQQVRIIgogIC0gSW50ZXJuZXQgY29ubmVjdGlvbiAoZm9yIHRo"
+        "cmVhdCBpbnRlbCBsb29rdXBzIGFuZCB1cGRhdGVzKQogIC0gT3B0aW9uYWw6IFdpcmVzaGFyay90"
+        "c2hhcmsgZm9yIG5ldHdvcmsgY2FwdHVyZQogICAgLS0+ICBodHRwczovL3d3dy53aXJlc2hhcmsu"
+        "b3JnL2Rvd25sb2FkLmh0bWwKICAgICAgICAgRHVyaW5nIFdpcmVzaGFyayBpbnN0YWxsOiBjaGVj"
+        "ayAiQWRkIHRzaGFyayB0byBQQVRIIgoKPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KICBbMl0gIElO"
+        "U1RBTExBVElPTgo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKICBPUFRJT04gQSAtLSBBdXRvbWF0"
+        "aWMgKHJlY29tbWVuZGVkKToKICAgIFJ1biB2MHJ0ZXgucHkgLS0gdGhlIHNldHVwIHdpemFyZCBo"
+        "YW5kbGVzIGV2ZXJ5dGhpbmc6CiAgICAgIC0gSW5zdGFsbHMgYWxsIFB5dGhvbiBkZXBlbmRlbmNp"
+        "ZXMgKFlBUkEgbXVsdGktc3RyYXRlZ3k6IHdoZWVsL3lhcmEteC9zcmMpCiAgICAgIC0gQXV0by1k"
+        "ZXRlY3RzIGFuZCBvcHRpb25hbGx5IGluc3RhbGxzIFdpcmVzaGFyay90c2hhcmsKICAgICAgLSBD"
+        "cmVhdGVzIGZvbGRlciBzdHJ1Y3R1cmUsIGNvbmZpZy5qc29uLCBzY2FuX2hpc3RvcnkuZGIKICAg"
+        "ICAgLSBBZGRzIFdpbmRvd3MgRGVmZW5kZXIgZXhjbHVzaW9ucwogICAgICAtIFdyaXRlcyBsYXVu"
+        "Y2guYmF0IC8gbGF1bmNoLnNoCgogIE9QVElPTiBCIC0tIE1hbnVhbDoKICAgIE9wZW4gYSB0ZXJt"
+        "aW5hbCBpbiB0aGUgVjBSVEVYIGZvbGRlciBhbmQgcnVuOgogICAgICBweXRob24gLW0gcGlwIGlu"
+        "c3RhbGwgLXIgcmVxdWlyZW1lbnRzLnR4dAoKICBJZiB5b3UgZ2V0ICJleHRlcm5hbGx5IG1hbmFn"
+        "ZWQgZW52aXJvbm1lbnQiOgogICAgICBweXRob24gLW0gcGlwIGluc3RhbGwgLXIgcmVxdWlyZW1l"
+        "bnRzLnR4dCAtLWJyZWFrLXN5c3RlbS1wYWNrYWdlcwoKPT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0K"
+        "ICBbM10gIEFQSSBLRVkgQ09ORklHVVJBVElPTiAgKENGRyA+IEFQSSBLRVlTIG9yIGNvbmZpZy5q"
+        "c29uKQo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKICB7CiAgICAiYXBpX2tleXMiOiBbXSwKICAg"
+        "ICJtYWx3YXJlYmF6YWFyX2tleSI6ICIiLAogICAgImFidXNlaXBkYl9rZXkiOiAiIiwKICAgICJ1"
+        "cmxzY2FuX2tleSI6ICIiLAogICAgIm90eF9rZXkiOiAiIiwKICAgICJzaG9kYW5fa2V5IjogIiIs"
+        "CiAgICAiZ3JleW5vaXNlX2tleSI6ICIiLAogICAgImh5YnJpZF9hbmFseXNpc19rZXkiOiAiIiwK"
+        "ICAgICJyZXF1ZXN0X2RlbGF5IjogMTUsCiAgICAidHNoYXJrX3BhdGgiOiAidHNoYXJrIiwKICAg"
+        "ICJjdWNrb29fdXJsIjogImh0dHA6Ly8xMjcuMC4wLjE6ODA5MCIsCiAgICAiY3Vja29vX2VuYWJs"
+        "ZWQiOiBmYWxzZQogIH0KCiAgLS0gVmlydXNUb3RhbDogICAgaHR0cHM6Ly93d3cudmlydXN0b3Rh"
+        "bC5jb20vZ3VpL2pvaW4tdXMgICg1MDAgcmVxL2RheSBmcmVlKQogIC0tIE1hbHdhcmVCYXphYXI6"
+        "IGh0dHBzOi8vYmF6YWFyLmFidXNlLmNoLwogIC0tIEFidXNlSVBEQjogICAgIGh0dHBzOi8vd3d3"
+        "LmFidXNlaXBkYi5jb20vYWNjb3VudC9hcGkgICgxMDAwL2RheSBmcmVlKQogIC0tIFVSTFNjYW4u"
+        "aW86ICAgIGh0dHBzOi8vdXJsc2Nhbi5pby91c2VyL3Byb2ZpbGUvI2FwaUtleQogIC0tIEFsaWVu"
+        "VmF1bHQgT1RYOmh0dHBzOi8vb3R4LmFsaWVudmF1bHQuY29tL2FwaQogIC0tIFNob2RhbjogICAg"
+        "ICAgIGh0dHBzOi8vYWNjb3VudC5zaG9kYW4uaW8KICAtLSBHcmV5Tm9pc2U6ICAgICBodHRwczov"
+        "L3Zpei5ncmV5bm9pc2UuaW8vc2lnbnVwCiAgLS0gSHlicmlkQW5hbHlzaXM6aHR0cHM6Ly93d3cu"
+        "aHlicmlkLWFuYWx5c2lzLmNvbS9teS1hY2NvdW50P3RhYj1hcGkta2V5CgogIEFmdGVyIGVkaXRp"
+        "bmcsIHVzZSBDRkcgPiBBUEkgS0VZUyA+IFRlc3QgQWxsIHRvIHZlcmlmeS4KCj09PT09PT09PT09"
         "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT0KCiAgIk1vZHVsZU5vdEZvdW5kRXJyb3I6IE5vIG1vZHVsZSBuYW1lZCAneWFy"
-        "YSciCiAgICAtLT4gUnVuOiBweXRob24gLW0gcGlwIGluc3RhbGwgeWFyYS1weXRob24KCiAgIk1v"
-        "ZHVsZU5vdEZvdW5kRXJyb3I6IE5vIG1vZHVsZSBuYW1lZCAndGtpbnRlcmRuZDInIgogICAgLS0+"
-        "IFJ1bjogcHl0aG9uIC1tIHBpcCBpbnN0YWxsIHRraW50ZXJkbmQyCgogICJ0c2hhcmsgbm90IGZv"
-        "dW5kIiAvIE5ldHdvcmsgdGFiIGRpc2FibGVkCiAgICAtLT4gSW5zdGFsbCBXaXJlc2hhcmsgZnJv"
-        "bSBodHRwczovL3d3dy53aXJlc2hhcmsub3JnCiAgICAgICAgRHVyaW5nIGluc3RhbGwsIGNoZWNr"
-        "ICJBZGQgdHNoYXJrIHRvIFBBVEgiCiAgICAgICAgT3Igc2V0IGZ1bGwgcGF0aCBpbiBjb25maWcu"
-        "anNvbjogInRzaGFya19wYXRoIjogIkM6XC4uLlx0c2hhcmsuZXhlIgoKICBWaXJ1c1RvdGFsIHJl"
-        "dHVybnMgIldyb25nQ3JlZGVudGlhbHNFcnJvciIgb3IgNDAzCiAgICAtLT4gWW91ciBBUEkga2V5"
-        "IGlzIGludmFsaWQgb3IgZXhwaXJlZC4gQ2hlY2sgY29uZmlnLmpzb24gPiBhcGlfa2V5cwogICAg"
-        "ICAgIFVzZSB0aGUgQVBJIEFuYWx5emVyIChTZXR0aW5ncyA+IEFQSSBLZXlzID4gVGVzdCBBbGwp"
-        "IHRvIGRlYnVnCgogIEFwcCBjcmFzaGVzIG9uIHN0YXJ0dXAgLyBibGFuayB3aW5kb3cKICAgIC0t"
-        "PiBDaGVjayB0aGUgZGVidWdfbG9nLyBmb2xkZXIgZm9yIHRoZSBsYXRlc3Qgc2Vzc2lvbiBsb2cK"
-        "ICAgICAgICBVc2UgUmVjb3ZlcnkgVGVybWluYWwgKERaIHRhYikgaWYgdGhlIGFwcCBwYXJ0aWFs"
-        "bHkgbG9hZHMKCiAgInNjYW5faGlzdG9yeS5kYiBpcyBsb2NrZWQiCiAgICAtLT4gT25seSBvbmUg"
-        "aW5zdGFuY2Ugb2YgVjBSVEVYIGNhbiBydW4gYXQgYSB0aW1lCiAgICAgICAgVXNlIFJlY292ZXJ5"
-        "IFRlcm1pbmFsID4gUmVzZXQgREIgdG8gZml4IGEgY29ycnVwdGVkIGRhdGFiYXNlCgo9PT09PT09"
+        "PT09PT09PT09PT09CiAgWzRdICBVUERBVEVSCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CgogIFYw"
+        "UlRFWCBoYXMgYSBidWlsdC1pbiBhdXRvLXVwZGF0ZXIgKENGRyA+IFVQREFURVIpLgoKICAtIENo"
+        "ZWNrcyBHaXRIdWIgZm9yIG5ldyB2ZXJzaW9ucyBvbiBzdGFydHVwIChjb25maWd1cmFibGUpCiAg"
+        "LSBDcmVhdGVzIEVNRVJHRU5DWV9SRVNUT1JFLnppcCBiYWNrdXAgYmVmb3JlIGFueSBjaGFuZ2Vz"
+        "CiAgLSBJZiB1cGRhdGUgZmFpbHM6IFBST1QgPiBCQUNLVVAgPiBFbWVyZ2VuY3kgUm9sbGJhY2sK"
+        "CiAgVG8gZm9yY2UgYSBzcGVjaWZpYyBicmFuY2gsIGFkZCB0byBjb25maWcuanNvbjoKICAgICJ1"
+        "cGRhdGVfYnJhbmNoIjogIlRFU1RJTkctR0VORVJBTCIKCiAgVXBkYXRlIGhpc3RvcnkgaXMgdmll"
+        "d2FibGUgaW4gQ0ZHID4gVVBEQVRFIExPRy4KCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgWzVd"
+        "ICBGRUFUVVJFUyAgKHYxLjAuMCAgLS0gIDIxIG1haW4gdGFicywgODArIHN1Yi10YWJzKQo9PT09"
         "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PQogIFs4XSAgTk9URVMKPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KCiAgLSBWMFJURVggaXMgYSBsb2NhbCB0b29s"
-        "LiBObyBkYXRhIGlzIHNlbnQgdG8gYW55IHNlcnZlciBleGNlcHQgdGhlCiAgICBvZmZpY2lhbCBB"
-        "UElzIHlvdSBjb25maWd1cmUgKFZpcnVzVG90YWwsIEFidXNlSVBEQiwgZXRjLikKICAtIE5ldmVy"
-        "IHJ1biB1bnRydXN0ZWQgbWFsd2FyZSBzYW1wbGVzIG91dHNpZGUgYSBWTSBmb3IgZnVsbCBpc29s"
-        "YXRpb24uCiAgICBUaGUgc2FuZGJveF9lbnYvZHJvcC8gZm9sZGVyIGlzIGZvciBtb25pdG9yaW5n"
-        "IG9ubHkg4oCUIGl0IGRvZXMgTk9UCiAgICBwcm92aWRlIGEgcmVhbCBpc29sYXRlZCBleGVjdXRp"
-        "b24gZW52aXJvbm1lbnQuCiAgLSBGcmVlIEFQSSB0aWVyIGxpbWl0czogVmlydXNUb3RhbCA1MDAg"
-        "cmVxL2RheSwgQWJ1c2VJUERCIDEwMDAgcmVxL2RheS4KICAgIFJlc3BlY3QgcmF0ZSBsaW1pdHMg"
-        "dG8gYXZvaWQgZ2V0dGluZyB5b3VyIGtleXMgcmV2b2tlZC4KICAtIFRoaXMgdG9vbCBpcyBmb3Ig"
-        "ZWR1Y2F0aW9uYWwgYW5kIGRlZmVuc2l2ZSBzZWN1cml0eSByZXNlYXJjaCBvbmx5LgoKPT09PT09"
+        "PT09PT09PT09PT09PT09PT09PQoKICBIT01FICAgIERhc2hib2FyZDogbGl2ZSBjb3VudGVycywg"
+        "dGhyZWF0IGxldmVsLCByZWNlbnQgc2NhbnMKICBMT0dTICAgIEZpbGUgb3BlcmF0aW9uIGxvZyAr"
+        "IGRlYnVnIGxvZyB2aWV3ZXIKICBDSFJUICAgIENoYXJ0cywgZW50cm9weSBoaXN0b2dyYW0sIHRo"
+        "cmVhdCBoZWF0bWFwCiAgUkVQICAgICBCcm93c2UgYW5kIG9wZW4gc2NhbiByZXBvcnRzIChIVE1M"
+        "L0pTT04vUERGKQogIElPQyAgICAgRXh0cmFjdCBJUHMvZG9tYWlucy9VUkxzL2hhc2hlcy9lbWFp"
+        "bHMvQ1ZFcy9yZWdpc3RyeSBrZXlzL1dpbiBBUElzCiAgICAgICAgICArIE1JVFJFIEFUVCZDSyBt"
+        "YXBwaW5nICsgSW1waGFzaCBhbmFseXplcgogIFlBUkEgICAgUnVsZSBzY2FubmVyLCBjb21tdW5p"
+        "dHkgbGlicmFyeSBkb3dubG9hZGVyLCBydWxlIGVkaXRvciwKICAgICAgICAgIGRlb2JmdXNjYXRv"
+        "ciAoWE9SL0I2NC9ST1QvSGV4KSwgU2lnbWEgdmlld2VyCiAgUEVSRiAgICBMaXZlIHN5c3RlbSBw"
+        "ZXJmb3JtYW5jZSBtb25pdG9yCiAgVEwgICAgICBTY2FuIGhpc3RvcnkgdGltZWxpbmUKICBTQiAg"
+        "ICAgIFNhbmRib3ggYXV0by1zY2FuLCBwcm9jZXNzIG1vbml0b3IsIGZpbGUgYW5hbHl6ZXIsIEN1"
+        "Y2tvby9DQVBFCiAgU0VUVVAgICBTZXR1cCB3aXphcmQgKGFjY2Vzc2libGUgd2l0aG91dCByZXN0"
+        "YXJ0aW5nKQogIENGRyAgICAgQVBJIGtleXMsIGNvbmZpZywgd2hpdGVsaXN0LCBleHBvcnQsIGNo"
+        "ZWNrcG9pbnQsIHNjYW4gaGlzdG9yeSwKICAgICAgICAgIGRlYnVnIGxvZ3MsIHVwZGF0ZSBsb2cs"
+        "IHVwZGF0ZXIKICBMT09LICAgIEhhc2gsIEhFWCB2aWV3ZXIsIFJFR0VYLCBET0MsIFNJRywgYmF0"
+        "Y2ggc2Nhbm5lciwgZGlmZiwgYXJjaGl2ZQogICAgICAgICAgdW5wYWNrZXIsIEI2NC9YT1IvQkNP"
+        "TlYvSldUL1JPVC9QRS1IRFIvVU5JQ09ERS9CSU5QQVQsCiAgICAgICAgICBGVVpaWSBoYXNoIHNp"
+        "bWlsYXJpdHkKICBQUk9DICAgIExpdmUgcHJvY2Vzc2VzLCBzZXJ2aWNlcywgc3RhcnR1cCBpdGVt"
+        "cywgZW52IHZhcnMsCiAgICAgICAgICBvcGVuIGhhbmRsZXMsIHByb2Nlc3MgdHJlZSwgcmVnaXN0"
+        "cnkgYnJvd3NlcgogIE5FVCAgICAgQ29ubmVjdGlvbnMgKHByb2Nlc3MvcG9ydCBmaWx0ZXIpLCBV"
+        "UkwgdG9vbHMsIElQL2RvbWFpbiByZXAsCiAgICAgICAgICBETlMsIFdIT0lTLCBIVFRQIGhlYWRl"
+        "cnMsIFNTTC9UTFMsIHBvcnQgc2Nhbm5lciwgUENBUCwKICAgICAgICAgIHBpbmcsIHByb3h5LCBU"
+        "b3IsIG5vaXNlIGdlbiwgbGl2ZSB0cmFmZmljLCBjb25uIHF1YWxpdHkgc3RhdHMKICBOT1RFUyAg"
+        "IE5vdGVwYWQsIE1JVFJFIEFUVCZDSyByZWZlcmVuY2UsIFRPRE8sIHNuaXBwZXRzCiAgQ1JZUFQg"
+        "ICBBRVMvUlNBIGVuY3J5cHQvZGVjcnlwdCwgaGFzaCBpbnNwZWN0b3IsIFZpZ2VuZXJlCiAgU0VU"
+        "ICAgICBHbG9iYWwgc2V0dGluZ3MKICBQUk9UICAgIEFwcCBwcm90ZWN0aW9uLCBpbnRlZ3JpdHks"
+        "IGRlZmVuc2UsIHNlbGYtZGVmZW5zZSwKICAgICAgICAgIGJhY2t1cCAmIHJlc3RvcmUgKHdpdGgg"
+        "ZW1lcmdlbmN5IHJvbGxiYWNrKSwgc3lzdGVtIGNoZWNrLCB3YXRjaGRvZwogIERaICAgICAgRGVi"
+        "dWcgem9uZSwgY3Jhc2ggc2ltdWxhdG9yLCBTT0MgZXJyb3IgY29kZXMKCj09PT09PT09PT09PT09"
         "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT0KICBWMFJURVggdjEuMCAgLSAgYnkgVmlkZXJfMDYKPT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0K"
+        "PT09PT09PT09CiAgWzZdICBZQVJBIFJVTEVTCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CgogIFYw"
+        "UlRFWCBsb2FkcyBhbGwgLnlhciAvIC55YXJhIGZpbGVzIGZyb20gdGhlIHJ1bGVzLyBkaXJlY3Rv"
+        "cnkuCiAgVG8gYWRkIHJ1bGVzOgogICAgLSBEcm9wIC55YXIgZmlsZXMgaW50byBydWxlcy8gYW5k"
+        "IHVzZSBZQVJBIE1hbmFnZXIgPiBSZWxvYWQKICAgIC0gVXNlIFlBUkEgTWFuYWdlciA+IExpYnJh"
+        "cnkgdG8gZG93bmxvYWQgY29tbXVuaXR5IHJ1bGVzZXRzIGZyb20gR2l0SHViCiAgWUFSQSBkb2Nz"
+        "OiBodHRwczovL3lhcmEucmVhZHRoZWRvY3MuaW8vZW4vc3RhYmxlLwoKPT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT0KICBbN10gIENVQ0tPTyAvIENBUEUgU0FOREJPWAo9PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PQoKICBDQVBFIFNhbmRib3ggKHJlY29tbWVuZGVkKToKICAgIGdpdCBjbG9uZSBodHRwczov"
+        "L2dpdGh1Yi5jb20va2V2b3JlaWxseS9DQVBFdjIKICAgIGNkIENBUEV2MiAmJiBzdWRvIGJhc2gg"
+        "Y2FwZTIuc2ggYmFzZQogICAgc3VkbyBzeXN0ZW1jdGwgc3RhcnQgY2FwZS13ZWIKICAgIFNldCBV"
+        "Ukw6IGh0dHA6Ly88Vk1fSVA+OjgwMDAKCiAgRG9ja2VyIChmYXN0ZXN0KToKICAgIGRvY2tlciBw"
+        "dWxsIGJsYWNrdG9wL2N1Y2tvbwogICAgZG9ja2VyIHJ1biAtZCAtcCA4MDkwOjgwOTAgYmxhY2t0"
+        "b3AvY3Vja29vCiAgICBTZXQgVVJMOiBodHRwOi8vMTI3LjAuMC4xOjgwOTAKCiAgSU1QT1JUQU5U"
+        "OiBBbHdheXMgcnVuIG1hbHdhcmUgaW4gYW4gaXNvbGF0ZWQgVk0sIG5ldmVyIG9uIHlvdXIgaG9z"
+        "dC4KCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgWzhdICBUUk9VQkxFU0hPT1RJTkcKPT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT0KCiAgIk1vZHVsZU5vdEZvdW5kRXJyb3I6IE5vIG1vZHVsZSBuYW1l"
+        "ZCAneWFyYSciCiAgICAtLT4gUnVuIHNldHVwIHdpemFyZCBhZ2Fpbiwgb3I6CiAgICAgICAgcHl0"
+        "aG9uIC1tIHBpcCBpbnN0YWxsIHlhcmEtcHl0aG9uLXdoZWVsCgogICJNb2R1bGVOb3RGb3VuZEVy"
+        "cm9yOiBObyBtb2R1bGUgbmFtZWQgJ3RraW50ZXJkbmQyJyIKICAgIC0tPiBweXRob24gLW0gcGlw"
+        "IGluc3RhbGwgdGtpbnRlcmRuZDIKCiAgInRzaGFyayBub3QgZm91bmQiIC8gTmV0d29yayB0YWIg"
+        "ZGlzYWJsZWQKICAgIC0tPiBJbnN0YWxsIFdpcmVzaGFyayBmcm9tIGh0dHBzOi8vd3d3LndpcmVz"
+        "aGFyay5vcmcKICAgICAgICBEdXJpbmcgaW5zdGFsbCBjaGVjayAiQWRkIHRzaGFyayB0byBQQVRI"
+        "IgogICAgICAgIE9yIHNldDogInRzaGFya19wYXRoIjogIkM6XFwuLi5cXHRzaGFyay5leGUiIGlu"
+        "IGNvbmZpZy5qc29uCgogIFZpcnVzVG90YWwgcmV0dXJucyA0MDMgLyBXcm9uZ0NyZWRlbnRpYWxz"
+        "RXJyb3IKICAgIC0tPiBDaGVjayBjb25maWcuanNvbiA+IGFwaV9rZXlzCiAgICAgICAgVXNlIENG"
+        "RyA+IEFQSSBLRVlTID4gVGVzdCBBbGwgdG8gZGVidWcKCiAgQXBwIGNyYXNoZXMgLyBibGFuayB3"
+        "aW5kb3cKICAgIC0tPiBDaGVjayBkZWJ1Z19sb2cvIGZvciB0aGUgbGF0ZXN0IHNlc3Npb24gbG9n"
+        "CiAgICAgICAgVXNlIERaIHRhYiA+IFJlY292ZXJ5IFRlcm1pbmFsIGlmIHRoZSBhcHAgcGFydGlh"
+        "bGx5IGxvYWRzCgogICJzY2FuX2hpc3RvcnkuZGIgaXMgbG9ja2VkIgogICAgLS0+IE9ubHkgb25l"
+        "IGluc3RhbmNlIGF0IGEgdGltZS4gVXNlIERaID4gUmVzZXQgREIgdG8gcmVwYWlyLgoKICBXaW5k"
+        "b3dzIERlZmVuZGVyIGZsYWdzIFYwUlRFWAogICAgLS0+IFNldHVwIHdpemFyZCBhZGRzIGV4Y2x1"
+        "c2lvbnMgYXV0b21hdGljYWxseS4KICAgICAgICBNYW51YWw6IGFkZCB0aGUgaW5zdGFsbCBmb2xk"
+        "ZXIgdG8gRGVmZW5kZXIgZXhjbHVzaW9ucy4KCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgWzld"
+        "ICBOT1RFUwo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKICAtIFYwUlRFWCBpcyBhIGxvY2FsIHRv"
+        "b2wuIE5vIGRhdGEgaXMgc2VudCBhbnl3aGVyZSBleGNlcHQgdGhlIEFQSXMKICAgIHlvdSBjb25m"
+        "aWd1cmUgKFZpcnVzVG90YWwsIEFidXNlSVBEQiwgZXRjLikKICAtIE5ldmVyIHJ1biBtYWx3YXJl"
+        "IG91dHNpZGUgYSBWTS4gc2FuZGJveF9lbnYvZHJvcC8gaXMgZm9yIG1vbml0b3JpbmcKICAgIG9u"
+        "bHkgLS0gaXQgZG9lcyBOT1QgcHJvdmlkZSBhIHJlYWwgaXNvbGF0ZWQgZXhlY3V0aW9uIGVudmly"
+        "b25tZW50LgogIC0gRnJlZSBBUEkgbGltaXRzOiBWaXJ1c1RvdGFsIDUwMCByZXEvZGF5LCBBYnVz"
+        "ZUlQREIgMTAwMCByZXEvZGF5LgogIC0gRm9yIGVkdWNhdGlvbmFsIGFuZCBkZWZlbnNpdmUgc2Vj"
+        "dXJpdHkgcmVzZWFyY2ggb25seS4KCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgVjBSVEVYIHYx"
+        "LjAuMCAgLSAgYnkgVmlkZXJfMDYgIHwgIGh0dHBzOi8vZ2l0aHViLmNvbS9WaWRlcjA2L1YwcnRl"
+        "eAo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PQo="
+    
     ),
 }
+_pre_sl("BOOT L354", "BOOT")
 _REQUIREMENTS = (
     "requests>=2.31.0\n"
     "pefile>=2023.2.7\n"
@@ -736,6 +1128,7 @@ _REQUIREMENTS = (
     "PyYAML>=6.0.0\n"
     "olefile>=0.47\n"
     "numpy>=1.24.0\n"
+    "requests[socks]>=2.31.0\n"
 )
 _DEFAULT_CONFIG = {
     "api_keys": [],
@@ -770,6 +1163,7 @@ _DEFAULT_CONFIG = {
     "crash_zip_include_config": True,
     "crash_zip_include_admin_log": True,
     "log_ops_count": 30,
+    "auto_censor_logs": True,
 }
 _SUBDIRS = [
     "modules", "rules", "rules/external",
@@ -810,6 +1204,9 @@ def _build_trampoline_script():
         "        with open(_LOG_FILE, 'a', encoding='utf-8') as _lf: _lf.write(line)\n"
         "    except Exception: pass\n"
         "\n"
+                "try: open(_LOG, 'w', encoding='utf-8').close()\n"
+                "except Exception: pass\n"
+                "\n"
         "_log(f'Trampoline started — mode={MODE}')\n"
         "_log(f'Kill PIDs: {KILL_PIDS}')\n"
         "_log(f'Dirs    : {DIRS_TO_WIPE}')\n"
@@ -922,18 +1319,28 @@ _CONSOLE_POSITION_CODE = (
 
 
 def _build_uninstall_script(install_dir, python_exe, trampoline_code):
+    _pyw = python_exe
+    if isinstance(_pyw, str) and _pyw.lower().endswith('pythonw.exe'):
+        _pyc = _pyw[:-len('pythonw.exe')] + 'python.exe'
+        if __import__('os').path.isfile(_pyc):
+            _pyw = _pyc
+    python_exe = _pyw
     T = repr(trampoline_code)
     return f'''
+import sys as _sys, os as _os, traceback as _tb
+def _crash_to_file(_et, _ev, _etb):
+    try:
+        _log = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '_crash_debug.txt')
+        with open(_log, 'a', encoding='utf-8') as _cf:
+            _cf.write('CRASH:' + chr(10))
+            _cf.write(''.join(_tb.format_exception(_et, _ev, _etb)))
+    except Exception:
+        pass
+_sys.excepthook = _crash_to_file
 import tkinter as tk, tkinter.ttk as ttk, tkinter.messagebox as tmb
 import os, sys, threading, subprocess, zipfile, tempfile, shutil, platform, traceback
 import datetime as _dt
 
-if sys.platform == "win32":
-    try:
-        import ctypes
-        ctypes.windll.kernel32.FreeConsole()
-    except Exception:
-        pass
 
 import subprocess as _subprocess_orig
 _NW_FLAGS = {{"creationflags": 0x08000000}} if __import__("sys").platform == "win32" else {{}}
@@ -984,189 +1391,7 @@ TAG = dict(
     NORM=(C['text'], None),
 )
 
-def _ts(): return _dt.datetime.now().strftime('%H:%M:%S.%f')
-def _write_log(line):
-    try:
-        os.makedirs(BACKUP_DIR, exist_ok=True)
-        with open(_LOG_FILE, 'a', encoding='utf-8') as _f: _f.write(line + '\\n')
-    except Exception: pass
 
-root = tk.Tk()
-root.title('V0RTEX — Uninstall')
-root.configure(bg=C['bg'])
-root.resizable(False, False)
-W, H = 720, 560
-sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
-root.geometry(f'{{W}}x{{H}}+{{(sw-W)//2}}+{{max((sh-H)//3, 20)}}')
-root.protocol('WM_DELETE_WINDOW', lambda: sys.exit(0))
-
-sty = ttk.Style(); sty.theme_use('default')
-sty.configure('U.Horizontal.TProgressbar',
-    troughcolor=C['card'], background=C['accent'],
-    lightcolor=C['accent2'], darkcolor='#dc2626', bordercolor=C['border'], thickness=6)
-sty.configure('U.Green.Horizontal.TProgressbar',
-    troughcolor=C['card'], background=C['green'],
-    lightcolor=C['green'], darkcolor='#1aaf82', bordercolor=C['border'], thickness=5)
-
-status_var = tk.StringVar(value='Ready')
-pct_var    = tk.StringVar(value='')
-step_var   = tk.StringVar(value='')
-step_pct   = tk.StringVar(value='')
-v_backup     = tk.BooleanVar(value=True)
-v_packages   = tk.BooleanVar(value=False)
-v_buildtools = tk.BooleanVar(value=False)
-log_w = [None]; dbg_w = [None]; bar_w = [None]; sbar_w = [None]; btn_start = [None]
-
-import time as _anim_time
-spinner_var   = tk.StringVar(value="")
-elapsed_var   = tk.StringVar(value="")
-heartbeat_var = tk.StringVar(value="")
-activity_var  = tk.StringVar(value="")
-_anim_active  = [False]
-_anim_start_t = [0.0]
-_anim_frame   = [0]
-_pulse_dir    = [1]
-_pulse_val    = [0.0]
-_last_log_t   = [0.0]
-_last_log_msg = [""]
-_hb_lbl       = [None]
-_SPINNER_FRAMES = ["\u280b","\u2819","\u2839","\u2838","\u283c","\u2834","\u2826","\u2827","\u2807","\u280f"]
-_STALL_SECS   = 30
-
-def _anim_tick():
-    if not _anim_active[0]: return
-    _anim_frame[0] = (_anim_frame[0] + 1) % len(_SPINNER_FRAMES)
-    spinner_var.set(_SPINNER_FRAMES[_anim_frame[0]])
-    elapsed = _anim_time.time() - _anim_start_t[0]
-    m, s = divmod(int(elapsed), 60)
-    elapsed_var.set(f"{{m:02d}}:{{s:02d}}")
-    sb = sbar_w[0]
-    if sb and float(sb["value"]) < 1.0:
-        _pulse_val[0] += 0.7 * _pulse_dir[0]
-        if _pulse_val[0] >= 18: _pulse_dir[0] = -1
-        elif _pulse_val[0] <= 0: _pulse_dir[0] = 1; _pulse_val[0] = 0
-        try: sb["value"] = _pulse_val[0]
-        except Exception: pass
-    else:
-        _pulse_val[0] = 0.0; _pulse_dir[0] = 1
-    if _last_log_t[0] > 0:
-        since = _anim_time.time() - _last_log_t[0]
-        if since < _STALL_SECS:
-            heartbeat_var.set("\u25cf LIVE")
-            if _hb_lbl[0]:
-                try: _hb_lbl[0].config(fg=C["green"])
-                except Exception: pass
-        else:
-            sm, ss = divmod(int(since), 60)
-            heartbeat_var.set(f"\u26a0 NO ACTIVITY  {{sm:02d}}:{{ss:02d}}")
-            if _hb_lbl[0]:
-                try: _hb_lbl[0].config(fg=C["yellow"])
-                except Exception: pass
-        if _last_log_msg[0]:
-            activity_var.set(f"last: {{_last_log_msg[0]}}")
-    root.after(100, _anim_tick)
-
-def _anim_start():
-    _anim_active[0] = True
-    _anim_start_t[0] = _anim_time.time()
-    _last_log_t[0]   = _anim_time.time()
-    _anim_frame[0] = 0
-    root.after(100, _anim_tick)
-
-def _anim_stop():
-    _anim_active[0] = False
-    spinner_var.set("\u2713")
-    heartbeat_var.set("\u25cf DONE")
-    if _hb_lbl[0]:
-        try: _hb_lbl[0].config(fg=C["green"])
-        except Exception: pass
-
-
-def _log(msg, tag='NORM'):
-    if _anim_active[0] and msg.strip():
-        _last_log_t[0] = _anim_time.time()
-        _last_log_msg[0] = msg.strip()[:60]
-    def _do():
-        w = log_w[0]
-        if not w: return
-        w.config(state='normal'); w.insert('end', msg + '\\n', tag)
-        w.see('end'); w.config(state='disabled'); _write_log(msg)
-    try: root.after(0, _do)
-    except Exception: pass
-
-def _dlog(msg):
-    def _do():
-        w = dbg_w[0]
-        if not w: return
-        line = f'[{{_ts()}}] {{msg}}'
-        w.config(state='normal'); w.insert('end', line + '\\n', 'DIM')
-        w.see('end'); w.config(state='disabled'); _write_log(f'[DBG] {{msg}}')
-    try: root.after(0, _do)
-    except Exception: pass
-
-def _prog(pct, st=None):
-    def _do():
-        b = bar_w[0]
-        if b: b['value'] = pct
-        if st: status_var.set(st)
-        pct_var.set(f'{{int(pct)}}%' if pct else '')
-    try: root.after(0, _do)
-    except Exception: pass
-
-def _sprog(pct, st=None):
-    def _do():
-        b = sbar_w[0]
-        if b: b['value'] = pct
-        if st: step_var.set(st)
-        step_pct.set(f'{{int(pct)}}%' if pct else '')
-    try: root.after(0, _do)
-    except Exception: pass
-
-def _set_done(ok, close_after=4000):
-    _anim_stop()
-    def _do():
-        b = btn_start[0]
-        if not b: return
-        b.config(text='  ✓  Done — closing…  ' if ok else '  ✗  Failed  ',
-                 bg=C['green'] if ok else C['red'], fg=C['bg'], state='disabled')
-        if ok: root.after(close_after, lambda: sys.exit(0))
-    try: root.after(0, _do)
-    except Exception: pass
-
-def _rmdir(path, tag):
-    import time as _rt, gc as _gc
-    if not os.path.exists(path):
-        _dlog(f'~ Already gone: {{path}}'); return True
-    _gc.collect()
-    if sys.platform == 'win32':
-        try:
-            import psutil as _psu
-            cur = os.getpid()
-            for _p in _psu.process_iter(['pid','open_files']):
-                try:
-                    if _p.pid == cur: continue
-                    for _of in (_p.open_files() or []):
-                        if _of.path.startswith(path): _p.kill(); break
-                except Exception: pass
-        except Exception: pass
-    for _attempt in range(4):
-        try:
-            shutil.rmtree(path, ignore_errors=True)
-        except Exception: pass
-        if not os.path.exists(path):
-            _log(f'  ✓ Removed {{tag}}', 'OK'); return True
-        if sys.platform == 'win32':
-            try:
-                subprocess.run(['cmd','/c','rmdir','/s','/q',path],
-                               capture_output=True, timeout=30)
-            except Exception: pass
-            if not os.path.exists(path):
-                _log(f'  ✓ Removed {{tag}} (cmd)', 'OK'); return True
-        if _attempt < 3:
-            _dlog(f'rmdir attempt {{_attempt+1}} failed — retrying in 600ms…')
-            _rt.sleep(0.6)
-    _log(f'  ~ Could not fully remove {{tag}} — delete manually', 'WARN')
-    return False
 
 def _do_uninstall():
     do_bk  = v_backup.get()
@@ -1255,8 +1480,29 @@ def _do_uninstall():
     else:
         _log('  ~ Build tools removal skipped', 'DIM')
 
-    _log(f'\\n[ {{n[0]}} / {{steps}} ]  Removing installation folders', 'HEAD')
-    _prog(70, 'Deleting folders…')
+    _log(f'\\n[ {{n[0]}} / {{steps}} ]  Cleaning TEMP files', 'HEAD'); n[0] += 1
+    _prog(65, 'Cleaning TEMP…')
+    _sprog(0, 'scanning…')
+    try:
+        import glob as _rgl
+        _tmp = _TEMP
+        _tmp_patterns = [
+            'v0rtex_fresh_install*.py', 'v0rtex_trampoline*.py',
+            'v0rtex_uninstall_trampoline*.py', 'v0rtex_reinstall_trampoline*.py',
+            'vs_buildtools_setup*.exe', 'get-pip*.py',
+            '*_v0rtex_update.py', '*_v0rtex_adapter.py', '_v0rtex_req_tmp.txt',
+        ]
+        _tmp_removed = 0
+        for _tp in _tmp_patterns:
+            for _tf in _rgl.glob(os.path.join(_tmp, _tp)):
+                try: os.remove(_tf); _tmp_removed += 1
+                except Exception: pass
+        _log(f'  {{\"✓\" if _tmp_removed else \"·\"}} TEMP: {{_tmp_removed}} V0RTEX file(s) removed', 'OK' if _tmp_removed else 'DIM')
+    except Exception as _te: _log(f'  ~ TEMP cleanup: {{_te}}', 'WARN')
+    _sprog(100, '')
+
+    _log(f'\\n[ {{n[0]}} / {{steps}} ]  Removing installation folders', 'HEAD'); n[0] += 1
+    _prog(80, 'Deleting folders…')
     _sprog(0, 'removing app folder…')
     _rmdir(INSTALL_DIR, 'app folder')
     _sprog(50, 'removing media folder…')
@@ -1274,10 +1520,187 @@ def _do_uninstall():
     _dlog('Uninstall worker done')
     _set_done(True, close_after=4000)
 
+def _ts(): return _dt.datetime.now().strftime('%H:%M:%S.%f')
+def _write_log(line):
+    try:
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        with open(_LOG_FILE, 'a', encoding='utf-8') as _f: _f.write(line + '\\n')
+    except Exception: pass
+
+root = tk.Tk()
+
+if sys.platform == "win32":
+    try:
+        import ctypes as _ctypes_fc; _ctypes_fc.windll.kernel32.FreeConsole(); del _ctypes_fc
+    except Exception: pass
+root.title('V0RTEX — Uninstall')
+root.configure(bg=C['bg'])
+root.resizable(False, False)
+W, H = 720, 540
+sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+root.geometry(f'{{W}}x{{H}}+{{(sw-W)//2}}+{{max((sh-H)//3, 20)}}')
+root.protocol('WM_DELETE_WINDOW', lambda: sys.exit(0))
+
+sty = ttk.Style(); sty.theme_use('default')
+sty.configure('U.Horizontal.TProgressbar',
+    troughcolor=C['card'], background=C['accent'],
+    darkcolor=C['accent'], lightcolor=C['accent'], thickness=6)
+sty.configure('U.Green.Horizontal.TProgressbar',
+    troughcolor=C['card'], background=C['green'],
+    darkcolor=C['green'], lightcolor=C['green'], thickness=3)
+
+spinner_var   = tk.StringVar(value='')
+status_var    = tk.StringVar(value='Ready')
+pct_var       = tk.StringVar(value='')
+heartbeat_var = tk.StringVar(value='')
+activity_var  = tk.StringVar(value='')
+elapsed_var   = tk.StringVar(value='')
+step_var      = tk.StringVar(value='')
+step_pct      = tk.StringVar(value='')
+bar_w         = [None]
+sbar_w        = [None]
+btn_start     = [None]
+_anim_active  = [False]
+_anim_start_t = [0.0]
+_last_log_t   = [0.0]
+_last_log_msg = ['']
+_start_time   = [0.0]
+_hb_lbl       = [None]
+v_backup      = tk.BooleanVar(value=True)
+v_packages    = tk.BooleanVar(value=True)
+v_buildtools  = tk.BooleanVar(value=False)
+
+import time as _anim_time, math as _anim_math
+
+_SPINNER_FRAMES = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏']
+_spinner_idx = [0]
+
+def _anim_tick():
+    if not _anim_active[0]: return
+    _spinner_idx[0] = (_spinner_idx[0] + 1) % len(_SPINNER_FRAMES)
+    spinner_var.set(_SPINNER_FRAMES[_spinner_idx[0]])
+    elapsed = _anim_time.time() - _anim_start_t[0]
+    elapsed_var.set(f'{{elapsed:.0f}}s')
+    since = _anim_time.time() - _last_log_t[0]
+    if since > 3 and _last_log_t[0] > 0:
+        beats = ['●','○']
+        heartbeat_var.set(beats[int(_anim_time.time()*2) % 2] + ' working')
+    if _last_log_msg[0]:
+        activity_var.set(f'last: {{_last_log_msg[0]}}')
+    root.after(120, _anim_tick)
+
+def _anim_start():
+    _anim_active[0] = True
+    _anim_start_t[0] = _anim_time.time()
+    _last_log_t[0] = _anim_time.time()
+    root.after(120, _anim_tick)
+
+def _anim_stop():
+    _anim_active[0] = False
+    spinner_var.set('✓')
+
+def _log(msg, tag='NORM'):
+    if _anim_active[0] and msg.strip():
+        _last_log_t[0] = _anim_time.time()
+        _last_log_msg[0] = msg.strip()[:60]
+    try:
+        w = log_w[0]
+        if w:
+            ts = _ts()
+            w.config(state='normal')
+            for tg, (fg, bg) in TAG.items():
+                pass
+            w.insert('end', '[%s]  %s' % (ts, msg) + chr(10), tag)
+            w.see('end'); w.config(state='disabled')
+    except Exception: pass
+    _write_log(f'[{{_ts()}}] {{msg}}')
+
+def _dlog(msg):
+    try:
+        w = dbg_w[0]
+        if w:
+            w.config(state='normal')
+            w.insert('end', '[%s] %s' % (_ts(), msg) + chr(10), 'DIM')
+            w.see('end'); w.config(state='disabled')
+    except Exception: pass
+    _write_log(f'[DBG] {{msg}}')
+
+def _prog(pct, label=''):
+    try:
+        b = bar_w[0]
+        if b: b.config(value=pct)
+        if label: status_var.set(label)
+        pct_var.set(f'{{pct}}%')
+        root.update_idletasks()
+    except Exception: pass
+
+def _sprog(pct, label=''):
+    try:
+        b = sbar_w[0]
+        if b: b.config(value=pct)
+        if label: step_var.set(label)
+        step_pct.set(f'{{pct}}%' if pct else '')
+        root.update_idletasks()
+    except Exception: pass
+
+def _set_done(ok, close_after=0):
+    _anim_stop()
+    root.after(0, lambda: btn_start[0].config(
+        state='normal', text='  ✓ Done  ' if ok else '  ✗ Failed  '))
+    if close_after:
+        root.after(close_after, root.destroy)
+
+def _rmdir(path, label=''):
+    try:
+        import shutil as _sh
+        if os.path.isdir(path):
+            _sh.rmtree(path, ignore_errors=True)
+            if os.path.isdir(path):
+                subprocess.run(['cmd','/c','rmdir','/s','/q',path],
+                               capture_output=True, timeout=30)
+            _log(f'  ✓ {{label or path}} removed', 'OK')
+        else:
+            _log(f'  ~ {{label or path}} not found', 'DIM')
+    except Exception as e:
+        _log(f'  ✗ {{label}}: {{e}}', 'ERR')
+
+def _make_log_panel(title, dots=True):
+    _ref = [None]
+    panel = tk.Frame(logs_pane, bg=C['panel'], bd=0, highlightthickness=1,
+                     highlightbackground=C['border'])
+    hdr = tk.Frame(panel, bg=C['panel'], pady=5, padx=12); hdr.pack(fill='x')
+    if dots:
+        for col, sym in [('#f87171','●'),('#fbbf24','●'),('#22d3a0','●')]:
+            tk.Label(hdr, text=sym, font=('Consolas',9), bg=C['panel'], fg=col).pack(side='left', padx=1)
+    tk.Label(hdr, text=f'   {{title}}', font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left')
+    def _cp():
+        w = _ref[0]
+        if not w: return
+        try: panel.clipboard_clear(); panel.clipboard_append(w.get('1.0','end').strip())
+        except Exception: pass
+    tk.Button(hdr, text='⎘ copy', font=('Consolas',7), bg=C['border'], fg=C['subtext'],
+              relief='flat', bd=0, padx=6, pady=2, cursor='hand2',
+              activebackground=C['muted'], command=_cp).pack(side='right')
+    tk.Frame(panel, bg=C['border'], height=1).pack(fill='x')
+    inner = tk.Frame(panel, bg='#07070f'); inner.pack(fill='both', expand=True)
+    sc = tk.Scrollbar(inner, bg=C['card'], width=7, troughcolor='#07070f', relief='flat')
+    sc.pack(side='right', fill='y')
+    txt = tk.Text(inner, bg='#07070f', fg=C['text'], font=('Consolas',8), relief='flat', bd=0,
+                  padx=10, pady=8, wrap='none', cursor='arrow', yscrollcommand=sc.set, state='disabled')
+    sc.config(command=txt.yview); txt.pack(fill='both', expand=True)
+    for tg, (fg, bg_) in TAG.items():
+        kw = dict(foreground=fg)
+        if bg_: kw['background'] = bg_
+        txt.tag_configure(tg, **kw)
+    _ref[0] = txt
+    return panel, txt
+
+log_w = [None]; dbg_w = [None]
+
 topbar = tk.Frame(root, bg=C['panel'], height=38); topbar.pack(fill='x'); topbar.pack_propagate(False)
 tk.Label(topbar, text='⬡', font=('Consolas',16,'bold'), bg=C['panel'], fg=C['accent']).pack(side='left', padx=(14,4), pady=6)
 tk.Label(topbar, text='V0RTEX', font=('Consolas',12,'bold'), bg=C['panel'], fg=C['text']).pack(side='left')
-tk.Label(topbar, text=_VX_VER, font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
+tk.Label(topbar, text='{_VX_VER}', font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
 tk.Label(topbar, text='UNINSTALL', font=('Consolas',8,'bold'), bg=C['panel'], fg=C['accent']).pack(side='right', padx=14)
 tk.Frame(root, bg=C['accent'], height=2).pack(fill='x')
 
@@ -1305,6 +1728,25 @@ for _var, _txt in [
 tk.Frame(root, bg=C['border'], height=1).pack(fill='x', side='bottom')
 bot = tk.Frame(root, bg=C['panel'], padx=16, pady=6); bot.pack(fill='x', side='bottom')
 
+def _start():
+    b = btn_start[0]
+    try:
+        threading.Thread(target=_do_uninstall, daemon=True).start()
+    except Exception as _se:
+        tmb.showerror('Uninstall', 'Could not start uninstall thread:\\n' + str(_se), parent=root)
+        if b: b.config(state='normal', text='  \u26d4  UNINSTALL  ')
+
+b = tk.Button(bot, text='  \u26d4  UNINSTALL  ', font=('Consolas',10,'bold'),
+              bg=C['accent'], fg='#0d0d14', relief='flat', bd=0,
+              activebackground='#dc2626', cursor='hand2', command=_start, padx=20, pady=8)
+b.pack(side='left', padx=(0,10)); btn_start[0] = b
+tk.Button(bot, text='  \u2715  Exit  ', font=('Consolas',9),
+          bg=C['border'], fg=C['muted'], relief='flat', bd=0,
+          padx=12, pady=8, cursor='hand2', activebackground=C['muted'],
+          command=lambda: sys.exit(0)).pack(side='right', padx=(0,6))
+tk.Label(bot, text=f'Python {{sys.version.split()[0]}}  \u00b7  {{platform.system()}}',
+         font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='right')
+
 prog_frame = tk.Frame(root, bg=C['bg'], padx=16, pady=2); prog_frame.pack(fill='x')
 pr = tk.Frame(prog_frame, bg=C['bg']); pr.pack(fill='x')
 tk.Label(pr, textvariable=spinner_var, font=('Consolas',10,'bold'), bg=C['bg'], fg=C['accent2'], width=2).pack(side='left', padx=(0,4))
@@ -1328,37 +1770,8 @@ tk.Label(hb_row, textvariable=elapsed_var, font=('Consolas',7), bg=C['bg'], fg=C
 logs_pane = tk.PanedWindow(root, orient='horizontal', bg=C['border'], sashwidth=4, sashrelief='flat', bd=0)
 logs_pane.pack(fill='both', expand=True, padx=16, pady=(5,0))
 
-def _make_log_panel(title, dots=True):
-    panel = tk.Frame(logs_pane, bg=C['panel'], bd=0, highlightthickness=1, highlightbackground=C['border'])
-    hdr = tk.Frame(panel, bg=C['panel'], pady=5, padx=12); hdr.pack(fill='x')
-    if dots:
-        for col, sym in [('#f87171','●'),('#fbbf24','●'),('#22d3a0','●')]:
-            tk.Label(hdr, text=sym, font=('Consolas',9), bg=C['panel'], fg=col).pack(side='left', padx=1)
-    tk.Label(hdr, text=f'   {{title}}', font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left')
-    _tr = [None]
-    def _cp(t=_tr):
-        w = t[0]
-        if not w: return
-        try: panel.clipboard_clear(); panel.clipboard_append(w.get('1.0','end').strip())
-        except Exception: pass
-    tk.Button(hdr, text='⎘ copy', font=('Consolas',7), bg=C['border'], fg=C['subtext'],
-              relief='flat', bd=0, padx=6, pady=2, cursor='hand2',
-              activebackground=C['muted'], command=_cp).pack(side='right')
-    tk.Frame(panel, bg=C['border'], height=1).pack(fill='x')
-    inner = tk.Frame(panel, bg='#07070f'); inner.pack(fill='both', expand=True)
-    sc = tk.Scrollbar(inner, bg=C['card'], width=7, troughcolor='#07070f', relief='flat'); sc.pack(side='right', fill='y')
-    txt = tk.Text(inner, bg='#07070f', fg=C['text'], font=('Consolas',8), relief='flat', bd=0,
-                  padx=10, pady=8, wrap='none', cursor='arrow', yscrollcommand=sc.set, state='disabled')
-    sc.config(command=txt.yview); txt.pack(fill='both', expand=True)
-    for tag, (fg, _bg) in TAG.items():
-        kw = dict(foreground=fg)
-        if _bg: kw['background'] = _bg
-        txt.tag_configure(tag, **kw)
-    _tr[0] = txt
-    return panel, txt
-
-lp, ltxt = _make_log_panel('uninstall log', dots=True); logs_pane.add(lp, stretch='always', minsize=180); log_w[0] = ltxt
-dp, dtxt = _make_log_panel('debug log', dots=False);    logs_pane.add(dp, stretch='always', minsize=180); dbg_w[0] = dtxt
+lp, ltxt = _make_log_panel('uninstall log', dots=True);  logs_pane.add(lp, stretch='always', minsize=180); log_w[0] = ltxt
+dp, dtxt = _make_log_panel('debug log',     dots=False); logs_pane.add(dp, stretch='always', minsize=180); dbg_w[0] = dtxt
 
 def _equal_sash_u(event=None):
     try:
@@ -1367,30 +1780,6 @@ def _equal_sash_u(event=None):
     except Exception: pass
 logs_pane.bind('<Configure>', _equal_sash_u)
 for _d in (50, 150, 350, 700, 1400, 2500): root.after(_d, _equal_sash_u)
-
-def _start():
-    b = btn_start[0]
-    if b: b.config(state='disabled', text='  Working…  ')
-    try:
-        _anim_start()
-        threading.Thread(target=_do_uninstall, daemon=True).start()
-    except Exception as _se:
-        tmb.showerror('Uninstall', 'Could not start thread:\\n' + str(_se), parent=root)
-        if b: b.config(state='normal', text='  ⛔  UNINSTALL  ')
-
-b = tk.Button(bot, text='  ⛔  UNINSTALL  ', font=('Consolas',10,'bold'),
-              bg=C['accent'], fg=C['bg'], relief='flat', bd=0,
-              activebackground='#dc2626', cursor='hand2', command=_start, padx=20, pady=8)
-b.pack(side='left', padx=(0,10)); btn_start[0] = b
-tk.Button(bot, text='  ✕  Exit  ', font=('Consolas',9),
-          bg=C['border'], fg=C['muted'], relief='flat', bd=0,
-          padx=12, pady=8, cursor='hand2', activebackground=C['muted'],
-          command=lambda: sys.exit(0)).pack(side='right', padx=(0,6))
-tk.Label(bot, text=f'Python {{sys.version.split()[0]}}  ·  {{platform.system()}}',
-         font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='right')
-
-_dlog(f'Uninstall UI ready — INSTALL_DIR={{INSTALL_DIR}}')
-_dlog(f'BACKUP_DIR={{BACKUP_DIR}}')
 
 
 def _uninstall_crash_handler(exc_type, exc_value, exc_tb):
@@ -1438,29 +1827,477 @@ def _uninstall_crash_handler(exc_type, exc_value, exc_tb):
 sys.excepthook = _uninstall_crash_handler
 
 def _tk_error_handler(exc, val, tb):
+    _dlog('TK ERROR: ' + (exc.__name__ if hasattr(exc,'__name__') else str(exc)) + ': ' + str(val))
     _uninstall_crash_handler(exc, val, tb)
 try:
     root.report_callback_exception = _tk_error_handler
 except Exception:
     pass
 
+
+
+
 root.mainloop()
 '''
 
 
+def _build_censor_script() -> str:
+    return r"""
+import os, sys, re, json, threading, time, shutil
+import tkinter as tk
+import tkinter.ttk as ttk
+import tkinter.filedialog as tfd
+
+VERSION = "2.0.0"
+
+SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
+UTILS_DIR   = SCRIPT_DIR
+TEMP_LOG_STORAGE = os.path.join(UTILS_DIR, "Temp_Log_Storage")
+CENSOR_CONFIG_PATH = os.path.join(UTILS_DIR, "censor_config.json")
+DEBUG_DIR   = os.path.join(UTILS_DIR, "debug_log")
+
+TLS_SUBS = ("session_log", "silent_log", "live_traffic",
+            "conn_quality", "tor", "proxy", "noise_gen")
+
+RULE_LABELS = {
+    "ip_addresses":   "IP Addresses (IPv4)",
+    "ipv6_addresses": "IP Addresses (IPv6)",
+    "usernames":      "Usernames (from paths)",
+    "paths":          "File Paths",
+    "emails":         "Email Addresses",
+    "mac_addresses":  "MAC Addresses",
+    "scan_filenames": "Scanned Filenames",
+    "hashes":         "Hashes (MD5/SHA)",
+    "pids":           "Process IDs",
+    "ports":          "Port Numbers",
+    "domains":        "Domain Names",
+    "urls":           "URLs",
+    "hostnames":      "Hostnames",
+    "v0rtex_session": "Session Numbers",
+}
+
+PATTERNS = {
+    "ip_addresses":   r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
+    "ipv6_addresses": r"\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b",
+    "usernames":      r"(?:Users|home)[/\\]([A-Za-z0-9_.-]+)",
+    "emails":         r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b",
+    "hostnames":      r"(?i)(?:hostname|host|computer)\s*[:=\s]+([A-Za-z0-9_\-\.]+)",
+    "mac_addresses":  r"\b(?:[0-9A-Fa-f]{2}[:\-]){5}[0-9A-Fa-f]{2}\b",
+    "paths":          r"[A-Za-z]:\\(?:[^\s\\/:*?\"<>|\r\n]+\\)+[^\s\\/:*?\"<>|\r\n]*",
+    "hashes":         r"\b[0-9a-fA-F]{32,64}\b",
+    "pids":           r"(?i)\bPID[:\s]+(\d{3,6})\b",
+    "ports":          r"\b(?:port|:\s*)(\d{2,5})\b",
+    "domains":        r"\b(?:[a-z0-9\-]+\.){2,}[a-z]{2,6}\b",
+    "urls":           r"https?://[^\s\r\n\"'<>]+",
+    "scan_filenames": r"(?:Scan(?:ning)?|Analyzed?)\s+([^\s\r\n]{4,})",
+    "v0rtex_session": r"Session\s*#\s*\d+",
+}
+
+C = dict(
+    bg="#07070f", panel="#0d0d1c", card="#12121f", border="#1a1a30",
+    accent="#cba6f7", accent2="#f5c2e7", green="#a6e3a1", red="#f38ba8",
+    yellow="#f9e2af", blue="#89b4fa", teal="#94e2d5",
+    text="#cdd6f4", subtext="#a6adc8", muted="#6c7086", dim="#45475a",
+)
+
+
+def _load_config():
+    defaults = {k: (k in ("ip_addresses","ipv6_addresses","usernames",
+                           "emails","hostnames","mac_addresses","urls"))
+                for k in PATTERNS}
+    try:
+        if os.path.isfile(CENSOR_CONFIG_PATH):
+            with open(CENSOR_CONFIG_PATH, encoding="utf-8") as f:
+                data = json.load(f)
+            defaults.update({k: bool(v) for k, v in data.get("rules", {}).items()})
+    except Exception:
+        pass
+    return defaults
+
+
+def _save_config(rules):
+    try:
+        with open(CENSOR_CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump({"rules": rules,
+                       "last_updated": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                       "version": "1.0"}, f, indent=2)
+    except Exception:
+        pass
+
+
+def _censor_text(text, rules):
+    stats = {}
+    for key, pat in PATTERNS.items():
+        if not rules.get(key, False):
+            continue
+        count = [0]
+        def _rep(m, c=count):
+            c[0] += 1
+            return "\u2588" * len(m.group(0))
+        text = re.sub(pat, _rep, text)
+        if count[0]:
+            stats[key] = count[0]
+    return text, stats
+
+
+def _flush_temp(rules, log_cb=None):
+    import shutil as _sh
+    total = 0
+    for sub in TLS_SUBS:
+        src_dir = os.path.join(TEMP_LOG_STORAGE, sub)
+        if not os.path.isdir(src_dir):
+            continue
+        unc_dir  = os.path.join(UTILS_DIR, "UNCENSORED", sub)
+        if sub in ("session_log", "silent_log"):
+            final_dir = os.path.join(DEBUG_DIR, sub)
+            unc2_dir  = os.path.join(DEBUG_DIR, "UNCENSORED", sub)
+        else:
+            app_dir   = os.path.join(os.path.dirname(UTILS_DIR), "app_usage_log")
+            final_dir = os.path.join(app_dir, sub)
+            unc2_dir  = os.path.join(app_dir, "UNCENSORED", sub)
+        for d in (unc_dir, unc2_dir, final_dir):
+            os.makedirs(d, exist_ok=True)
+        for fname in os.listdir(src_dir):
+            fpath = os.path.join(src_dir, fname)
+            if not os.path.isfile(fpath):
+                continue
+            try:
+                raw = open(fpath, encoding="utf-8", errors="replace").read()
+            except Exception:
+                continue
+            try:
+                _sh.copy2(fpath, os.path.join(unc_dir, fname))
+                _sh.copy2(fpath, os.path.join(unc2_dir, fname))
+            except Exception:
+                pass
+            censored, stats = _censor_text(raw, rules)
+            replaced = sum(stats.values())
+            total += replaced
+            try:
+                with open(os.path.join(final_dir, fname), "w", encoding="utf-8") as out:
+                    out.write(censored)
+                os.remove(fpath)
+                if log_cb:
+                    log_cb(f"  \u2713  {sub}/{fname}  ({replaced} replacements)", "OK" if replaced else "DIM")
+            except Exception as e:
+                if log_cb:
+                    log_cb(f"  \u2717  {fname}: {e}", "ERR")
+    return total
+
+
+def _silent_flush_and_exit():
+    rules = _load_config()
+    _flush_temp(rules)
+    try:
+        os.remove(os.path.join(UTILS_DIR, "_v0rtex_running.lock"))
+    except Exception:
+        pass
+    os._exit(0)
+
+
+def _check_orphan():
+    lock = os.path.join(UTILS_DIR, "_v0rtex_running.lock")
+    if not os.path.isfile(lock):
+        return
+    try:
+        import psutil
+        with open(lock, encoding="utf-8") as f:
+            pid = int(f.read().strip())
+        if psutil.pid_exists(pid):
+            return
+    except Exception:
+        pass
+    _silent_flush_and_exit()
+
+
+_check_orphan()
+
+if "--silent" in sys.argv:
+    _silent_flush_and_exit()
+
+
+def _build_ui():
+    root = tk.Tk()
+    root.title(f"V0RTEX Log Censor  v{VERSION}")
+    root.configure(bg=C["bg"])
+    root.resizable(True, True)
+    W, H = 860, 640
+    sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+    root.geometry(f"{W}x{H}+{(sw-W)//2}+{max((sh-H)//3,20)}")
+
+    tk.Frame(root, bg=C["accent"], height=3).pack(fill="x")
+    hdr = tk.Frame(root, bg=C["panel"], padx=16, pady=10)
+    hdr.pack(fill="x")
+    tk.Label(hdr, text="V0RTEX LOG CENSOR", font=("Consolas", 14, "bold"),
+             bg=C["panel"], fg=C["accent"]).pack(side="left")
+    tk.Label(hdr, text=f"v{VERSION}", font=("Consolas", 8),
+             bg=C["panel"], fg=C["muted"]).pack(side="left", padx=8, pady=(5,0))
+    tk.Label(hdr, text="reads censor_config.json  \u00b7  saves rule selection  \u00b7  flushes Temp_Log_Storage",
+             font=("Consolas", 8), bg=C["panel"], fg=C["subtext"]).pack(side="left", padx=12)
+    tk.Frame(root, bg=C["border"], height=1).pack(fill="x")
+
+    body = tk.Frame(root, bg=C["bg"])
+    body.pack(fill="both", expand=True, padx=10, pady=8)
+
+    left = tk.Frame(body, bg=C["bg"], width=300)
+    left.pack(side="left", fill="y", padx=(0,8))
+    left.pack_propagate(False)
+
+    tk.Label(left, text="CENSOR RULES", font=("Consolas", 9, "bold"),
+             bg=C["bg"], fg=C["blue"]).pack(anchor="w", pady=(0,4))
+    tk.Label(left, text="Selection saved to censor_config.json",
+             font=("Consolas", 7), bg=C["bg"], fg=C["muted"]).pack(anchor="w")
+
+    current_rules = _load_config()
+    rule_vars = {}
+    rc_frame = tk.Frame(left, bg=C["card"], highlightthickness=1,
+                        highlightbackground=C["border"])
+    rc_frame.pack(fill="x", pady=6)
+    for key, label in RULE_LABELS.items():
+        var = tk.BooleanVar(value=current_rules.get(key, False))
+        rule_vars[key] = var
+        row = tk.Frame(rc_frame, bg=C["card"])
+        row.pack(fill="x", padx=6, pady=1)
+        tk.Checkbutton(row, variable=var, text=label,
+                       font=("Consolas", 8), bg=C["card"], fg=C["text"],
+                       selectcolor=C["card"], activebackground=C["card"],
+                       activeforeground=C["accent"], anchor="w",
+                       relief="flat", bd=0).pack(side="left")
+
+    def _save_rules():
+        rules = {k: v.get() for k,v in rule_vars.items()}
+        _save_config(rules)
+        _log("  \u2713 Rules saved to censor_config.json", "OK")
+
+    sel_row = tk.Frame(left, bg=C["bg"])
+    sel_row.pack(fill="x", pady=2)
+    for txt, cmd in (
+        ("All",     lambda: [v.set(True)  for v in rule_vars.values()]),
+        ("None",    lambda: [v.set(False) for v in rule_vars.values()]),
+        ("Save",    _save_rules),
+    ):
+        tk.Button(sel_row, text=txt, command=cmd, font=("Consolas", 8),
+                  bg=C["card"], fg=C["subtext"], relief="flat",
+                  padx=8, pady=2, cursor="hand2", bd=0).pack(side="left", padx=2)
+
+    tk.Frame(left, bg=C["border"], height=1).pack(fill="x", pady=6)
+    tk.Label(left, text="FILES (optional override)", font=("Consolas", 9, "bold"),
+             bg=C["bg"], fg=C["blue"]).pack(anchor="w", pady=(0,3))
+    tk.Label(left, text="Leave empty to flush Temp_Log_Storage automatically",
+             font=("Consolas", 7), bg=C["bg"], fg=C["muted"]).pack(anchor="w")
+
+    fl = tk.Frame(left, bg=C["card"], highlightthickness=1,
+                  highlightbackground=C["border"])
+    fl.pack(fill="x", pady=4)
+    fl_sb = tk.Scrollbar(fl, orient="vertical", bg=C["border"], width=6, relief="flat")
+    file_lb = tk.Listbox(fl, bg=C["card"], fg=C["text"],
+                         font=("Consolas", 8), relief="flat", bd=0,
+                         selectbackground=C["accent"], selectforeground=C["bg"],
+                         height=5, activestyle="none", yscrollcommand=fl_sb.set)
+    fl_sb.config(command=file_lb.yview)
+    fl_sb.pack(side="right", fill="y")
+    file_lb.pack(fill="x", expand=True)
+
+    br = tk.Frame(left, bg=C["bg"])
+    br.pack(fill="x", pady=2)
+
+    def _add_files():
+        paths = tfd.askopenfilenames(
+            title="Select log files",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
+        for p in paths:
+            if p not in file_lb.get(0, "end"):
+                file_lb.insert("end", p)
+
+    def _add_dlog():
+        added = 0
+        for walk_root, dirs, files in os.walk(DEBUG_DIR):
+            dirs[:] = [d for d in sorted(dirs) if d != "UNCENSORED"]
+            for fn in sorted(files):
+                if fn.endswith(".txt"):
+                    fp = os.path.join(walk_root, fn)
+                    if fp not in file_lb.get(0, "end"):
+                        file_lb.insert("end", fp)
+                        added += 1
+        _log(f"  + {added} file(s) from debug_log", "DIM")
+
+    def _add_app_log():
+        app_dir = os.path.join(os.path.dirname(UTILS_DIR), "app_usage_log") if os.path.isdir(
+            os.path.join(os.path.dirname(UTILS_DIR), "app_usage_log")) else UTILS_DIR
+        added = 0
+        for walk_root, dirs, files in os.walk(app_dir):
+            dirs[:] = [d for d in sorted(dirs) if d != "UNCENSORED"]
+            for fn in sorted(files):
+                if fn.endswith(".txt"):
+                    fp = os.path.join(walk_root, fn)
+                    if fp not in file_lb.get(0, "end"):
+                        file_lb.insert("end", fp)
+                        added += 1
+        _log(f"  + {added} file(s) from app_usage_log", "DIM")
+
+    for txt, cmd in (
+        ("+ Files",      _add_files),
+        ("debug_log",    _add_dlog),
+        ("app_usage_log",_add_app_log),
+        ("Remove",       lambda: [file_lb.delete(i) for i in reversed(list(file_lb.curselection()))]),
+    ):
+        tk.Button(br, text=txt, command=cmd, font=("Consolas", 8),
+                  bg=C["card"], fg=C["subtext"], relief="flat",
+                  padx=5, pady=2, cursor="hand2", bd=0).pack(side="left", padx=1)
+
+    right = tk.Frame(body, bg=C["bg"])
+    right.pack(side="left", fill="both", expand=True)
+
+    tk.Label(right, text="OUTPUT", font=("Consolas", 9, "bold"),
+             bg=C["bg"], fg=C["blue"]).pack(anchor="w", pady=(0,3))
+
+    out_f = tk.Frame(right, bg="#050510", highlightthickness=1,
+                     highlightbackground=C["border"])
+    out_f.pack(fill="both", expand=True)
+    out_sb = tk.Scrollbar(out_f, orient="vertical", bg=C["border"], width=6, relief="flat")
+    out_tx = tk.Text(out_f, bg="#050510", fg=C["text"], font=("Consolas", 8),
+                     relief="flat", bd=0, padx=8, pady=6, wrap="word", state="disabled",
+                     yscrollcommand=out_sb.set)
+    out_sb.config(command=out_tx.yview)
+    out_sb.pack(side="right", fill="y")
+    out_tx.pack(fill="both", expand=True)
+    for tag, fg in (("HEAD",C["accent"]),("OK",C["green"]),("ERR",C["red"]),
+                    ("WARN",C["yellow"]),("DIM",C["muted"]),("SUB",C["subtext"])):
+        out_tx.tag_config(tag, foreground=fg)
+
+    def _log(msg, tag="SUB"):
+        def _d():
+            out_tx.config(state="normal")
+            out_tx.insert("end", msg+"\n", tag)
+            out_tx.see("end")
+            out_tx.config(state="disabled")
+        root.after(0, _d)
+
+    tk.Frame(right, bg=C["border"], height=1).pack(fill="x", pady=4)
+
+    bot = tk.Frame(right, bg=C["bg"])
+    bot.pack(fill="x")
+    status_sv = tk.StringVar(value="Ready")
+    tk.Label(bot, textvariable=status_sv, font=("Consolas", 8),
+             bg=C["bg"], fg=C["subtext"]).pack(side="left")
+    pbar_var = tk.IntVar(value=0)
+    sty = ttk.Style(); sty.theme_use("default")
+    sty.configure("C.Horizontal.TProgressbar",
+                  troughcolor=C["card"], background=C["accent"],
+                  lightcolor=C["accent"], darkcolor=C["accent"], thickness=5)
+    ttk.Progressbar(bot, variable=pbar_var, maximum=100, length=140,
+                    orient="horizontal", mode="determinate",
+                    style="C.Horizontal.TProgressbar").pack(side="right", padx=4)
+
+    tk.Frame(right, bg=C["border"], height=1).pack(fill="x", pady=(4,2))
+    run_row = tk.Frame(right, bg=C["bg"])
+    run_row.pack(fill="x", pady=2)
+
+    def _run():
+        rules = {k: v.get() for k, v in rule_vars.items()}
+        _save_config(rules)
+        files = list(file_lb.get(0, "end"))
+        run_btn.config(state="disabled")
+        pbar_var.set(0)
+        _log(f"\n{'='*56}", "HEAD")
+        _log(f"  V0RTEX LOG CENSOR  v{VERSION}", "HEAD")
+        _log(f"  Active rules: {', '.join(k for k,v in rules.items() if v)}", "DIM")
+        _log(f"{'='*56}", "HEAD")
+
+        def _worker():
+            total = 0
+            if not files:
+                _log("\n  Flushing Temp_Log_Storage...", "HEAD")
+                def _cb(msg, tag): _log(msg, tag)
+                t = _flush_temp(rules, log_cb=_cb)
+                total += t
+            else:
+                for i, fp in enumerate(files):
+                    root.after(0, lambda p=int((i/len(files))*90): pbar_var.set(p))
+                    root.after(0, lambda n=i+1, t2=len(files):
+                               status_sv.set(f"Processing {n}/{t2}"))
+                    try:
+                        raw = open(fp, encoding="utf-8", errors="replace").read()
+                        censored, stats = _censor_text(raw, rules)
+                        replaced = sum(stats.values())
+                        total += replaced
+                        unc = os.path.join(os.path.dirname(fp),
+                                           "UNCENSORED",
+                                           os.path.basename(fp))
+                        os.makedirs(os.path.dirname(unc), exist_ok=True)
+                        try:
+                            import shutil as _sh2
+                            _sh2.copy2(fp, unc)
+                        except Exception:
+                            pass
+                        with open(fp, "w", encoding="utf-8") as wf:
+                            wf.write(censored)
+                        _log(f"  \u2713  {os.path.basename(fp)}  ({replaced} replacements)",
+                             "OK" if replaced else "DIM")
+                    except Exception as e:
+                        _log(f"  \u2717  {os.path.basename(fp)}: {e}", "ERR")
+
+            root.after(0, lambda: (
+                pbar_var.set(100),
+                status_sv.set(f"Done \u2014 {total} total replacement(s)"),
+                run_btn.config(state="normal"),
+                _log(f"\n  \u2713 Done \u2014 {total} replacement(s)", "OK"),
+            ))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    run_btn = tk.Button(run_row, text="  \u26db  CENSOR & FLUSH  ",
+                        command=_run,
+                        font=("Consolas", 11, "bold"),
+                        bg=C["accent"], fg=C["bg"],
+                        relief="flat", padx=20, pady=8,
+                        cursor="hand2", bd=0,
+                        activebackground=C["accent2"])
+    run_btn.pack(side="left")
+
+    tk.Button(run_row, text="Clear",
+              command=lambda: (out_tx.config(state="normal"),
+                               out_tx.delete("1.0","end"),
+                               out_tx.config(state="disabled")),
+              font=("Consolas", 8), bg=C["card"], fg=C["muted"],
+              relief="flat", padx=10, pady=8, cursor="hand2", bd=0
+              ).pack(side="left", padx=6)
+
+    _log("V0RTEX Log Censor ready.", "HEAD")
+    _log("Rules are loaded from censor_config.json and saved on each run.", "DIM")
+    _log("Click CENSOR & FLUSH to process Temp_Log_Storage, or add specific files.", "DIM")
+
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    _build_ui()
+"""
+
+
 def _build_reinstall_script(install_dir, python_exe, trampoline_code):
+    _pyw = python_exe
+    if isinstance(_pyw, str) and _pyw.lower().endswith('pythonw.exe'):
+        _pyc = _pyw[:-len('pythonw.exe')] + 'python.exe'
+        if __import__('os').path.isfile(_pyc):
+            _pyw = _pyc
+    python_exe = _pyw
     T = repr(trampoline_code)
     return f'''
+import sys as _sys, os as _os, traceback as _tb
+def _crash_to_file(_et, _ev, _etb):
+    try:
+        _log = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '_crash_debug.txt')
+        with open(_log, 'a', encoding='utf-8') as _cf:
+            _cf.write('CRASH:' + chr(10))
+            _cf.write(''.join(_tb.format_exception(_et, _ev, _etb)))
+    except Exception:
+        pass
+_sys.excepthook = _crash_to_file
 import tkinter as tk, tkinter.ttk as ttk, tkinter.filedialog as tfd, tkinter.messagebox as tmb
 import os, sys, threading, subprocess, zipfile, tempfile, shutil, platform, traceback
 import datetime as _dt
 
-if sys.platform == "win32":
-    try:
-        import ctypes
-        ctypes.windll.kernel32.FreeConsole()
-    except Exception:
-        pass
 
 import subprocess as _subprocess_orig
 _NW_FLAGS = {{"creationflags": 0x08000000}} if __import__("sys").platform == "win32" else {{}}
@@ -1519,6 +2356,10 @@ def _write_log(line):
     except Exception: pass
 
 root = tk.Tk()
+if sys.platform == "win32":
+    try:
+        import ctypes as _ctypes_fc; _ctypes_fc.windll.kernel32.FreeConsole(); del _ctypes_fc
+    except Exception: pass
 root.title('V0RTEX — Reinstall')
 root.configure(bg=C['bg'])
 root.resizable(False, False)
@@ -1552,6 +2393,7 @@ spinner_var   = tk.StringVar(value="")
 elapsed_var   = tk.StringVar(value="")
 heartbeat_var = tk.StringVar(value="")
 activity_var  = tk.StringVar(value="")
+
 _anim_active  = [False]
 _anim_start_t = [0.0]
 _anim_frame   = [0]
@@ -1827,7 +2669,7 @@ def _do_reinstall():
 
     _log(f'\\n[ {{n[0]}} / {{steps}} ]  Preparing v0rtex.py', 'HEAD'); n[0] += 1
     _prog(50, 'Preparing v0rtex.py…')
-    v0tmp = os.path.join(_TEMP, 'v0rtex_fresh_install.py')
+    v0tmp = os.path.join(_TEMP, '_v0rtex_ri_staged.py')
     _downloaded = False
 
     if v_github_download.get():
@@ -1835,7 +2677,8 @@ def _do_reinstall():
             _dlog('GitHub download enabled — fetching latest…')
             _log('  → Downloading latest from GitHub…', 'INFO')
             import urllib.request as _ur
-            _req2 = _ur.Request('https://raw.githubusercontent.com/Vider06/V0rtex/main/v0rtex.py', headers={{'User-Agent': 'V0RTEX-Reinstall/1.0'}})
+            _ri_branch = 'Windows_Release' if sys.platform == 'win32' else ('MacOS_Release' if sys.platform == 'darwin' else 'Linux_release')
+            _req2 = _ur.Request(f'https://raw.githubusercontent.com/Vider06/V0rtex/{{_ri_branch}}/v0rtex.py', headers={{'User-Agent': 'V0RTEX-Reinstall/1.0'}})
             with _ur.urlopen(_req2, timeout=30) as _resp:
                 _remote = _resp.read().decode('utf-8', 'replace')
             if len(_remote) < 10000:
@@ -1853,7 +2696,7 @@ def _do_reinstall():
     if not _downloaded:
         try:
             import shutil as _shu_cp
-            _current = os.path.abspath(sys.argv[0])
+            _current = _v0rtex_src[0]
             _dlog(f'Copying current file: {{_current}} → {{v0tmp}}')
             _shu_cp.copy2(_current, v0tmp)
             _log(f'  ✓ Current v0rtex.py copied to TEMP', 'OK')
@@ -1863,8 +2706,29 @@ def _do_reinstall():
             _dlog(f'ABORT: {{e}}'); _set_done(False)
             root.after(0, lambda: btn_start[0].config(state='normal', text='  ♻  REINSTALL  '))
             return
+    _log(f'\\n[ {{n[0]}} / {{steps}} ]  Cleaning TEMP files', 'HEAD'); n[0] += 1
+    _prog(58, 'Cleaning TEMP…')
+    _sprog(0, 'scanning…')
+    try:
+        import glob as _rgl2
+        _tmp2 = _TEMP
+        _tmp_patterns2 = [
+            'v0rtex_fresh_install*.py', 'v0rtex_trampoline*.py',
+            'v0rtex_uninstall_trampoline*.py', 'v0rtex_reinstall_trampoline*.py',
+            'vs_buildtools_setup*.exe', 'get-pip*.py',
+            '*_v0rtex_update.py', '*_v0rtex_adapter.py', '_v0rtex_req_tmp.txt',
+        ]
+        _tmp_removed2 = 0
+        for _tp2 in _tmp_patterns2:
+            for _tf2 in _rgl2.glob(os.path.join(_tmp2, _tp2)):
+                try: os.remove(_tf2); _tmp_removed2 += 1
+                except Exception: pass
+        _log(f'  {{\"✓\" if _tmp_removed2 else \"·\"}} TEMP: {{_tmp_removed2}} V0RTEX file(s) removed', 'OK' if _tmp_removed2 else 'DIM')
+    except Exception as _te2: _log(f'  ~ TEMP cleanup: {{_te2}}', 'WARN')
+    _sprog(100, '')
+
     _log(f'\\n[ {{n[0]}} / {{steps}} ]  Removing old installation', 'HEAD'); n[0] += 1
-    _prog(65, 'Removing folders…')
+    _prog(72, 'Removing folders…')
     _sprog(0, 'removing app folder…')
     _rmdir(INSTALL_DIR, 'app folder')
     _sprog(50, 'removing media folder…')
@@ -1898,33 +2762,92 @@ def _do_reinstall():
         _sprog(100, '')
 
 
-    _log(f'\\n[ {{n[0]}} / {{steps}} ]  Launching fresh setup', 'HEAD'); n[0] += 1
-    _prog(88, 'Launching V0RTEX…')
-    _dlog(f'Launching: {{PYTHON_EXE}} {{v0tmp}}')
+    _log(f'\\n[ {{n[0]}} / {{steps}} ]  Installing fresh copy', 'HEAD'); n[0] += 1
+    _prog(82, 'Creating install directory…')
+    _fresh_ok = False
     try:
-        if sys.platform == 'win32':
-            subprocess.Popen(
-                ['cmd', '/c', 'start', '', PYTHON_EXE, v0tmp],
-                creationflags=0x08000000,
-                close_fds=True,
-            )
-        else:
-            subprocess.Popen([PYTHON_EXE, v0tmp], creationflags=0x08000000 if sys.platform=="win32" else 0)
-        _log('  ✓ V0RTEX setup wizard launched', 'OK')
-        _dlog('Launch OK')
-    except Exception as e:
-        _log(f'  ✗ Launch failed: {{e}}', 'ERR')
-        _log(f'  → Run manually: {{PYTHON_EXE}} "{{v0tmp}}"', 'WARN')
-        _dlog(f'Launch error: {{e}}')
+        os.makedirs(INSTALL_DIR, exist_ok=True)
+        _target_py = os.path.join(INSTALL_DIR, 'v0rtex.py')
+        import shutil as _shu_ri
+        _shu_ri.copy2(v0tmp, _target_py)
+        open(os.path.join(INSTALL_DIR, '_setup_complete'), 'w').close()
+        _dlog(f'Installed: {{_target_py}}')
+        _log('  ✓ v0rtex.py installed to new dir', 'OK')
+        _fresh_ok = True
+    except Exception as _ie:
+        _log(f'  ✗ Install failed: {{_ie}}', 'ERR')
+        _dlog(f'Install error: {{_ie}}')
 
-    import time as _wait_launch; _wait_launch.sleep(2.0)
     try:
-        if os.path.exists(v0tmp):
-            os.remove(v0tmp)
-            _dlog('Temp copy deleted')
-    except Exception as _rme:
-        _dlog(f'Could not delete temp copy: {{_rme}}')
+        if os.path.exists(v0tmp): os.remove(v0tmp)
+    except Exception: pass
 
+    _prog(90, 'Installing packages…')
+    if _fresh_ok:
+        _target_py = os.path.join(INSTALL_DIR, 'v0rtex.py')
+        _pkgs_ri = [
+            'requests>=2.31.0', 'pefile>=2023.2.7', 'matplotlib>=3.7.0',
+            'tkinterdnd2>=0.3.0', 'psutil>=5.9.0', 'fpdf2>=2.7.0',
+            'watchdog>=3.0.0', 'pystray>=0.19.0', 'Pillow>=10.0.0',
+            'cryptography>=41.0.0', 'reportlab>=4.0.0', 'chardet>=5.0.0',
+            'dnspython>=2.4.0', 'python-whois>=0.9.0', 'PyYAML>=6.0.0',
+            'olefile>=0.47', 'numpy>=1.24.0', 'yara-python-wheel',
+        ]
+        _nwf = {{'creationflags': 0x08000000}} if sys.platform == 'win32' else {{}}
+        _pip_flags = (['--break-system-packages'] if sys.platform != 'win32' else []) + [
+            '--trusted-host', 'pypi.org', '--trusted-host', 'pypi.python.org',
+            '--trusted-host', 'files.pythonhosted.org',
+        ]
+        _log(f'\\n  Installing {{len(_pkgs_ri)}} packages…', 'INFO')
+        try:
+            subprocess.run([PYTHON_EXE, '-m', 'pip', 'install', '--upgrade', 'pip',
+                            '--quiet', '--no-warn-script-location'] + _pip_flags,
+                           capture_output=True, timeout=60, **_nwf)
+        except Exception: pass
+        _ok_ri = 0
+        for _i_ri, _pkg_ri in enumerate(_pkgs_ri):
+            _pct_ri = 90 + int(_i_ri / len(_pkgs_ri) * 8)
+            _short_ri = _pkg_ri.split('>')[0].split('=')[0]
+            _prog(_pct_ri, f'Installing {{_short_ri}}…')
+            _sprog(int(_i_ri / len(_pkgs_ri) * 100), f'{{_short_ri}}…')
+            try:
+                _r_ri = subprocess.run(
+                    [PYTHON_EXE, '-m', 'pip', 'install', _pkg_ri,
+                     '--quiet', '--prefer-binary', '--no-cache-dir',
+                     '--progress-bar', 'off'] + _pip_flags,
+                    capture_output=True, text=True, timeout=120, **_nwf)
+                if _r_ri.returncode == 0:
+                    _ok_ri += 1
+                    _log(f'  \u2713 {{_short_ri}}', 'OK')
+                else:
+                    _err_ri = (_r_ri.stderr or _r_ri.stdout or '').strip().splitlines()
+                    _em_ri = next((l for l in _err_ri if l.strip() and 'WARNING' not in l), '')
+                    _log(f'  \u26a0 {{_short_ri}}: {{_em_ri[:60]}}', 'WARN')
+                    _dlog(f'pip {{_short_ri}} rc={{_r_ri.returncode}}')
+            except Exception as _pe_ri:
+                _log(f'  \u2717 {{_short_ri}}: {{_pe_ri}}', 'ERR')
+        _log(f'  {{_ok_ri}}/{{len(_pkgs_ri)}} packages installed',
+             'OK' if _ok_ri >= len(_pkgs_ri)-2 else 'WARN')
+        _sprog(100, '')
+        _prog(98, 'Launching V0RTEX…')
+        _pyw = PYTHON_EXE
+        if sys.platform == 'win32' and _pyw.lower().endswith('python.exe'):
+            _pyww = _pyw[:-len('python.exe')] + 'pythonw.exe'
+            if os.path.isfile(_pyww): _pyw = _pyww
+        _dlog(f'Launching: {{_pyw}} {{_target_py}}')
+        try:
+            if sys.platform == 'win32':
+                subprocess.Popen([_pyw, _target_py],
+                                 creationflags=0x00000008, close_fds=True)
+            else:
+                subprocess.Popen([_pyw, _target_py])
+            _log('  \u2713 V0RTEX launched', 'OK')
+            _dlog('Launch OK')
+        except Exception as e:
+            _log(f'  \u2717 Launch failed: {{e}}', 'ERR')
+            _dlog(f'Launch error: {{e}}')
+    else:
+        _log('  \u2192 Install failed \u2014 check debug log', 'WARN')
     _prog(100, 'Reinstall complete!')
     _log('', 'NORM')
     _log('━' * 38, 'HEAD')
@@ -1938,7 +2861,7 @@ def _do_reinstall():
 topbar = tk.Frame(root, bg=C['panel'], height=38); topbar.pack(fill='x'); topbar.pack_propagate(False)
 tk.Label(topbar, text='⬡', font=('Consolas',16,'bold'), bg=C['panel'], fg=C['accent']).pack(side='left', padx=(14,4), pady=6)
 tk.Label(topbar, text='V0RTEX', font=('Consolas',12,'bold'), bg=C['panel'], fg=C['text']).pack(side='left')
-tk.Label(topbar, text=_VX_VER, font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
+tk.Label(topbar, text='{_VX_VER}', font=('Consolas',8), bg=C['panel'], fg=C['muted']).pack(side='left', padx=(4,0), pady=(10,0))
 tk.Label(topbar, text='REINSTALL', font=('Consolas',8,'bold'), bg=C['panel'], fg=C['accent']).pack(side='right', padx=14)
 tk.Frame(root, bg=C['accent'], height=2).pack(fill='x')
 
@@ -1953,6 +2876,7 @@ card_opts = tk.Frame(root, bg=C['card'], padx=16, pady=7); card_opts.pack(fill='
 tk.Label(card_opts, text='OPTIONS', font=('Consolas',7,'bold'), bg=C['card'], fg=C['muted']).pack(anchor='w')
 tk.Frame(card_opts, bg=C['border'], height=1).pack(fill='x', pady=(3,6))
 _opts_widgets = []
+
 for _var, _txt in [
     (v_backup,          '  Backup ZIP  →  saved outside V0rtex_System/'),
     (v_packages,        '  pip uninstall requirements.txt packages'),
@@ -2117,38 +3041,39 @@ root.mainloop()
 def _launch_script(script_path):
     launched = False
     if sys.platform == "win32":
+        _py = sys.executable
+        if _py.lower().endswith("pythonw.exe"):
+            _py_c = _py[:-len("pythonw.exe")] + "python.exe"
+            if os.path.isfile(_py_c):
+                _py = _py_c
         try:
-            import ctypes
-            _py = sys.executable
-            if _py.lower().endswith("pythonw.exe"):
-                _py = _py[:-len("pythonw.exe")] + "python.exe"
-            if not os.path.isfile(_py):
-                _py = sys.executable
-            ret = ctypes.windll.shell32.ShellExecuteW(
-                None, "open", _py, f'"{script_path}"', None, 1)
-            if ret > 32:
-                launched = True
-            else:
-                raise RuntimeError(f"ShellExecuteW returned {ret}")
+            subprocess.Popen(
+                [_py, script_path],
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+                close_fds=True)
+            launched = True
         except Exception as _se:
-            print(f"[LAUNCH] ShellExecuteW failed ({_se}), fallback a Popen")
-
+            try:
+                subprocess.Popen(
+                    ["cmd", "/c", "start", "V0RTEX", _py, script_path],
+                    creationflags=0x08000000,
+                    close_fds=True)
+                launched = True
+            except Exception:
+                pass
     if not launched:
         try:
-            kw = {}
-            if sys.platform == "win32":
-                kw["creationflags"] = subprocess.CREATE_NEW_CONSOLE
+            kw = {"creationflags": subprocess.CREATE_NEW_CONSOLE} if sys.platform == "win32" else {}
             subprocess.Popen([sys.executable, script_path], **kw)
             launched = True
         except Exception as _e:
-            try: messagebox.showerror("Launch Error", f"Could not launch script:\n{_e}")
+            try: messagebox.showerror("Launch Error", f"Could not launch:\n{_e}")
             except Exception: print(f"[LAUNCH ERROR] {_e}")
             return
-
     def _quit_after():
-        import time as _tq, os as _oq
-        _tq.sleep(0.8)
-        try: _oq._exit(0)
+        import time as _tq
+        _tq.sleep(1.5)
+        try: os._exit(0)
         except Exception: pass
     import threading as _tls
     _tls.Thread(target=_quit_after, daemon=True).start()
@@ -2165,7 +3090,11 @@ def _build_updater_script(install_dir, python_exe):
         "MAIN_SCRIPT = os.path.join(INSTALL_DIR, 'v0rtex.py')\n"
         "UTILS_DIR   = os.path.join(os.path.dirname(INSTALL_DIR), 'v0rtex_utils')\n"
         "GITHUB_API  = 'https://api.github.com/repos/Vider06/V0rtex/releases/latest'\n"
-        "GITHUB_RAW  = 'https://raw.githubusercontent.com/Vider06/V0rtex/main/v0rtex.py'\n\n"
+        "# Branch-aware raw URL\n"
+        "import sys as _bsys\n"
+        "_BRANCH = 'Windows_Release' if _bsys.platform=='win32' else ('MacOS_Release' if _bsys.platform=='darwin' else 'Linux_release')\n"
+        "GITHUB_RAW  = f'https://raw.githubusercontent.com/Vider06/V0rtex/{_BRANCH}/v0rtex.py'\n"
+        "GITHUB_ADAPTER_URL = f'https://raw.githubusercontent.com/Vider06/V0rtex/{_BRANCH}/Adapters/v0rtex_adapter.py'\n\n"
         "BG='#0d0d14'; PNL='#11111b'; BRD='#313244'\n"
         "BLU='#89b4fa'; GRN='#a6e3a1'; RED='#f38ba8'; TXT='#cdd6f4'; DIM='#585b70'\n"
         "YEL='#f9e2af'\n\n"
@@ -2173,7 +3102,7 @@ def _build_updater_script(install_dir, python_exe):
         "root = tk.Tk()\n"
         "root.title('V0RTEX Standalone Updater')\n"
         "root.configure(bg=BG)\n"
-        "root.geometry('640x520')\n"
+        "root.geometry('820x540')\n"
         "root.resizable(True, True)\n"
         "tk.Frame(root, bg=BLU, height=3).pack(fill='x')\n"
         "hf = tk.Frame(root, bg=PNL, pady=8, padx=14); hf.pack(fill='x')\n"
@@ -2201,7 +3130,7 @@ def _build_updater_script(install_dir, python_exe):
         "            with open(MAIN_SCRIPT,'r',encoding='utf-8',errors='replace') as _f:\n"
         "                for line in _f:\n"
         "                    # skip obfuscated badge constants, find real title line\n"
-        "                    if ('v0.9' in line and 'by Vider' in line\n"
+        "                    if ('by Vider' in line\n"
         "                            and '_ADM_BADGE' not in line\n"
         "                            and '_T([' not in line\n"
         "                            and 'root.title' not in line\n"
@@ -2209,7 +3138,7 @@ def _build_updater_script(install_dir, python_exe):
         "                        v = line.strip().lstrip('#').strip()[:80]\n"
         "                        root.after(0, lambda vv=v: local_sv.set(f'Local: {vv}'))\n"
         "                        return\n"
-        "                    if 'root.title' in line and 'V0RTEX' in line and 'v0.9' in line:\n"
+        "                    if 'root.title' in line and 'V0RTEX' in line:\n"
         "                        import re as _re\n"
         "                        m = _re.search(r'V0RTEX[^\"]+', line)\n"
         "                        v = m.group(0)[:80] if m else line.strip()[:80]\n"
@@ -2235,7 +3164,13 @@ def _build_updater_script(install_dir, python_exe):
         "            notes=(data.get('body','') or '')[:300]\n"
         "            if notes: _log(f'Release notes: {notes}','DIM')\n"
         "            root.after(0, lambda: upd_btn.config(state='normal'))\n"
-        "        except Exception as e: _log(f'Check failed: {e}','ERR'); root.after(0,lambda: remote_sv.set('Remote: check failed'))\n"
+        "        except Exception as e:\n"
+        "            if '403' in str(e) or 'rate limit' in str(e).lower():\n"
+        "                _log('Check failed: GitHub API rate limit — wait 60 s and retry','ERR')\n"
+        "                root.after(0,lambda: remote_sv.set('Remote: rate limited — retry later'))\n"
+        "            else:\n"
+        "                _log(f'Check failed: {e}','ERR')\n"
+        "                root.after(0,lambda: remote_sv.set('Remote: check failed'))\n"
         "    threading.Thread(target=_fetch,daemon=True).start()\n\n"
         "def _rebuild_filesystem():\n"
         "    _log('Rebuilding v0rtex_utils filesystem...','INFO')\n"
@@ -2317,9 +3252,9 @@ def _build_updater_script(install_dir, python_exe):
 def _build_recovery_ui_script(install_dir, python_exe):
     _id = repr(install_dir)
     _py = repr(python_exe)
-    # The standalone recovery UI script:
-    # 1) First tries to launch V0RTEX main script in recovery mode (via sentinel)
-    # 2) If main script missing/fails, falls back to an embedded minimal recovery UI
+
+
+
     return (
         "import os, sys, subprocess, json, datetime, threading, sqlite3, shutil\n"
         "import tkinter as tk\n"
@@ -2370,7 +3305,7 @@ def _build_recovery_ui_script(install_dir, python_exe):
         "# ── Embedded minimal recovery UI ─────────────────────────────────────\n"
         "def _run_embedded_recovery():\n"
         "    rr = tk.Tk()\n"
-        f"    rr.title('V0RTEX — STANDALONE RECOVERY  v{{_VX_VER}}')\n"
+        f"    rr.title('V0RTEX — STANDALONE RECOVERY  v{_VX_VER}')\n"
         "    rr.configure(bg=BG)\n"
         "    rr.geometry('900x640')\n"
         "    try: rr.state('zoomed')\n"
@@ -2379,8 +3314,7 @@ def _build_recovery_ui_script(install_dir, python_exe):
         "    hdr = tk.Frame(rr, bg='#080816', pady=8, padx=14); hdr.pack(fill='x')\n"
         "    tk.Label(hdr, text='  \u26a0  V0RTEX  \u203a  STANDALONE RECOVERY',\n"
         "             font=('Consolas',11,'bold'), bg='#080816', fg=RED).pack(side='left')\n"
-        f"    tk.Label(hdr, text=f'  v{{_VX_VER}}',\n"
-        "             font=('Consolas',9), bg='#080816', fg=DIM2).pack(side='left')\n"
+        f"    tk.Label(hdr, text='  v{_VX_VER}', font=('Consolas',9), bg='#080816', fg=DIM2).pack(side='left')\n"
         "    adm_sv = tk.StringVar(value='\u26a1 ADMIN' if _is_admin() else '\u25cf user mode')\n"
         "    tk.Label(hdr, textvariable=adm_sv,\n"
         "             font=('Consolas',8,'bold'), bg='#080816',\n"
@@ -2478,11 +3412,37 @@ def _build_recovery_ui_script(install_dir, python_exe):
         "                except Exception as e: rr.after(0, lambda pp=p,ee=e: rlog(f'  \u2717 {pp}: {ee}','ERR'))\n"
         "            rr.after(0, lambda: rlog('\u255a\u2500 Done.','OK'))\n"
         "        threading.Thread(target=_do,daemon=True).start()\n\n"
+        "    def _download_and_replace():\n"
+        "        rlog('\u256c\u2500 DOWNLOAD & REPLACE V0RTEX \u2557', 'HEAD')\n"
+        "        _BRANCH = 'Windows_Release' if sys.platform=='win32' else ('MacOS_Release' if sys.platform=='darwin' else 'Linux_release')\n"
+        "        _RAW = 'https://raw.githubusercontent.com/Vider06/V0rtex/' + _BRANCH + '/v0rtex.py'\n"
+        "        def _do():\n"
+        "            import urllib.request as _ur\n"
+        "            rr.after(0, lambda: rlog('  Fetching: ' + _RAW, 'DIM'))\n"
+        "            try:\n"
+        "                req = _ur.Request(_RAW, headers={'User-Agent': 'V0RTEX-Recovery/1.0'})\n"
+        "                with _ur.urlopen(req, timeout=30) as _resp:\n"
+        "                    _data = _resp.read()\n"
+        "                rr.after(0, lambda: rlog('  \u2193 Downloaded ' + str(len(_data)//1024) + ' KB', 'INFO'))\n"
+        "                _dest = os.path.join(INSTALL_DIR, 'v0rtex.py')\n"
+        "                os.makedirs(INSTALL_DIR, exist_ok=True)\n"
+        "                if os.path.exists(_dest):\n"
+        "                    shutil.copy2(_dest, _dest + '.recovery_bak')\n"
+        "                    rr.after(0, lambda: rlog('  \u2713 Backup: v0rtex.py.recovery_bak', 'DIM'))\n"
+        "                with open(_dest, 'wb') as _wf:\n"
+        "                    _wf.write(_data)\n"
+        "                rr.after(0, lambda: rlog('  \u2713 v0rtex.py replaced successfully.', 'OK'))\n"
+        "                rr.after(0, lambda: rlog('\u255a\u2500 Done. Use LAUNCH tab to start V0RTEX.', 'OK'))\n"
+        "            except Exception as _de:\n"
+        "                rr.after(0, lambda ee=str(_de): rlog('  \u2717 Download failed: ' + ee, 'ERR'))\n"
+        "                rr.after(0, lambda: rlog('\u255a\u2500 Failed.', 'ERR'))\n"
+        "        threading.Thread(target=_do, daemon=True).start()\n\n"
         "    rep_btn_f = tk.Frame(t_rep, bg=PNL2, padx=8, pady=6)\n"
         "    rep_btn_f.pack(fill='x', side='bottom')\n"
         "    tk.Frame(t_rep, bg=BRD, height=1).pack(fill='x', side='bottom')\n"
         "    for _rt, _rb, _rf, _rl, _rcmd in [\n"
         "        ('  \U0001f527  Recreate Dirs  ', '#0a1a0a', GRN2, GRN2, lambda: threading.Thread(target=_recreate_dirs,daemon=True).start()),\n"
+        "        ('  \u2b07  Download & Replace  ', '#001a2a', BLU, BLU, lambda: threading.Thread(target=_download_and_replace,daemon=True).start()),\n"
         "        ('  \U0001f4e6  Install Packages  ', '#0d2a0d', GRN2, GRN2, _install_packages),\n"
         "        ('  \U0001f50d  Integrity Check  ', '#0f1a2a', BLU, BLU, lambda: threading.Thread(target=_integrity_check,daemon=True).start()),\n"
         "        ('  \u2699\ufe0f  Reset Config  ', BRD2, YEL, YEL, lambda: threading.Thread(target=_reset_config,daemon=True).start()),\n"
@@ -2565,6 +3525,170 @@ def _build_recovery_ui_script(install_dir, python_exe):
 
 
 
+def _tor_launch_popup(root, cfg_path, tor_scan, log_cb, dlog_cb):
+    import threading as _tlpt
+    _result = [None]
+    _done   = _tlpt.Event()
+
+    def _show():
+        import tkinter as _tk
+        _C = dict(
+            bg="#07070f", panel="#0d0d1c", card="#12121f", border="#1a1a30",
+            accent="#cba6f7", accent2="#f5c2e7", green="#a6e3a1", red="#f38ba8",
+            yellow="#f9e2af", text="#cdd6f4", subtext="#a6adc8", muted="#6c7086",
+        )
+
+        dlg = _tk.Toplevel(root)
+        dlg.title("Tor — Path Detection")
+        dlg.configure(bg=_C["bg"])
+        dlg.resizable(False, False)
+        dlg.grab_set()
+        dlg.focus_force()
+        W, H = 480, 250
+        px = root.winfo_x() + (root.winfo_width()  - W) // 2
+        py = root.winfo_y() + (root.winfo_height() - H) // 2
+        dlg.geometry(f"{W}x{H}+{px}+{py}")
+
+        _tk.Frame(dlg, bg=_C["yellow"], height=3).pack(fill="x")
+
+        hdr = _tk.Frame(dlg, bg=_C["panel"], padx=14, pady=9)
+        hdr.pack(fill="x")
+        _tk.Label(hdr, text="TOR PATH DETECTION", font=("Consolas", 11, "bold"),
+                  bg=_C["panel"], fg=_C["yellow"]).pack(side="left")
+        _tk.Frame(dlg, bg=_C["border"], height=1).pack(fill="x")
+
+        body = _tk.Frame(dlg, bg=_C["bg"], padx=16, pady=14)
+        body.pack(fill="both", expand=True)
+
+        _tk.Label(body,
+                  text="Tor binary not found, even after winget installation.\n\n"
+                       "Search for \"Tor Browser\" in the Windows search bar\n"
+                       "and open it. Once it is running, click the button\n"
+                       "below to scan for the PATH automatically.",
+                  font=("Consolas", 8), bg=_C["bg"], fg=_C["subtext"],
+                  justify="left").pack(anchor="w")
+
+        _status_sv = _tk.StringVar(value="")
+        _tk.Label(body, textvariable=_status_sv, font=("Consolas", 8),
+                  bg=_C["bg"], fg=_C["green"]).pack(anchor="w", pady=(8, 0))
+
+        _tk.Frame(dlg, bg=_C["border"], height=1).pack(fill="x")
+
+        btn_row = _tk.Frame(dlg, bg=_C["bg"], padx=16, pady=10)
+        btn_row.pack(fill="x")
+
+        _dismissed = [False]
+
+        def _scan_and_close():
+            import os as _osc, glob as _osg
+            _lapp_s = _osc.environ.get("LOCALAPPDATA", "")
+            _upro_s = _osc.environ.get("USERPROFILE", "")
+            found = None
+            try:
+                import psutil as _psu2
+                for _proc2 in _psu2.process_iter(["name", "exe"]):
+                    try:
+                        _pname2 = (_proc2.info.get("name") or "").lower()
+                        _pexe2  = _proc2.info.get("exe") or ""
+                        if "tor" in _pname2 and _pexe2 and _osc.path.isfile(_pexe2):
+                            if "torbrowser" in _pexe2.lower() or "tor browser" in _pexe2.lower():
+                                found = _pexe2
+                                break
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+            if not found:
+                _scan_all = list(tor_scan) + [
+                    _osc.path.join(_lapp_s, "Programs", "Tor Browser", "Browser", "TorBrowser", "Tor", "tor.exe"),
+                    _osc.path.join(_lapp_s, "Tor Browser", "Browser", "TorBrowser", "Tor", "tor.exe"),
+                    _osc.path.join(_upro_s, "AppData", "Local", "Programs", "Tor Browser", "Browser", "TorBrowser", "Tor", "tor.exe"),
+                ]
+                for _gp2 in [
+                    _osc.path.join(_lapp_s, "**", "TorBrowser", "Tor", "tor.exe"),
+                    _osc.path.join(_upro_s, "**", "TorBrowser", "Tor", "tor.exe"),
+                ]:
+                    try:
+                        _scan_all.extend(_osg.glob(_gp2, recursive=True))
+                    except Exception:
+                        pass
+                found = next((p for p in _scan_all if _osc.path.isfile(p)), None)
+            if found:
+                _result[0] = found
+                try:
+                    import json as _jj
+                    if __import__("os").path.isfile(cfg_path):
+                        with open(cfg_path, encoding="utf-8") as _cf:
+                            _cfg = _jj.load(_cf)
+                        _cfg["tor_path"] = found
+                        with open(cfg_path, "w", encoding="utf-8") as _cf:
+                            _jj.dump(_cfg, _cf, indent=2)
+                except Exception:
+                    pass
+            try:
+                dlg.destroy()
+            except Exception:
+                pass
+            _done.set()
+
+        def _do_scan():
+            if _dismissed[0]:
+                return
+            _dismissed[0] = True
+            scan_btn.config(state="disabled")
+            skip_btn.config(state="disabled")
+            _status_sv.set("Scanning processes and paths…")
+
+            def _worker():
+                import time as _tt
+                _status_sv.set("Scanning processes…")
+                _tt.sleep(1)
+                dlg.after(0, _scan_and_close)
+
+            _tlpt.Thread(target=_worker, daemon=True).start()
+
+        def _skip():
+            if _dismissed[0]:
+                return
+            _dismissed[0] = True
+            try:
+                dlg.destroy()
+            except Exception:
+                pass
+            _done.set()
+
+        scan_btn = _tk.Button(btn_row, text="  🔍  SCAN FOR PATH  ",
+                              command=_do_scan,
+                              font=("Consolas", 10, "bold"),
+                              bg=_C["yellow"], fg=_C["bg"],
+                              relief="flat", padx=16, pady=6,
+                              cursor="hand2", bd=0,
+                              activebackground=_C["accent2"])
+        scan_btn.pack(side="left")
+
+        skip_btn = _tk.Button(btn_row, text="NOT NOW",
+                              command=_skip,
+                              font=("Consolas", 9),
+                              bg=_C["card"], fg=_C["muted"],
+                              relief="flat", padx=12, pady=6,
+                              cursor="hand2", bd=0)
+        skip_btn.pack(side="left", padx=8)
+
+        dlg.protocol("WM_DELETE_WINDOW", _skip)
+
+    root.after(0, _show)
+    _done.wait(timeout=300)
+
+    found = _result[0]
+    if found:
+        log_cb(f"  ✓ Tor binary located: {__import__('os').path.basename(__import__('os').path.dirname(found))}", "OK")
+        dlog_cb(f"tor binary confirmed via popup: {found}", "OK")
+    else:
+        log_cb("  ~ Tor binary not detected — you can set it manually in Settings", "WARN")
+        dlog_cb("tor popup: binary not found or skipped", "WARN")
+    return found
+
+
 def _run_setup_ui():
     import tkinter as tk
     import tkinter.ttk as ttk
@@ -2611,6 +3735,8 @@ def _run_setup_ui():
 
     dir_var    = tk.StringVar()
     ws_var     = tk.BooleanVar(value=True)
+    tor_var    = tk.BooleanVar(value=True)
+    auto_censor_var = tk.BooleanVar(value=False)
     pct_var    = tk.StringVar(value="")
     status_var = tk.StringVar(value="Ready")
     done_evt   = threading.Event()
@@ -2848,6 +3974,8 @@ def _run_setup_ui():
                 "platform":         platform.system(),
                 "pkgs_installed":   [],
                 "vs_build_tools":   False,
+                "tor_installed_by_setup": False,
+                "downloaded_files":  [],
                 "defender_exclusions": {
                     "paths": [], "processes": [], "cfa": []
                 },
@@ -2869,6 +3997,33 @@ def _run_setup_ui():
                 if not existed and path not in _manifest["dirs_created"]:
                     _manifest["dirs_created"].append(path)
             os.makedirs = _tracked_makedirs
+
+            _log("[ PRE ]  Checking internet connection...", "HEAD")
+            _step_prog(0, "internet check...")
+            _dlog("internet check: connecting to 8.8.8.8:53", "INFO")
+            _internet_ok = False
+            try:
+                import socket as _inet_sk
+                _inet_sk.setdefaulttimeout(5)
+                _inet_sk.socket(_inet_sk.AF_INET, _inet_sk.SOCK_STREAM).connect(("8.8.8.8", 53))
+                _internet_ok = True
+                _dlog("internet check: OK", "OK")
+                _log("  ✓ Internet connection available", "OK")
+            except Exception as _inet_e:
+                _dlog(f"internet check FAILED: {_inet_e}", "ERR")
+            if not _internet_ok:
+                root.after(0, lambda: _setup_panic(
+                    "No Internet Connection",
+                    "V0RTEX Setup requires an active internet connection.\n\n"
+                    "Setup needs to:\n"
+                    "  • Download Python packages (~50 MB)\n"
+                    "  • Verify Wireshark/tshark\n"
+                    "  • Install Tor (optional)\n\n"
+                    "Connect to the internet and run setup again.",
+                    "socket.connect(8.8.8.8:53) failed",
+                    setup_root=root))
+                _set_done(False)
+                return
 
             _log("[ 0 / 8 ]  Updating pip & checking packages", "HEAD")
             _step_prog(0, "checking pip…")
@@ -2969,6 +4124,7 @@ def _run_setup_ui():
             if not _pip_missing:
                 _step_prog(75, "upgrading pip…")
                 _dlog("─── pip self-upgrade ───", "INFO")
+                _record_activity("upgrading pip...")
                 _r0 = _sp_run(
                     [sys.executable, "-m", "pip", "install", "--upgrade", "pip",
                      "--no-cache-dir", "--quiet"] + _TRUSTED,
@@ -3081,11 +4237,24 @@ def _run_setup_ui():
             if os.path.exists(cfg_path):
                 _log("  ~ config.json  (user config preserved)", "DIM")
                 _dlog("config.json kept (user data)", "DIM")
+                try:
+                    with open(cfg_path, encoding="utf-8") as _ecf:
+                        _ecfg = json.load(_ecf)
+                    _ecfg["auto_censor_logs"] = auto_censor_var.get()
+                    with open(cfg_path, "w", encoding="utf-8") as _ecf:
+                        json.dump(_ecfg, _ecf, indent=2)
+                    _log(f"    auto_censor_logs → {auto_censor_var.get()}  (applied)", "DIM")
+                    _dlog(f"config.json: auto_censor_logs → {auto_censor_var.get()}", "DIM")
+                except Exception as _ecfe:
+                    _log(f"    auto_censor_logs patch failed: {_ecfe}", "WARN")
+                    _dlog(f"config.json patch failed: {_ecfe}", "WARN")
             else:
-                _cfg_str = json.dumps(_DEFAULT_CONFIG, indent=2)
+                _setup_cfg = dict(_DEFAULT_CONFIG)
+                _setup_cfg["auto_censor_logs"] = auto_censor_var.get()
+                _cfg_str = json.dumps(_setup_cfg, indent=2)
                 _wf_track(cfg_path, _cfg_str)
-                _log("  ✓ config.json  (factory defaults written)", "OK")
-                _dlog(f"config.json written ({len(_cfg_str)} bytes)", "OK")
+                _log(f"  ✓ config.json  (factory defaults written, auto_censor_logs={auto_censor_var.get()})", "OK")
+                _dlog(f"config.json written ({len(_cfg_str)} bytes), auto_censor_logs={auto_censor_var.get()}", "OK")
             rs_path = os.path.join(base, "rules", "rules_state.json")
             if not os.path.exists(rs_path):
                 _wf_track(rs_path, "{}")
@@ -3145,7 +4314,25 @@ def _run_setup_ui():
                 if os.path.exists(lpath):
                     _log("  ~ launch.bat  (already present, kept)", "DIM")
                 else:
-                    _bat = '@echo off\r\ncd /d "%~dp0"\r\npython v0rtex.py\r\nif errorlevel 1 pause\r\n'
+                    _bat = (
+                        '@echo off\r\n'
+                        'setlocal EnableDelayedExpansion\r\n'
+                        'title V0RTEX v1.0.0 - Launcher\r\n'
+                        'color 0A\r\n'
+                        'python --version >nul 2>&1\r\n'
+                        'if %errorLevel% neq 0 (\r\n'
+                        '    echo  [ERR] Python not found. Install from https://www.python.org\r\n'
+                        '    pause & exit /b 1\r\n'
+                        ')\r\n'
+                        'cd /d "%~dp0"\r\n'
+                        'if not exist "v0rtex.py" (\r\n'
+                        '    echo  [ERR] v0rtex.py not found\r\n'
+                        '    pause & exit /b 1\r\n'
+                        ')\r\n'
+                        'echo  [OK] Launching V0RTEX...\r\n'
+                        'start "" pythonw v0rtex.py %*\r\n'
+                        'endlocal\r\n'
+                    )
                     _wf_track(lpath, _bat)
                     _log("  ✓ launch.bat  (written)", "OK")
             else:
@@ -3169,7 +4356,7 @@ def _run_setup_ui():
             pkgs     = [p.strip() for p in _REQUIREMENTS.strip().splitlines() if p.strip()]
             YARA_PKG    = "yara-python-wheel"
             OPTIONAL    = {YARA_PKG}
-            main_pkgs   = [p for p in pkgs if "yara" not in p.lower()]
+            main_pkgs   = [p for p in pkgs if "yara" not in p.lower() and "[" not in p]
             _dlog(f"packages: {len(pkgs)} total ({len(main_pkgs)} required, 1 optional yara)", "DIM")
 
             
@@ -3328,8 +4515,10 @@ def _run_setup_ui():
                         name = line.split()[1] if len(line.split()) > 1 else ""
                         _log(f"  ↓ {name}", "INFO")
                         _dlog(f"collecting: {name}", "INFO")
+                        _record_activity(f"collecting: {name}")
                     elif line.startswith("Downloading"):
                         _dlog(f"downloading: {line[10:60]}", "DIM")
+                        _record_activity(f"downloading: {line[10:50]}")
                     elif line.startswith("Installing collected"):
                         _dlog(f"installing: {line[:60]}", "DIM")
                     elif "error" in line.lower() or "ERROR" in line or line.startswith("WARNING"):
@@ -3657,8 +4846,15 @@ def _run_setup_ui():
                     }
                     _verify_failed_req  = []
                     _verify_failed_opt  = []
+                    _v_seen = set()
+                    _v_total = len(pkgs)
+                    _v_idx   = 0
                     for _vpkg in pkgs:
                         _vname = _vpkg.split(">=")[0].split("==")[0].split("[")[0].strip().lower()
+                        if _vname in _v_seen: continue
+                        _v_seen.add(_vname)
+                        _v_idx += 1
+                        _record_activity(f"verifying imports… {_v_idx}/{_v_total}: {_vname}")
                         _vmod  = _PKG_TO_MOD.get(_vname, _vname)
                         _vopt  = (YARA_PKG in _vpkg)
                         try:
@@ -3911,10 +5107,17 @@ def _run_setup_ui():
                     "pyyaml":       "yaml",
                     "olefile":      "olefile",
                     "numpy":        "numpy",
+                    "requests[socks]": "socks",
                 }
                 _final_ok = []; _final_miss_req = []; _final_miss_opt = []
+                _final_seen = set()
+                _ff_idx = 0
                 for _fpkg in pkgs:
                     _fname = _fpkg.split(">=")[0].split("==")[0].split("[")[0].strip()
+                    if _fname.lower() in _final_seen: continue
+                    _final_seen.add(_fname.lower())
+                    _ff_idx += 1
+                    _record_activity(f"final import check… {_ff_idx}: {_fname}")
                     _fmod  = _PKG_TO_MOD_FINAL.get(_fname.lower(), _fname)
                     _fopt  = (YARA_PKG in _fpkg)
                     try:
@@ -3966,6 +5169,8 @@ def _run_setup_ui():
 
             _log("", "NORM")
             _log("[ 8 / 8 ]  Wireshark / tshark", "HEAD")
+            _dlog("step 8: Wireshark/tshark", "INFO")
+            _record_activity("[ 8 / 8 ] Wireshark / Tor...")
             if ws_var.get():
                 tshark_installed = False
                 installed_ver    = ""
@@ -4033,6 +5238,10 @@ def _run_setup_ui():
                     except Exception as _cfe:
                         _dlog(f"tshark config save failed: {_cfe}", "WARN")
                     _log(f"  ✓ tshark found: {installed_ver}", "OK")
+                    _dlog(f"tshark version: {installed_ver}", "OK")
+                    _dlog(f"tshark exe path: {tshark_exe}", "OK")
+                    _dlog(f"tshark: {installed_ver}", "OK")
+                    _dlog(f"tshark path: {tshark_exe}", "OK")
                     if tshark_exe != "tshark":
                         _log(f"  ~ path: {tshark_exe}", "DIM")
                     _log("  → Checking for updates…", "INFO")
@@ -4063,18 +5272,47 @@ def _run_setup_ui():
                 else:
                     sys_ = platform.system()
                     if sys_ == "Windows":
-                        _log("  ↓ Downloading Wireshark installer…", "INFO")
+                        _log("  ↓ Wireshark not found — downloading installer…", "INFO")
+                        _record_activity("Downloading Wireshark installer...")
                         try:
-                            import urllib.request as ur
-                            url  = "https://www.wireshark.org/download/win64/Wireshark-latest-x64.exe"
-                            inst = os.path.join(base, "_recovery", "WiresharkSetup.exe")
-                            ur.urlretrieve(url, inst)
-                            _sp_popen([inst, "/desktopicon=no"])
-                            _log("  ✓ Wireshark installer opened — follow the on-screen steps", "OK")
+                            import urllib.request as _wur
+                            _ws_url  = "https://www.wireshark.org/download/win64/Wireshark-latest-x64.exe"
+                            _ws_inst = os.path.join(base, "_recovery", "WiresharkSetup.exe")
+                            os.makedirs(os.path.dirname(_ws_inst), exist_ok=True)
+                            _manifest["downloaded_files"].append(_ws_inst)
+                            _dlog(f"wireshark: downloading {_ws_url}", "DIM")
+                            _log(f"  ↓ {_ws_url}", "DIM")
+                            import socket as _wssock
+                            _wssock.setdefaulttimeout(120)
+                            _ws_req = _wur.Request(_ws_url, headers={"User-Agent": "Mozilla/5.0"})
+                            with _wur.urlopen(_ws_req, timeout=120) as _wsr:
+                                _ws_total = int(_wsr.headers.get("Content-Length", 0))
+                                _ws_done  = 0
+                                _ws_lpct  = -1
+                                with open(_ws_inst, "wb") as _wsf:
+                                    while True:
+                                        _wchunk = _wsr.read(65536)
+                                        if not _wchunk:
+                                            break
+                                        _wsf.write(_wchunk)
+                                        _ws_done += len(_wchunk)
+                                        if _ws_total > 0:
+                                            _wpct = int(_ws_done * 100 / _ws_total)
+                                            if _wpct >= _ws_lpct + 10:
+                                                _ws_lpct = _wpct
+                                                _record_activity(f"Wireshark download… {_wpct}%")
+                                                _dlog(f"wireshark download: {_wpct}% ({_ws_done//1024}KB)", "DIM")
+                            _wssock.setdefaulttimeout(None)
+                            _log(f"  ✓ Download complete  ({_ws_done//1024} KB)", "OK")
+                            _sp_popen([_ws_inst, "/desktopicon=no", "/S"])
+                            _log("  ✓ Wireshark installer launched — complete the wizard to finish", "OK")
                             _log("  ⚠ Make sure to tick 'TShark' during install!", "WARN")
+                            _log("  → V0RTEX will detect tshark automatically on next launch", "DIM")
+                            _dlog(f"wireshark installer launched: {_ws_inst}", "OK")
                         except Exception as _we:
-                            _log(f"  ⚠ Auto-download failed: {_we}", "WARN")
-                            _log("    → Install manually from https://www.wireshark.org", "DIM")
+                            _log(f"  ~ Wireshark download failed: {_we}", "WARN")
+                            _log("  → Install manually from https://www.wireshark.org", "DIM")
+                            _dlog(f"wireshark download error: {_we}", "WARN")
                     elif sys_ == "Linux":
                         try:
                             _sp_run(["sudo","apt-get","install","-y","tshark"],
@@ -4091,6 +5329,137 @@ def _run_setup_ui():
                             _log(f"  ⚠ {_me}", "WARN")
             else:
                 _log("  — skipped (checkbox unchecked)", "DIM")
+
+            _log("", "NORM")
+            _log("[ + ]  Tor — anonymous routing", "HEAD")
+            _dlog("step tor: checking installation", "INFO")
+            if tor_var.get():
+                import shutil as _torsh
+                _uname2 = os.environ.get("USERNAME", "")
+                _lapp2  = os.environ.get("LOCALAPPDATA", os.path.join(os.environ.get("USERPROFILE", ""), "AppData", "Local"))
+                _upro2  = os.environ.get("USERPROFILE", "")
+                _TOR_PATHS_CHECK = [
+                    r"C:\Program Files\Tor Browser\Browser\TorBrowser\Tor\tor.exe",
+                    r"C:\Program Files (x86)\Tor Browser\Browser\TorBrowser\Tor\tor.exe",
+                    os.path.join(_lapp2, "Programs", "Tor Browser", "Browser", "TorBrowser", "Tor", "tor.exe"),
+                    os.path.join(_lapp2, "Tor Browser", "Browser", "TorBrowser", "Tor", "tor.exe"),
+                    os.path.join(_upro2, "Desktop", "Tor Browser", "Browser", "TorBrowser", "Tor", "tor.exe"),
+                    os.path.join(_upro2, "AppData", "Local", "Programs", "Tor Browser", "Browser", "TorBrowser", "Tor", "tor.exe"),
+                    os.path.join(_upro2, "AppData", "Roaming", "Tor Browser", "Browser", "TorBrowser", "Tor", "tor.exe"),
+                ]
+                import glob as _tglob
+                _glob_extra = []
+                for _gp in [
+                    os.path.join(_lapp2, "**", "TorBrowser", "Tor", "tor.exe"),
+                    os.path.join(_upro2, "**", "TorBrowser", "Tor", "tor.exe"),
+                ]:
+                    try:
+                        _glob_extra.extend(_tglob.glob(_gp, recursive=True))
+                    except Exception:
+                        pass
+                _tor_scan = _TOR_PATHS_CHECK + _glob_extra
+                _tor_exe = _torsh.which("tor") or next((p for p in _tor_scan if os.path.isfile(p)), None)
+                _dlog(f"tor binary check: {_tor_exe}", "INFO")
+                if _tor_exe:
+                    _log(f"  ✓ Tor already installed: {os.path.basename(os.path.dirname(_tor_exe))}", "OK")
+                    _dlog(f"tor found at: {_tor_exe}", "OK")
+                    try:
+                        import json as _torj
+                        _cfg_tor_path = os.path.join(base, "config.json")
+                        if os.path.isfile(_cfg_tor_path):
+                            with open(_cfg_tor_path, encoding="utf-8") as _ctf:
+                                _cfg_tor = _torj.load(_ctf)
+                            _cfg_tor["tor_path"] = _tor_exe
+                            with open(_cfg_tor_path, "w", encoding="utf-8") as _ctfw:
+                                _torj.dump(_cfg_tor, _ctfw, indent=2)
+                    except Exception:
+                        pass
+                else:
+                    _log("  ↓ Tor not found — downloading installer…", "INFO")
+                    _record_activity("Downloading Tor installer...")
+                    if platform.system() == "Windows":
+                        try:
+                            import urllib.request as _tur, json as _turj, urllib.error as _uerr
+                            _tor_ver = None
+                            _tor_url = None
+                            try:
+                                with _tur.urlopen(
+                                    "https://aus1.torproject.org/torbrowser/update_3/release/downloads.json",
+                                    timeout=15
+                                ) as _tvr:
+                                    _tvd = _turj.loads(_tvr.read().decode())
+                                _tor_ver = _tvd.get("version")
+                                _win_dl = (
+                                    _tvd.get("downloads", {})
+                                        .get("win64", {})
+                                        .get("en-US", {})
+                                        .get("binary")
+                                )
+                                if _win_dl:
+                                    _tor_url = _win_dl
+                                elif _tor_ver:
+                                    _v = _tor_ver
+                                    _tor_url = (
+                                        f"https://www.torproject.org/dist/torbrowser/{_v}/"
+                                        f"tor-browser-windows-x86_64-portable-{_v}.exe"
+                                    )
+                            except Exception as _tje:
+                                _dlog(f"tor: version fetch failed: {_tje}", "WARN")
+                            if _tor_url and _tor_ver:
+                                try:
+                                    _tur.urlopen(_tor_url, timeout=5).close()
+                                except _uerr.HTTPError:
+                                    _v = _tor_ver
+                                    _tor_url = (
+                                        f"https://www.torproject.org/dist/torbrowser/{_v}/"
+                                        f"torbrowser-install-win64-{_v}_ALL.exe"
+                                    )
+                                except Exception:
+                                    pass
+                            if not _tor_url:
+                                raise RuntimeError("Could not resolve Tor Browser download URL")
+                            _tor_inst_path = os.path.join(base, "_recovery", "TorBrowserSetup.exe")
+                            _manifest["downloaded_files"].append(_tor_inst_path)
+                            os.makedirs(os.path.dirname(_tor_inst_path), exist_ok=True)
+                            _dlog(f"tor: downloading {_tor_url}", "DIM")
+                            _log(f"  ↓ {_tor_url}", "DIM")
+                            import socket as _tsock
+                            _tsock.setdefaulttimeout(120)
+                            _dl_req = _tur.Request(_tor_url, headers={"User-Agent": "Mozilla/5.0"})
+                            with _tur.urlopen(_dl_req, timeout=120) as _dlr:
+                                _dl_total = int(_dlr.headers.get("Content-Length", 0))
+                                _dl_done  = 0
+                                _dl_lpct  = -1
+                                with open(_tor_inst_path, "wb") as _dlf:
+                                    while True:
+                                        _chunk = _dlr.read(65536)
+                                        if not _chunk:
+                                            break
+                                        _dlf.write(_chunk)
+                                        _dl_done += len(_chunk)
+                                        if _dl_total > 0:
+                                            _pct = int(_dl_done * 100 / _dl_total)
+                                            if _pct >= _dl_lpct + 10:
+                                                _dl_lpct = _pct
+                                                _record_activity(f"Tor download… {_pct}%")
+                                                _dlog(f"tor download: {_pct}% ({_dl_done//1024}KB)", "DIM")
+                            _tsock.setdefaulttimeout(None)
+                            _log(f"  ✓ Download complete  ({_dl_done//1024} KB)", "OK")
+                            _sp_popen([_tor_inst_path])
+                            _log("  ✓ Tor Browser installer launched — complete the wizard to finish", "OK")
+                            _log("  → V0RTEX will detect Tor automatically on next launch", "DIM")
+                            _dlog(f"tor installer launched: {_tor_inst_path}", "OK")
+                            _manifest["tor_installed_by_setup"] = True
+                        except Exception as _tde:
+                            _log(f"  ~ Tor download failed: {_tde}", "WARN")
+                            _log("  → Install manually: https://www.torproject.org/download/", "DIM")
+                            _dlog(f"tor download error: {_tde}", "WARN")
+                    else:
+                        _log("  → Install manually: https://www.torproject.org/download/", "DIM")
+                        _dlog("tor: non-Windows, skipping auto-download", "DIM")
+            else:
+                _log("  — skipped (unchecked)", "DIM")
+
 
             if platform.system() == "Windows":
                 _log("", "NORM")
@@ -4238,15 +5607,18 @@ def _run_setup_ui():
             _log("[ ✎ ]  Writing installation log", "HEAD")
             try:
                 import datetime as _dti
-                _system_dir = os.path.dirname(base)
-                _ilog_dir   = os.path.join(_system_dir, "v0rtex_utils", "debug_log")
+                _system_dir  = os.path.dirname(base)
+                _ilog_base   = os.path.join(_system_dir, "v0rtex_utils", "debug_log")
+                _ilog_dir    = os.path.join(_ilog_base, "setup_log")
+                _ilog_tls    = os.path.join(_system_dir, "v0rtex_utils", "Temp_Log_Storage", "setup_log")
                 os.makedirs(_ilog_dir, exist_ok=True)
+                os.makedirs(_ilog_tls, exist_ok=True)
                 for _sub in ("crash_log", "session_log", "trampoline_log",
                               "admin_log", "update_log", "setup_log"):
-                    try: os.makedirs(os.path.join(_ilog_dir, _sub), exist_ok=True)
+                    try: os.makedirs(os.path.join(_ilog_base, _sub), exist_ok=True)
                     except Exception: pass
                 _ilog_ts    = _dti.datetime.now().strftime("%Y%m%d_%H%M%S")
-                _ilog_path  = os.path.join(_ilog_dir, f"install_{_ilog_ts}.txt")
+                _ilog_path  = os.path.join(_ilog_tls, f"install_{_ilog_ts}.txt")
                 _ilog_lines = [
                     "=" * 72,
                     f"  {_VX_TITLE} — INSTALLATION LOG",
@@ -4272,8 +5644,9 @@ def _run_setup_ui():
                 _ilog_lines += ["", "=" * 72]
                 with open(_ilog_path, "w", encoding="utf-8", errors="replace") as _ilf:
                     _ilf.write("\n".join(_ilog_lines))
-                _log(f"  ✓ Install log → debug_log/{os.path.basename(_ilog_path)}", "OK")
-                _dlog(f"install log written: {_ilog_path}", "OK")
+                _log(f"  ✓ Install log staged → Temp_Log_Storage/setup_log/{os.path.basename(_ilog_path)}", "OK")
+                _log(  "    Will be censored and moved to debug_log/setup_log/ on next app exit.", "DIM")
+                _dlog(f"install log staged: {_ilog_path}", "OK")
             except Exception as _ile:
                 _log(f"  ~ Install log failed: {_ile}", "WARN")
                 _dlog(f"install log error: {_ile}", "WARN")
@@ -4303,6 +5676,7 @@ def _run_setup_ui():
                 ("v0rtex_reinstall.py",   "_build_reinstall_script",   (base, sys.executable, _tram_code_setup)),
                 ("v0rtex_updater.py",     "_build_updater_script",     (base, sys.executable)),
                 ("v0rtex_recovery_ui.py", "_build_recovery_ui_script", (base, sys.executable)),
+                ("v0rtex_log_censor.py",  "_build_censor_script",      ()),
             ]
             for _sname, _sfn_name, _sargs in _setup_builders:
                 _sfn = globals().get(_sfn_name)
@@ -4404,6 +5778,23 @@ def _run_setup_ui():
                    font=("Consolas", 9), bg=C["card"], fg=C["text"],
                    selectcolor=C["panel"], activebackground=C["card"],
                    relief="flat").pack(side="left")
+
+    tor_row = tk.Frame(card2, bg=C["card"])
+    tor_row.pack(anchor="w", pady=(4, 0))
+    tk.Checkbutton(tor_row, variable=tor_var,
+                   text="  Install Tor — anonymous routing for V0RTEX network requests",
+                   font=("Consolas", 9), bg=C["card"], fg=C["text"],
+                   selectcolor=C["panel"], activebackground=C["card"],
+                   relief="flat").pack(side="left")
+
+    censor_row = tk.Frame(card2, bg=C["card"])
+    censor_row.pack(anchor="w", pady=(4, 0))
+    tk.Checkbutton(censor_row, variable=auto_censor_var,
+                   text="  Auto-censor logs — redact usernames, IPs and paths (applied on flush at exit)",
+                   font=("Consolas", 9), bg=C["card"], fg=C["text"],
+                   selectcolor=C["panel"], activebackground=C["card"],
+                   relief="flat").pack(side="left")
+
 
     card_bk = tk.Frame(root, bg=C["card"], padx=16, pady=7)
     card_bk.pack(fill="x", padx=16, pady=(5, 0))
@@ -4649,14 +6040,20 @@ def _run_setup_ui():
         target_py = (new_py if (os.path.exists(new_py) and
                      os.path.abspath(new_py) != src_py) else src_py)
         current_pid = os.getpid()
-        trampoline_path = os.path.join(base, "_v0rtex_relaunch.py")
+        _tram_dir = os.path.join(os.path.dirname(base), "v0rtex_utils")
+        try: os.makedirs(_tram_dir, exist_ok=True)
+        except Exception: pass
+        trampoline_path = os.path.join(_tram_dir, "_v0rtex_relaunch.py")
 
         _log("", "NORM")
         _log("━"*52, "HEAD")
 
         if platform.system() == "Windows":
             task_name = "V0RTEXRelaunch"
-            log_path  = os.path.join(base, "_v0rtex_relaunch.txt")
+            _tram_log_dir = os.path.join(os.path.dirname(base), "v0rtex_utils", "debug_log", "trampoline_log")
+            try: os.makedirs(_tram_log_dir, exist_ok=True)
+            except Exception: pass
+            log_path  = os.path.join(_tram_log_dir, "_v0rtex_relaunch.txt")
             trampoline_code = (
                 "import os, sys, time, subprocess, ctypes\n"
                 f"_PID    = {current_pid}\n"
@@ -4669,11 +6066,11 @@ def _run_setup_ui():
                 "def _log(msg):\n"
                 "    try:\n"
                 "        import datetime\n"
-                "        with open(_LOG, 'a') as f:\n"
+                "        with open(_LOG, 'a', encoding='utf-8') as f:\n"
                 "            f.write(f'[{datetime.datetime.now().strftime(\"%H:%M:%S.%f\")}] {msg}\\n')\n"
                 "    except Exception: pass\n"
                 "\n"
-                "_log(f'Trampoline started — killing PID {_PID}')\n"
+                "_log(f'Trampoline started - killing PID {_PID}')\n"
                 "k32 = ctypes.windll.kernel32\n"
                 "time.sleep(0.5)\n"
                 "try:\n"
@@ -4702,7 +6099,7 @@ def _run_setup_ui():
                 "p = subprocess.Popen([_PYW, _TARGET], creationflags=0x08000000)\n"
                 "_log(f'Launched PID: {p.pid}')\n"
                 "time.sleep(1)\n"
-                "_log('Trampoline done — self-deleting')\n"
+                "_log('Trampoline done - self-deleting')\n"
                 "try: os.remove(_SELF)\n"
                 "except Exception: pass\n"
             )
@@ -4754,7 +6151,10 @@ def _run_setup_ui():
                 return
 
             root.destroy()
-            sys.exit(0)
+            try:
+                import os as _oe1; _oe1._exit(0)
+            except Exception:
+                sys.exit(0)
 
         else:
             real_user = os.environ.get("SUDO_USER", "")
@@ -4809,7 +6209,10 @@ def _run_setup_ui():
                 return
 
             root.destroy()
-            sys.exit(0)
+            try:
+                import os as _oe2; _oe2._exit(0)
+            except Exception:
+                sys.exit(0)
 
 
     b_inst = tk.Button(bot, text="  ⬡  INSTALL  ", font=("Consolas", 10, "bold"),
@@ -4834,40 +6237,43 @@ def _run_setup_ui():
         dlg.resizable(False, False)
         dlg.grab_set()
         dlg.attributes("-topmost", True)
-        dw, dh = 520, 200
+        dw, dh = 540, 240
         root.update_idletasks()
         rx, ry = root.winfo_x(), root.winfo_y()
         rw, rh = root.winfo_width(), root.winfo_height()
         dlg.geometry(f"{dw}x{dh}+{rx+(rw-dw)//2}+{ry+(rh-dh)//2}")
 
-        tk.Frame(dlg, bg=C["accent"], height=2).pack(fill="x")
+        tk.Frame(dlg, bg=C["red"], height=2).pack(fill="x")
         body = tk.Frame(dlg, bg=C["bg"], padx=22, pady=14)
         body.pack(fill="both", expand=True)
 
         tk.Label(body, text="Abort setup and exit?",
                  font=("Consolas", 10, "bold"), bg=C["bg"], fg=C["text"]).pack(anchor="w")
-        tk.Label(body, text="Any partially installed files will remain on disk.",
+        tk.Label(body,
+                 text="Setup will stop. Files already written to disk will be left as-is\n"
+                      "unless you check the option below.",
                  font=("Consolas", 8), bg=C["bg"], fg=C["muted"],
-                 wraplength=460).pack(anchor="w", pady=(2,10))
+                 wraplength=480, justify="left").pack(anchor="w", pady=(2, 10))
 
-        uninstall_var = tk.BooleanVar(value=False)
+        cleanup_var = tk.BooleanVar(value=False)
         tk.Checkbutton(body,
-                       text="  Also uninstall packages installed so far (runs in terminal)",
-                       variable=uninstall_var,
-                       font=("Consolas", 9), bg=C["bg"], fg=C["text"],
+                       text="  Delete ONLY files and packages installed by this setup\n"
+                            "  (pre-existing user files will NOT be touched)",
+                       variable=cleanup_var,
+                       font=("Consolas", 8), bg=C["bg"], fg=C["text"],
                        selectcolor=C["panel"], activebackground=C["bg"],
-                       wraplength=460, justify="left",
+                       wraplength=480, justify="left",
                        relief="flat").pack(anchor="w")
 
         btn_row = tk.Frame(dlg, bg=C["panel"], padx=14, pady=8)
         btn_row.pack(fill="x", side="bottom")
 
         def _confirm():
-            do_uninstall = uninstall_var.get()
+            do_cleanup = cleanup_var.get()
             try: dlg.destroy()
             except Exception: pass
 
-            if do_uninstall:
+            if do_cleanup:
                 import tempfile as _tmp, json as _json_u
 
                 _manifest_data = None
@@ -4881,28 +6287,25 @@ def _run_setup_ui():
                         pass
 
                 if _manifest_data:
-                    _pkgs         = _manifest_data.get("pkgs_installed", [])
-                    _vs_bt        = _manifest_data.get("vs_build_tools", False)
-                    _def_paths    = _manifest_data.get("defender_exclusions", {}).get("paths", [])
-                    _def_procs    = _manifest_data.get("defender_exclusions", {}).get("processes", [])
-                    _def_cfa      = _manifest_data.get("defender_exclusions", {}).get("cfa", [])
-                    _files        = _manifest_data.get("files_created", [])
-                    _dirs         = _manifest_data.get("dirs_created", [])
-                    _inst_dir     = _manifest_data.get("install_dir", _inst_dir or "")
-                    if not _pkgs:
-                        _pkgs = [
-                            ln.strip().split(">=")[0].split("==")[0].split("<")[0].strip()
-                            for ln in _REQUIREMENTS.strip().splitlines()
-                            if ln.strip() and not ln.strip().startswith("#")
-                        ]
+                    _pkgs          = _manifest_data.get("pkgs_installed", [])
+                    _vs_bt         = _manifest_data.get("vs_build_tools", False)
+                    _tor_by_setup  = _manifest_data.get("tor_installed_by_setup", False)
+                    _def_paths     = _manifest_data.get("defender_exclusions", {}).get("paths", [])
+                    _def_procs     = _manifest_data.get("defender_exclusions", {}).get("processes", [])
+                    _def_cfa       = _manifest_data.get("defender_exclusions", {}).get("cfa", [])
+                    _files         = _manifest_data.get("files_created", [])
+                    _dirs          = _manifest_data.get("dirs_created", [])
+                    _dl_files      = _manifest_data.get("downloaded_files", [])
+                    _inst_dir      = _manifest_data.get("install_dir", _inst_dir or "")
                 else:
                     _pkgs = [
                         ln.strip().split(">=")[0].split("==")[0].split("<")[0].strip()
                         for ln in _REQUIREMENTS.strip().splitlines()
                         if ln.strip() and not ln.strip().startswith("#")
                     ]
-                    _vs_bt = False
-                    _def_paths = _def_procs = _def_cfa = _files = _dirs = []
+                    _vs_bt = _tor_by_setup = False
+                    _def_paths = _def_procs = _def_cfa = []
+                    _files = _dirs = _dl_files = []
 
                 _script = (
                     "import subprocess, sys, os, shutil, time\n"
@@ -4916,36 +6319,58 @@ def _run_setup_ui():
                     "\n"
                     f"PKGS          = {repr(_pkgs)}\n"
                     f"VS_BUILD      = {repr(_vs_bt)}\n"
+                    f"TOR_BY_SETUP  = {repr(_tor_by_setup)}\n"
                     f"DEF_PATHS     = {repr(_def_paths)}\n"
                     f"DEF_PROCS     = {repr(_def_procs)}\n"
                     f"DEF_CFA       = {repr(_def_cfa)}\n"
                     f"FILES         = {repr(_files)}\n"
                     f"DIRS          = {repr(_dirs)}\n"
+                    f"DL_FILES      = {repr(_dl_files)}\n"
                     f"INSTALL_DIR   = {repr(_inst_dir)}\n"
                     "\n"
-                    "print('=' * 60)\n"
-                    "print('  V0RTEX Setup — Cleanup / Uninstall')\n"
-                    "print('=' * 60)\n"
+                    "print('=' * 64)\n"
+                    "print('  V0RTEX Setup — Surgical Cleanup')\n"
+                    "print('  Only files/packages installed by THIS setup are removed.')\n"
+                    "print('  Pre-existing user files are NOT touched.')\n"
+                    "print('=' * 64)\n"
                     "\n"
-                    "# 1 — pip uninstall only what setup actually installed\n"
+                    "# 1 — pip uninstall only packages setup actually installed\n"
                     "if PKGS:\n"
-                    "    print(f'\\n[1/5] Uninstalling {len(PKGS)} package(s) installed by setup...')\n"
+                    "    print(f'\\n[1/6] Uninstalling {len(PKGS)} package(s) installed by setup...')\n"
                     "    for p in PKGS:\n"
                     "        r = subprocess.run([sys.executable, '-m', 'pip', 'uninstall', p, '-y'],\n"
                     "                           capture_output=True, text=True)\n"
                     "        out = r.stdout + r.stderr\n"
-                    "        if 'Successfully uninstalled' in out or r.returncode == 0:\n"
+                    "        if 'Successfully uninstalled' in out:\n"
                     "            print(f'  ✓ removed: {p}')\n"
                     "        elif 'not installed' in out.lower() or 'WARNING: Skipping' in out:\n"
-                    "            print(f'  ~ already gone: {p}')\n"
+                    "            print(f'  ~ was not installed: {p}')\n"
                     "        else:\n"
                     "            print(f'  ~ skipped: {p} (exit {r.returncode})')\n"
                     "else:\n"
-                    "    print('\\n[1/5] No packages to uninstall (none were newly installed).')\n"
+                    "    print('\\n[1/6] No packages to uninstall.')\n"
                     "\n"
-                    "# 2 — Remove Defender exclusions\n"
+                    "# 2 — Uninstall Tor Browser (only if setup installed it via winget)\n"
+                    "if TOR_BY_SETUP:\n"
+                    "    print('\\n[2/6] Uninstalling Tor Browser (installed by setup via winget)...')\n"
+                    "    import shutil as _sh\n"
+                    "    if _sh.which('winget'):\n"
+                    "        r = subprocess.run(['winget', 'uninstall', '--id', 'TorProject.TorBrowser',\n"
+                    "                            '--silent', '--accept-source-agreements'],\n"
+                    "                           capture_output=True, text=True, timeout=120)\n"
+                    "        print(f'  winget exit {r.returncode}')\n"
+                    "        if r.returncode == 0:\n"
+                    "            print('  ✓ Tor Browser removed')\n"
+                    "        else:\n"
+                    "            print('  ~ Tor Browser removal may need manual uninstall')\n"
+                    "    else:\n"
+                    "        print('  ~ winget not found, Tor Browser not removed automatically')\n"
+                    "else:\n"
+                    "    print('\\n[2/6] Tor Browser was pre-existing — not removed.')\n"
+                    "\n"
+                    "# 3 — Remove Defender exclusions added by setup\n"
                     "if DEF_PATHS or DEF_PROCS or DEF_CFA:\n"
-                    "    print(f'\\n[2/5] Removing Windows Defender exclusions...')\n"
+                    "    print(f'\\n[3/6] Removing Windows Defender exclusions added by setup...')\n"
                     "    for p in DEF_PATHS:\n"
                     "        _ps(f'Remove-MpPreference -ExclusionPath \"{p}\"')\n"
                     "        print(f'  ✓ path exclusion removed: {p}')\n"
@@ -4956,13 +6381,13 @@ def _run_setup_ui():
                     "        _ps(f'Remove-MpPreference -ControlledFolderAccessAllowedApplications \"{p}\"')\n"
                     "        print(f'  ✓ CFA removed: {os.path.basename(p)}')\n"
                     "else:\n"
-                    "    print('\\n[2/5] No Defender exclusions to remove.')\n"
+                    "    print('\\n[3/6] No Defender exclusions to remove.')\n"
                     "\n"
-                    "# 3 — Uninstall VS Build Tools (only if setup installed it)\n"
+                    "# 4 — Uninstall VS Build Tools (only if setup installed it)\n"
                     "if VS_BUILD:\n"
-                    "    print('\\n[3/5] Uninstalling VS Build Tools (installed by setup)...')\n"
-                    "    import shutil as _sh\n"
-                    "    if _sh.which('winget'):\n"
+                    "    print('\\n[4/6] Uninstalling VS Build Tools (installed by setup)...')\n"
+                    "    import shutil as _sh2\n"
+                    "    if _sh2.which('winget'):\n"
                     "        r = subprocess.run(['winget', 'uninstall', '--id',\n"
                     "                            'Microsoft.VisualStudio.2022.BuildTools',\n"
                     "                            '--silent', '--accept-source-agreements'],\n"
@@ -4971,37 +6396,52 @@ def _run_setup_ui():
                     "    else:\n"
                     "        print('  ~ winget not found, skipping VS Build Tools removal')\n"
                     "else:\n"
-                    "    print('\\n[3/5] VS Build Tools was pre-existing — not removed.')\n"
+                    "    print('\\n[4/6] VS Build Tools was pre-existing — not removed.')\n"
                     "\n"
-                    "# 4 — Delete individual files created by setup\n"
-                    "print(f'\\n[4/5] Removing {len(FILES)} file(s) created by setup...')\n"
+                    "# 5 — Delete downloaded files (e.g. Tor installer in _recovery/)\n"
+                    "if DL_FILES:\n"
+                    "    print(f'\\n[5/6] Removing {len(DL_FILES)} downloaded file(s)...')\n"
+                    "    for f in DL_FILES:\n"
+                    "        try:\n"
+                    "            if os.path.isfile(f):\n"
+                    "                os.remove(f)\n"
+                    "                print(f'  ✓ deleted: {os.path.basename(f)}')\n"
+                    "        except Exception as e:\n"
+                    "            print(f'  ~ could not delete {f}: {e}')\n"
+                    "else:\n"
+                    "    print('\\n[5/6] No downloaded files to remove.')\n"
+                    "\n"
+                    "# 6 — Surgical delete: only files/dirs that setup created\n"
+                    "#      Never deletes pre-existing content\n"
+                    "print(f'\\n[6/6] Removing {len(FILES)} file(s) and {len(DIRS)} dir(s) created by setup...')\n"
+                    "deleted_f = deleted_d = 0\n"
                     "for f in FILES:\n"
                     "    try:\n"
-                    "        if os.path.exists(f):\n"
+                    "        if os.path.isfile(f):\n"
                     "            os.remove(f)\n"
-                    "            print(f'  ✓ deleted: {os.path.basename(f)}')\n"
+                    "            print(f'  ✓ file: {os.path.basename(f)}')\n"
+                    "            deleted_f += 1\n"
                     "    except Exception as e:\n"
-                    "        print(f'  ~ could not delete {f}: {e}')\n"
-                    "\n"
-                    "# 5 — Delete install directory tree\n"
-                    "print(f'\\n[5/5] Removing install directory: {INSTALL_DIR}')\n"
-                    "if INSTALL_DIR and os.path.isdir(INSTALL_DIR):\n"
+                    "        print(f'  ~ {f}: {e}')\n"
+                    "for d in sorted(DIRS, key=len, reverse=True):\n"
                     "    try:\n"
-                    "        shutil.rmtree(INSTALL_DIR, ignore_errors=True)\n"
-                    "        print(f'  ✓ removed: {INSTALL_DIR}')\n"
-                    "        # Also try parent V0rtex_System if now empty\n"
-                    "        _parent = os.path.dirname(INSTALL_DIR)\n"
-                    "        if _parent and os.path.isdir(_parent) and not os.listdir(_parent):\n"
-                    "            shutil.rmtree(_parent, ignore_errors=True)\n"
-                    "            print(f'  ✓ removed empty parent: {_parent}')\n"
+                    "        if os.path.isdir(d) and not os.listdir(d):\n"
+                    "            os.rmdir(d)\n"
+                    "            print(f'  ✓ dir:  {os.path.basename(d)}')\n"
+                    "            deleted_d += 1\n"
                     "    except Exception as e:\n"
-                    "        print(f'  ~ rmtree failed: {e}')\n"
-                    "else:\n"
-                    "    print('  ~ install dir not found, skipping')\n"
+                    "        print(f'  ~ {d}: {e}')\n"
+                    "if INSTALL_DIR and os.path.isdir(INSTALL_DIR) and not os.listdir(INSTALL_DIR):\n"
+                    "    try:\n"
+                    "        os.rmdir(INSTALL_DIR)\n"
+                    "        print(f'  ✓ install dir empty and removed: {INSTALL_DIR}')\n"
+                    "    except Exception: pass\n"
+                    "print(f'  {deleted_f} file(s) and {deleted_d} dir(s) removed.')\n"
                     "\n"
-                    "print('\\n' + '=' * 60)\n"
+                    "print('\\n' + '=' * 64)\n"
                     "print('  Cleanup complete.')\n"
-                    "print('=' * 60)\n"
+                    "print('  Pre-existing user files were NOT modified.')\n"
+                    "print('=' * 64)\n"
                     "try:\n"
                     "    os.remove(__file__)\n"
                     "except Exception: pass\n"
@@ -5029,11 +6469,15 @@ def _run_setup_ui():
                              f"|| xterm -e '{sys.executable} {_tmp_path}'"]
                         )
                 except Exception as _ue:
-                    print(f"[V0RTEX Setup] Could not launch uninstall terminal: {_ue}")
+                    print(f"[V0RTEX Setup] Could not launch cleanup terminal: {_ue}")
 
             try: root.destroy()
             except Exception: pass
-            sys.exit(0)
+            try:
+                import os as _os_exit
+                _os_exit._exit(0)
+            except Exception:
+                sys.exit(0)
 
         def _cancel():
             try: dlg.grab_release()
@@ -5066,7 +6510,7 @@ def _run_setup_ui():
 
 
 
-def _run_silent_update_ui(install_dir, python_exe):
+def _run_silent_update_ui(install_dir, python_exe, title="V0RTEX — POST-UPDATE SETUP"):
     import tkinter as _suk
     import tkinter.ttk as _sutt
     import threading as _suth
@@ -5099,7 +6543,7 @@ def _run_silent_update_ui(install_dir, python_exe):
     except Exception:
         return
 
-    root_upd.title("V0RTEX Updater")
+    root_upd.title("V0RTEX — Post-Update Setup")
     root_upd.configure(bg=_BG)
     root_upd.resizable(False, False)
     _W, _H = 520, 320
@@ -5107,12 +6551,15 @@ def _run_silent_update_ui(install_dir, python_exe):
     _sh = root_upd.winfo_screenheight()
     root_upd.geometry(f"{_W}x{_H}+{(_sw - _W) // 2}+{(_sh - _H) // 2}")
     root_upd.overrideredirect(True)
+    root_upd.attributes("-topmost", True)
+    root_upd.lift()
+    root_upd.focus_force()
 
     _suk.Frame(root_upd, bg=_ACC, height=3).pack(fill="x")
     _hf = _suk.Frame(root_upd, bg=_PNL, padx=16, pady=10)
     _hf.pack(fill="x")
 
-    _title_sv = _suk.StringVar(value="V0RTEX IS UPDATING!")
+    _title_sv = _suk.StringVar(value=title)
     _title_lbl = _suk.Label(
         _hf, textvariable=_title_sv,
         font=("Consolas", 15, "bold"), bg=_PNL, fg=_BLU)
@@ -5188,6 +6635,16 @@ def _run_silent_update_ui(install_dir, python_exe):
             pass
 
     root_upd.after(120, _spin_tick)
+
+    def _force_top_su():
+        try:
+            root_upd.lift()
+            root_upd.attributes("-topmost", True)
+            root_upd.focus_force()
+        except Exception:
+            return
+        root_upd.after(800, _force_top_su)
+    root_upd.after(300, _force_top_su)
 
     def _log(msg, tag="DIM"):
         def _d():
@@ -5321,7 +6778,7 @@ def _run_silent_update_ui(install_dir, python_exe):
                 _done_flag[0] = True
                 _spin_sv.set("✔")
                 _spin_lbl.config(fg=_GRN)
-                _title_sv.set("V0RTEX IS NOW UPDATED!")
+                _title_sv.set(title.replace("IN PROGRESS!", "COMPLETE!").replace("IS UPDATING!", "IS NOW UPDATED!"))
                 _title_lbl.config(fg=_GRN)
                 _prog_sv.set("Ready to launch")
                 _su_sty.configure(
@@ -5370,10 +6827,17 @@ def _check_first_run():
 
     _post_update = "--v0rtex-post-update" in _s.argv
 
-    _post_update = "--v0rtex-post-update" in _s.argv
+    _post_update    = "--v0rtex-post-update"    in _s.argv
+    _post_reinstall = "--v0rtex-post-reinstall" in _s.argv
 
     if _o.path.exists(_o.path.join(script_dir, "_setup_complete")):
+        if _post_reinstall:
+            import time as _t_su; _t_su.sleep(0.5)
+            _run_silent_update_ui(script_dir, _s.executable,
+                                  title="V0RTEX REINSTALL IN PROGRESS!")
+            return
         if _post_update:
+            import time as _t_su; _t_su.sleep(3.0)
             _run_silent_update_ui(script_dir, _s.executable)
             return
         return
@@ -5421,9 +6885,13 @@ def _check_first_run():
     except Exception as _ex:
         import traceback as _tc
         _setup_panic("Unexpected Error", str(_ex), _tc.format_exc())
-    sys.exit(0)
+    try:
+        import os as _oe3; _oe3._exit(0)
+    except Exception:
+        sys.exit(0)
 
 _check_first_run()
+_pre_sl("BOOT L5469", "BOOT")
 
 
 _APP_DYING = [False]
@@ -5832,7 +7300,7 @@ def _install_crash_handler():
 
                 def _kill_all_and_exit():
                     import signal as _sig2, time as _tk2
-                    _APP_DYING[0] = True
+                    _sl("App dying — exit initiated", "EXIT"); _sl("APP DYING", "EXIT"); _APP_DYING[0] = True
                     _terminals_active[0] = False
 
 
@@ -6231,6 +7699,9 @@ def _install_crash_handler():
                     if (_adm_log and os.path.exists(_adm_log)
                             and _cfg_priv.get("crash_zip_include_admin_log", True)):
                         _zc.write(_adm_log, "admin_log/admin_status.log")
+                    _sl_log = globals().get("_SILENT_LOG_PATH", "")
+                    if _sl_log and os.path.exists(_sl_log):
+                        _zc.write(_sl_log, f"silent_log/{os.path.basename(_sl_log)}")
                     _version_info = (
                         f"{_VX_TITLE}\n"
                         f"Crash: {_exc_name}: {str(exc_val)[:200]}\n"
@@ -6243,6 +7714,8 @@ def _install_crash_handler():
                     _zc.writestr("README.txt", _version_info)
             except Exception as _ze:
                 pass
+            try: _sl_copy_to_final()
+            except Exception: pass
             sess_log = globals().get("_SESSION_LOG_PATH")
             if sess_log and os.path.exists(os.path.dirname(sess_log)):
                 with open(sess_log, "a", encoding="utf-8") as sf:
@@ -6278,6 +7751,7 @@ def _install_crash_handler():
     globals()["_crash_theater_fn"] = _show_crash_theater
 
 _install_crash_handler()
+_pre_sl("BOOT L6328", "BOOT")
 
 
 _REQUIRED = {
@@ -6350,6 +7824,33 @@ if os.path.exists(_setup_sentinel):
 
 import json, threading, queue, sqlite3, hashlib, time
 import math, re, struct, webbrowser, base64
+
+import subprocess as _subprocess_orig
+_NW_FLAGS = {"creationflags": 0x08000000} if sys.platform == "win32" else {}
+class _SubprocessSilencer:
+    def __getattr__(self, name):
+        orig = getattr(_subprocess_orig, name)
+        if name in ("run", "check_output", "check_call"):
+            def _wrap(*a, **kw):
+                if "creationflags" not in kw: kw.update(_NW_FLAGS)
+                return orig(*a, **kw)
+            return _wrap
+        if name == "Popen":
+            def _popen_wrap(*a, **kw):
+                if "creationflags" not in kw: kw.update(_NW_FLAGS)
+                return orig(*a, **kw)
+            return _popen_wrap
+        return orig
+    def __dir__(self): return dir(_subprocess_orig)
+    PIPE            = _subprocess_orig.PIPE
+    DEVNULL         = _subprocess_orig.DEVNULL
+    STDOUT          = _subprocess_orig.STDOUT
+    STARTUPINFO     = _subprocess_orig.STARTUPINFO
+    STARTF_USESHOWWINDOW = _subprocess_orig.STARTF_USESHOWWINDOW
+    TimeoutExpired  = _subprocess_orig.TimeoutExpired
+    CalledProcessError = _subprocess_orig.CalledProcessError
+subprocess = _SubprocessSilencer()
+
 
 try:
     import requests
@@ -6500,6 +8001,7 @@ try:
     pefile = _pefile_module
 except ImportError:
     pefile = None
+_pre_sl("importing tkinter", "BOOT")
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
 
@@ -6653,19 +8155,194 @@ except ImportError:
 
 
 BASE_DIR          = os.path.dirname(os.path.abspath(__file__))
+_pre_sl(f"BASE_DIR: {BASE_DIR}", "BOOT")
 CONFIG_PATH       = os.path.join(BASE_DIR, "config.json")
 DB_PATH           = os.path.join(BASE_DIR, "scan_history.db")
 RULES_DIR         = os.path.join(BASE_DIR, "rules")
 RULES_PATH        = os.path.join(RULES_DIR,  "malware_rules.yar")
 RULES_EXTERN_DIR  = os.path.join(RULES_DIR,  "external")
 REPORTS_DIR       = os.path.join(BASE_DIR, "reports")
-DEBUG_DIR         = os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils", "debug_log")
+_UTILS_DIR        = os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils")
+DEBUG_DIR         = os.path.join(_UTILS_DIR, "debug_log")
+_pre_sl(f"DEBUG_DIR: {DEBUG_DIR}", "BOOT")
 QUARANTINE_DIR    = os.path.join(BASE_DIR, "quarantine")
-for _d in (REPORTS_DIR, RULES_EXTERN_DIR, QUARANTINE_DIR):
+APP_USAGE_LOG_DIR = os.path.join(BASE_DIR, "app_usage_log")
+QUALITY_CAPTURE_DIR = os.path.join(BASE_DIR, "Quality_Capture")
+
+TEMP_LOG_STORAGE  = os.path.join(_UTILS_DIR, "Temp_Log_Storage")
+CENSOR_CONFIG_PATH = os.path.join(_UTILS_DIR, "censor_config.json")
+
+_TLS_SUBS = ("session_log", "silent_log", "live_traffic",
+             "conn_quality", "tor", "proxy", "noise_gen",
+             "admin_log", "setup_log", "recovery_ops", "update_log")
+_AUL_SUBS = ("live_traffic", "conn_quality", "tor", "proxy", "noise_gen")
+_DBG_SUBS = ("crash_log", "session_log", "silent_log", "trampoline_log",
+             "admin_log", "update_log", "setup_log", "recovery_ops")
+
+for _d in (
+    REPORTS_DIR, RULES_EXTERN_DIR, QUARANTINE_DIR,
+    APP_USAGE_LOG_DIR, QUALITY_CAPTURE_DIR,
+    TEMP_LOG_STORAGE, _UTILS_DIR,
+    os.path.join(_UTILS_DIR, "UNCENSORED"),
+):
     os.makedirs(_d, exist_ok=True)
-os.makedirs(os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils"), exist_ok=True)
+
+for _sub in _TLS_SUBS:
+    os.makedirs(os.path.join(TEMP_LOG_STORAGE, _sub), exist_ok=True)
+    os.makedirs(os.path.join(_UTILS_DIR, "UNCENSORED", _sub), exist_ok=True)
+
+for _sub in _AUL_SUBS:
+    os.makedirs(os.path.join(APP_USAGE_LOG_DIR, _sub), exist_ok=True)
+    os.makedirs(os.path.join(APP_USAGE_LOG_DIR, "UNCENSORED", _sub), exist_ok=True)
+
+for _sub in _DBG_SUBS:
+    os.makedirs(os.path.join(DEBUG_DIR, _sub), exist_ok=True)
+    os.makedirs(os.path.join(DEBUG_DIR, "UNCENSORED", _sub), exist_ok=True)
+
 os.makedirs(DEBUG_DIR, exist_ok=True)
-# Write/refresh version metadata on every startup
+
+
+def _censor_config_load() -> dict:
+    _defaults = {
+        "ip_addresses": True, "ipv6_addresses": True, "usernames": True,
+        "emails": True, "hostnames": True, "mac_addresses": True,
+        "paths": False, "hashes": False, "pids": False,
+        "ports": False, "domains": False, "urls": True,
+        "scan_filenames": False, "v0rtex_session": False,
+    }
+    try:
+        if os.path.isfile(CENSOR_CONFIG_PATH):
+            import json as _ccj
+            with open(CENSOR_CONFIG_PATH, encoding="utf-8") as _ccf:
+                _data = _ccj.load(_ccf)
+            rules = _data.get("rules", {})
+            _defaults.update({k: bool(v) for k, v in rules.items()})
+    except Exception:
+        pass
+    return _defaults
+
+
+def _censor_config_save(rules: dict) -> None:
+    import json as _csj, datetime as _csd
+    try:
+        with open(CENSOR_CONFIG_PATH, "w", encoding="utf-8") as _csf:
+            _csj.dump({
+                "rules": rules,
+                "last_updated": _csd.datetime.now().isoformat(),
+                "version": "1.0",
+            }, _csf, indent=2)
+    except Exception:
+        pass
+
+
+def _censor_text_with_config(text: str, rules: dict) -> str:
+    import re as _cr
+    PATTERNS = {
+        "ip_addresses":   r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
+        "ipv6_addresses": r"\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b",
+        "usernames":      r"(?:Users|home)[/\\]([A-Za-z0-9_.-]+)",
+        "emails":         r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b",
+        "hostnames":      r"(?i)(?:hostname|host|computer)\s*[:=\s]+([A-Za-z0-9_\-\.]+)",
+        "mac_addresses":  r"\b(?:[0-9A-Fa-f]{2}[:\-]){5}[0-9A-Fa-f]{2}\b",
+        "paths":          r"[A-Za-z]:\\(?:[^\s\\/:*?\"<>|\r\n]+\\)+[^\s\\/:*?\"<>|\r\n]*",
+        "hashes":         r"\b[0-9a-fA-F]{32,64}\b",
+        "pids":           r"(?i)\bPID[:\s]+(\d{3,6})\b",
+        "ports":          r"\b(?:port|:\s*)(\d{2,5})\b",
+        "domains":        r"\b(?:[a-z0-9\-]+\.){2,}[a-z]{2,6}\b",
+        "urls":           r"https?://[^\s\r\n\"'<>]+",
+        "scan_filenames": r"(?:Scan(?:ning)?|Analyzed?)\s+([^\s\r\n]{4,})",
+        "v0rtex_session": r"Session\s*#\s*\d+",
+    }
+    for key, pat in PATTERNS.items():
+        if rules.get(key, False):
+            text = _cr.sub(pat, lambda m: "\u2588" * len(m.group(0)), text)
+    return text
+
+
+def _silent_log_censor_flush(force_rules: dict = None) -> None:
+    import shutil as _scsh, datetime as _scd, time as _sct
+    _dbg_path = os.path.join(DEBUG_DIR, "flush_debug.txt")
+    def _fdbg(msg):
+        try:
+            with open(_dbg_path, "a", encoding="utf-8") as _fd:
+                _fd.write(f"[{_scd.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] {msg}\n")
+        except Exception:
+            pass
+    _fdbg(f"flush started, TEMP_LOG_STORAGE={TEMP_LOG_STORAGE}")
+    _do_censor = force_rules is not None or CONFIG.get("auto_censor_logs", False)
+    rules = force_rules if force_rules is not None else (_censor_config_load() if _do_censor else {})
+    _fdbg(f"auto_censor_logs={_do_censor}  rules active: {[k for k,v in rules.items() if v]}")
+    _sct.sleep(0.5)
+    for _sub in _TLS_SUBS:
+        src_dir = os.path.join(TEMP_LOG_STORAGE, _sub)
+        if not os.path.isdir(src_dir):
+            continue
+        try:
+            files_in = os.listdir(src_dir)
+        except Exception as _le:
+            _fdbg(f"  {_sub}: listdir error: {_le}")
+            continue
+        _fdbg(f"  {_sub}: {len(files_in)} file(s)")
+        if _sub in ("session_log", "silent_log", "setup_log",
+                    "admin_log", "update_log", "recovery_ops"):
+            final_dir = os.path.join(DEBUG_DIR, _sub)
+            unc2_dir  = os.path.join(DEBUG_DIR, "UNCENSORED", _sub)
+        else:
+            final_dir = os.path.join(APP_USAGE_LOG_DIR, _sub)
+            unc2_dir  = os.path.join(APP_USAGE_LOG_DIR, "UNCENSORED", _sub)
+        unc_dir = os.path.join(_UTILS_DIR, "UNCENSORED", _sub)
+        for d in (unc_dir, unc2_dir, final_dir):
+            try:
+                os.makedirs(d, exist_ok=True)
+            except Exception as _me:
+                _fdbg(f"  makedirs {d}: {_me}")
+        for fname in files_in:
+            src_file = os.path.join(src_dir, fname)
+            if not os.path.isfile(src_file):
+                continue
+            try:
+                with open(src_file, encoding="utf-8", errors="replace") as _sf:
+                    raw = _sf.read()
+            except Exception as _re:
+                _fdbg(f"  read error {fname}: {_re}")
+                continue
+            if _do_censor:
+                try:
+                    _scsh.copy2(src_file, os.path.join(unc_dir, fname))
+                    _scsh.copy2(src_file, os.path.join(unc2_dir, fname))
+                except Exception as _ce:
+                    _fdbg(f"  copy error {fname}: {_ce}")
+            try:
+                censored = _censor_text_with_config(raw, rules) if _do_censor else raw
+            except Exception as _cxe:
+                _fdbg(f"  censor error {fname}: {_cxe}")
+                censored = raw
+            final_path = os.path.join(final_dir, fname)
+            try:
+                with open(final_path, "w", encoding="utf-8") as _df:
+                    _df.write(censored)
+                _sct.sleep(0.1)
+                for _attempt in range(5):
+                    try:
+                        os.remove(src_file)
+                        _fdbg(f"  OK: {_sub}/{fname}")
+                        break
+                    except PermissionError:
+                        _sct.sleep(0.3)
+                    except OSError:
+                        _fdbg(f"  remove OSError {fname}")
+                        break
+            except Exception as _we:
+                _fdbg(f"  write/remove error {fname}: {_we}")
+                try:
+                    _scsh.move(src_file, final_path)
+                    _fdbg(f"  moved {fname} as fallback")
+                except Exception as _mve:
+                    _fdbg(f"  move also failed {fname}: {_mve}")
+    _fdbg("flush complete")
+
+
+
 try:
     import json as _jvx
     _vx_meta_dir = os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils", ".vx_meta")
@@ -6676,10 +8353,166 @@ except Exception:
     pass
 
 CRASH_REPORT_DIR = os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils", "Crash_Full_Report")
+_pre_sl("BOOT L6729", "BOOT")
 os.makedirs(CRASH_REPORT_DIR, exist_ok=True)
+try:
+    _lock_path = os.path.join(_UTILS_DIR, "_v0rtex_running.lock")
+    with open(_lock_path, "w", encoding="utf-8") as _lf:
+        _lf.write(str(os.getpid()))
+except Exception:
+    pass
+
+
+
+
+
+
+
+_SILENT_LOG_PATH: str = ""
+_SILENT_LOG_READY: bool = False
+
+_SL_INIT_LOCK     = __import__("threading").Lock()
+_SILENT_LOG_LOCK  = __import__("threading").Lock()
+
+def _sl_init() -> None:
+    global _SILENT_LOG_PATH, _SILENT_LOG_READY
+    with _SL_INIT_LOCK:
+        if _SILENT_LOG_READY:
+            return
+    try:
+        import datetime as _sldt
+        _sl_dir = os.path.join(TEMP_LOG_STORAGE, "silent_log")
+        os.makedirs(_sl_dir, exist_ok=True)
+        _sl_name = (f"Silent_Session_{_SESSION_START_TS}"
+                    f"_session{_SESSION_NUMBER:04d}_pid{os.getpid()}.txt")
+        _SILENT_LOG_PATH = os.path.join(_sl_dir, _sl_name)
+        _header = (
+            "# ═══════════════════════════════════════════════════════════════════════════════\n"
+            "# V0RTEX_LOG_SYSTEM: THIS FILE POTENTIALLY CONTAINS PERSONAL INFORMATION.\n"
+            "# It is necessary to identify bugs. Run v0rtex_utils/v0rtex_log_censor.py\n"
+            "# to censor private data before sharing, or enable AUTO-CENSOR in Settings > Privacy.\n"
+            "# ═══════════════════════════════════════════════════════════════════════════════\n\n"
+            + "=" * 78 + "\n"
+            f"  V0RTEX  {_VX_VER}  —  SILENT SESSION LOG\n"
+            f"  Session #{_SESSION_NUMBER:04d}   Started: "
+            f"{_sldt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"  Python:   {sys.version.split()[0]}\n"
+            f"  Platform: {sys.platform}\n"
+            f"  PID:      {os.getpid()}\n"
+            f"  Script:   {os.path.abspath(__file__)}\n"
+            + "=" * 78 + "\n\n"
+        )
+        _buf_snap = list(_PRE_SL_BUF)
+        _PRE_SL_BUF.clear()
+        _sl_censor = False
+        try:
+            import json as _slj2
+            _cp2 = globals().get("CONFIG_PATH", os.path.join(BASE_DIR, "config.json"))
+            if os.path.isfile(_cp2):
+                with open(_cp2, encoding="utf-8") as _cff2:
+                    _sl_censor = bool(_slj2.load(_cff2).get("auto_censor_logs", False))
+        except Exception: pass
+        with open(_SILENT_LOG_PATH, "w", encoding="utf-8") as _slf:
+            _slf.write(_censor_log_msg(_header) if _sl_censor else _header)
+            for _buf_line in _buf_snap:
+                _raw2 = _buf_line.rstrip("\n")
+                _slf.write((_censor_log_msg(_raw2) if _sl_censor else _raw2) + "\n")
+        if _sl_censor:
+            _sl_unc_dir = os.path.join(TEMP_LOG_STORAGE, "UNCENSORED_pre_flush", "silent_log")
+            os.makedirs(_sl_unc_dir, exist_ok=True)
+            _sl_unc_path = os.path.join(_sl_unc_dir, _sl_name)
+            with open(_sl_unc_path, "w", encoding="utf-8") as _sluu:
+                _sluu.write(_header)
+                for _buf_line in _buf_snap:
+                    _sluu.write(_buf_line.rstrip("\n") + "\n")
+            globals()["_SILENT_LOG_UNCENSORED_PATH"] = _sl_unc_path
+        globals()["_SILENT_LOG_MIRROR"] = ""
+        _SILENT_LOG_READY = True
+    except Exception as _sle:
+        try:
+            _fb = os.path.join(DEBUG_DIR, "silent_log_INIT_FAIL.txt")
+            with open(_fb, "a", encoding="utf-8") as _ff:
+                import traceback as _fbtb
+                _ff.write(f"[{__import__('datetime').datetime.now()}] _sl_init FAILED: {_sle}\n")
+                _ff.write(_fbtb.format_exc() + "\n")
+        except Exception:
+            pass
+
+def _sl_copy_to_final() -> None:
+    try:
+        _mir = globals().get("_SILENT_LOG_MIRROR", "")
+        if _SILENT_LOG_PATH and _mir and os.path.exists(_SILENT_LOG_PATH):
+            import shutil as _slsh
+            _slsh.copy2(_SILENT_LOG_PATH, _mir)
+    except Exception:
+        pass
+
+
+
+def _app_log_open(subdir: str, prefix: str) -> tuple:
+    import datetime as _ald
+    ts  = _ald.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    folder = os.path.join(TEMP_LOG_STORAGE, subdir)
+    os.makedirs(folder, exist_ok=True)
+    existing = [f for f in os.listdir(folder) if f.startswith(prefix)]
+    num = len(existing) + 1
+    fname = f"{prefix}_{ts}_session{num:04d}.txt"
+    fpath = os.path.join(folder, fname)
+    header = (
+        "# ═══════════════════════════════════════════════════════════════════\n"
+        f"# V0RTEX_LOG_SYSTEM: {subdir.upper()} LOG\n"
+        "# THIS FILE IS STORED TEMPORARILY AND WILL BE CENSORED ON EXIT.\n"
+        "# Run v0rtex_utils/v0rtex_log_censor.py to censor manually.\n"
+        "# ═══════════════════════════════════════════════════════════════════\n\n"
+        f"  V0RTEX  {globals().get('_VX_VER','?')}  —  {subdir.upper().replace('_',' ')} LOG\n"
+        f"  Session #{num:04d}   Started: {_ald.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"  Python:  {__import__('sys').version.split()[0]}\n"
+        f"  PID:     {__import__('os').getpid()}\n"
+        + "═" * 68 + "\n\n"
+    )
+    try:
+        with open(fpath, "w", encoding="utf-8") as _af:
+            _af.write(header)
+    except Exception:
+        pass
+    return fpath, num
+
+
+def _app_log_write(fpath: str, msg: str) -> None:
+    import datetime as _alw
+    ts = _alw.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+    line = f"[{ts}] {msg}\n"
+    try:
+        with open(fpath, "a", encoding="utf-8", errors="replace") as _af:
+            _af.write(line)
+    except Exception:
+        pass
+
+
+def _sl(msg: str, tag: str = "EVT") -> None:
+    if not _SILENT_LOG_READY:
+        _pre_sl(msg, tag)
+        return
+    try:
+        ts = _dt.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        raw_line = f"[{ts}] [{tag:<8}] {msg}\n"
+        with _SILENT_LOG_LOCK:
+            with open(_SILENT_LOG_PATH, "a", encoding="utf-8", errors="replace") as _slw:
+                _slw.write(raw_line)
+    except Exception:
+        pass
+
+
+_sl(f"Install dir: {BASE_DIR}", "BOOT")
+_sl(f"Python:      {sys.executable}", "BOOT")
+
+
 for _dbl_sub in ("crash_log", "session_log", "trampoline_log",
-                  "admin_log", "update_log", "setup_log", "recovery_ops"):
+                  "admin_log", "update_log", "setup_log", "recovery_ops", "silent_log"):
     try: os.makedirs(os.path.join(DEBUG_DIR, _dbl_sub), exist_ok=True)
+    except Exception: pass
+for _unc_sub in ("session_log", "silent_log"):
+    try: os.makedirs(os.path.join(DEBUG_DIR, "UNCENSORED", _unc_sub), exist_ok=True)
     except Exception: pass
 
 
@@ -6693,16 +8526,25 @@ def _get_session_number()-> int:
         return 1
 
 _SESSION_NUMBER   = _get_session_number()
+_sl("BOOT: L6853", "BOOT")
 _SESSION_START_TS = _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 _SESSION_LOG_NAME = f"log_{_SESSION_START_TS}_session{_SESSION_NUMBER:04d}.txt"
-_SESSION_LOG_PATH = os.path.join(DEBUG_DIR, _SESSION_LOG_NAME)
+_SESSION_LOG_PATH = os.path.join(TEMP_LOG_STORAGE, "session_log", _SESSION_LOG_NAME)
+os.makedirs(os.path.join(TEMP_LOG_STORAGE, "session_log"), exist_ok=True)
+_sl_init()
+_sl(f"sl_init complete — path: {_SILENT_LOG_PATH}", "BOOT")
+
 
 def _session_log(msg: str, level: str = "INFO"):
     try:
+        _sl(msg, level)
+    except Exception:
+        pass
+    try:
         ts = _dt.datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        line = f"[{ts}] [{level:<7}] {msg}\n"
+        raw_line = f"[{ts}] [{level:<7}] {msg}\n"
         with open(_SESSION_LOG_PATH, "a", encoding="utf-8") as _slf:
-            _slf.write(line)
+            _slf.write(raw_line)
         if level not in ("OP", "SYSINFO", "CHKPT") and msg.strip():
             try:
                 with _OP_RING_LOCK:
@@ -6821,6 +8663,7 @@ def _format_system_snapshot(snap: dict) -> str:
 _SYSTEM_SNAPSHOT = {}
 
 def _take_startup_snapshot():
+    _sl("Startup snapshot taken", "BOOT")
     global _SYSTEM_SNAPSHOT
     try:
         _SYSTEM_SNAPSHOT = _collect_system_snapshot()
@@ -6907,6 +8750,10 @@ try:
     with open(_SESSION_LOG_PATH, "w", encoding="utf-8") as _slf:
         _ts_h = _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         _sn_h = globals().get("_SESSION_NUMBER", 0)
+        _slf.write("# " + "\u2550" * 77 + "\n")
+        _slf.write("# V0RTEX_LOG_SYSTEM: THIS FILE POTENTIALLY CONTAINS PERSONAL INFORMATION.\n")
+        _slf.write("# Run v0rtex_utils/v0rtex_log_censor.py to censor before sharing.\n")
+        _slf.write("# " + "\u2550" * 77 + "\n\n")
         _slf.write("=" * 78 + "\n")
         _slf.write(f"  {_VX_TITLE} — SESSION LOG\n")
         _slf.write(f"  Session #{_sn_h:04d}   Started: {_ts_h}\n")
@@ -6916,20 +8763,10 @@ try:
             _slf.write("\n[STARTUP SYSINFO]\n" + _si_h + "\n")
         except Exception:
             pass
-        _slf.write(f"  {_VX_TITLE} — SESSION LOG\n")
-        _slf.write(f"  Session #    {_SESSION_NUMBER}\n")
-        _slf.write(f"  Started      {_SESSION_START_TS}\n")
-        _slf.write(f"  Python       {sys.version.split()[0]}\n")
-        _slf.write(f"  Platform     {sys.platform}\n")
-        _slf.write(f"  PID          {os.getpid()}\n")
-        _slf.write(f"  Script       {os.path.abspath(__file__)}\n")
-        _slf.write("=" * 78 + "\n\n")
-        _slf.write(f"  {_VX_TITLE}  —  SESSION LOG\n")
-        _slf.write(f"  Session #:  {_SESSION_NUMBER}\n")
-        _slf.write(f"  Started:    {_dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         _slf.write(f"  Python:     {sys.version.split()[0]}\n")
         _slf.write(f"  Platform:   {sys.platform}\n")
         _slf.write(f"  PID:        {os.getpid()}\n")
+        _slf.write(f"  Script:     {os.path.abspath(__file__)}\n")
         _slf.write("=" * 78 + "\n\n")
 except Exception:
     pass
@@ -6950,6 +8787,7 @@ if os.path.exists(CONFIG_PATH):
         }
 else:
     _checkpoint("INIT", "config.json not found — using hardcoded defaults")
+    _sl("config.json not found — using hardcoded defaults", "INIT")
     CONFIG = {
         "api_keys": [], "malwarebazaar_key": "", "abuseipdb_key": "",
         "urlscan_key": "", "otx_key": "", "shodan_key": "",
@@ -7034,6 +8872,7 @@ _checkpoint("INIT", f"Runtime params set — VT keys: {len(API_KEYS)}, delay: {R
 
 
 import gc as _gc
+_sl("BOOT: L7206", "BOOT")
 
 _gc_last_run   = [0.0]
 _gc_run_count  = [0]
@@ -7073,9 +8912,11 @@ def _check_admin_startup():
             import ctypes
             if ctypes.windll.shell32.IsUserAnAdmin():
                 _checkpoint("INIT", "Admin check: running as ADMINISTRATOR on Windows — OK")
+                _sl("Admin check: running as ADMINISTRATOR on Windows — OK", "INIT")
                 return
 
             _checkpoint("INIT", "Admin check: NOT admin on Windows — requesting UAC elevation")
+            _sl("Admin check: NOT admin on Windows — requesting UAC elevation", "INIT")
             params = " ".join(f'"{a}"' for a in sys.argv)
             ctypes.windll.shell32.ShellExecuteW(
                 None, "runas", sys.executable, params, None, 1
@@ -7089,10 +8930,12 @@ def _check_admin_startup():
     else:
         if os.getuid() != 0:
             _checkpoint("WARN", "Admin check: require_admin_start=True but running as non-root on Unix — some features may be limited")
+            _sl("Admin check: require_admin_start=True but running as non-root on Unix — some features may be limited", "WARN")
             print("[ADMIN] Warning: app is configured to require root privileges "
                   "but was started as a normal user.")
         else:
             _checkpoint("INIT", "Admin check: running as root on Unix — OK")
+            _sl("Admin check: running as root on Unix — OK", "INIT")
 
 _check_admin_startup()
 
@@ -7108,6 +8951,7 @@ def _is_admin():
 
 _ADMIN_STATUS      = [_is_admin()]
 _ADMIN_STATUS_LOCK = threading.Lock()
+_sl(f"Admin status: {_ADMIN_STATUS[0]}", "BOOT")
 _ADMIN_LOG_PATH    = os.path.join(DEBUG_DIR if "DEBUG_DIR" in dir() else os.path.join(".", "debug_log"), "admin_log", "admin_status.log")
 
 def _log_admin_event(msg):
@@ -7134,6 +8978,8 @@ C = dict(
     blue="#89b4fa", sapphire="#74c7ec", sky="#89dceb",
     flamingo="#f2cdcd", rosewater="#f5e0dc", maroon="#eba0ac",
     lavender="#b4befe",
+    muted="#6c7086",
+    accent="#cba6f7",
 )
 FM = ("Consolas", 10)
 FB = ("Consolas", 11, "bold")
@@ -7194,45 +9040,9 @@ def _quar_quarantine(src_path: str, reason: str = "manual") -> bool:
         _checkpoint("QUAR", f"Quarantine FAILED: {os.path.basename(src_path)} — {e}")
         return False
 
-def _quar_restore(quar_path: str) -> bool:
-    try:
-        with _QUAR_LOCK:
-            with open(quar_path, "rb") as f:
-                raw = f.read()
-        if not raw.startswith(_QUAR_MAGIC):
-            return False
-        offset = len(_QUAR_MAGIC)
-        fn_l, re_l, ts_l, md5_l, sha2_l = _struct.unpack(">HHHHH", raw[offset:offset+10])
-        offset += 10
-        orig_path = raw[offset:offset+fn_l].decode("utf-8"); offset += fn_l
-        offset += re_l + ts_l + md5_l + sha2_l
-        obf = raw[offset:]
-        xor_key = b"SOCQUARANTINE2024"
-        data = bytes(b ^ xor_key[i % len(xor_key)] for i, b in enumerate(obf))
-        os.makedirs(os.path.dirname(orig_path) if os.path.dirname(orig_path) else ".", exist_ok=True)
-        with open(orig_path, "wb") as f:
-            f.write(data)
-        os.remove(quar_path)
-        _log_op(f"[QUARANTINE] Restored: {orig_path}", "INFO")
-        for cb in _quar_refresh_callbacks:
-            try: root.after(0, cb)
-            except Exception: pass
-        return True
-    except Exception as e:
-        _session_log(f"[QUARANTINE] FAIL restore {quar_path}: {e}", "ERROR")
-        return False
 
-def _quar_delete(quar_path: str) -> bool:
-    try:
-        os.remove(quar_path)
-        _log_op(f"[QUARANTINE] Deleted: {quar_path}", "INFO")
-        for cb in _quar_refresh_callbacks:
-            try: root.after(0, cb)
-            except Exception: pass
-        return True
-    except Exception as e:
-        _session_log(f"[QUARANTINE] FAIL delete {quar_path}: {e}", "ERROR")
-        return False
+
+
 
 def _quar_read_meta(quar_path: str) -> dict:
     try:
@@ -7256,13 +9066,7 @@ def _quar_read_meta(quar_path: str) -> dict:
         return {"orig_path": "?", "reason": "?", "ts": "?",
                 "md5": "?", "sha256": "?", "quar_file": quar_path, "quar_size": 0}
 
-def _quar_list() -> list:
-    try:
-        return [_quar_read_meta(os.path.join(QUARANTINE_DIR, f))
-                for f in sorted(os.listdir(QUARANTINE_DIR))
-                if f.endswith(".quar")]
-    except Exception:
-        return []
+
 
 def _quar_pe_repair(quar_path: str) -> bool:
     try:
@@ -7327,119 +9131,7 @@ def _defense_log(msg: str, tag: str = "DIM"):
         try: root.after(0, lambda m=msg, t=tag: cb(m, t))
         except Exception: pass
 
-def _defense_score_file(path: str) -> dict:
-    import math
-    result = {"path": path, "score": 0, "findings": [], "vt_positives": 0,
-              "entropy": 0.0, "yara_hits": [], "pe_suspicious": False,
-              "action_taken": None}
-    if not os.path.isfile(path):
-        return result
-    try:
-        data = open(path, "rb").read()
-    except Exception:
-        return result
 
-
-    if _DEFENSE_SETTINGS.get("scan_entropy", True) and data:
-        freq = [0]*256
-        for b in data: freq[b] += 1
-        entropy = -sum((c/len(data)) * math.log2(c/len(data))
-                       for c in freq if c > 0)
-        result["entropy"] = round(entropy, 3)
-        thresh = _DEFENSE_SETTINGS.get("entropy_threshold", 7.2)
-        if entropy >= thresh:
-            result["score"] = max(result["score"], 1)
-            result["findings"].append(f"High entropy: {entropy:.3f} (threshold {thresh})")
-
-
-    if _DEFENSE_SETTINGS.get("scan_yara", True) and _yara_rules:
-        try:
-            matches = _yara_rules.match(data=data)
-            if matches:
-                hit_names = [m.rule for m in matches]
-                result["yara_hits"] = hit_names
-                result["score"] = max(result["score"], 2)
-                result["findings"].append(f"YARA: {', '.join(hit_names[:4])}")
-        except Exception:
-            pass
-
-
-    if _DEFENSE_SETTINGS.get("scan_pe", True) and data[:2] == b"MZ":
-        try:
-            import pefile as _pef
-            pe = _pef.PE(data=data)
-            suspicious_pe = []
-
-            susp_secs = {b".text\x00", b"UPX0\x00\x00", b"UPX1\x00\x00", b".packed"}
-            for sec in pe.sections:
-                if sec.Name[:5] in {b"UPX0\x00", b"UPX1\x00"}:
-                    suspicious_pe.append("UPX packed")
-
-                sec_data = sec.get_data()
-                if sec_data:
-                    freq2 = [0]*256
-                    for b in sec_data: freq2[b] += 1
-                    ent2 = -sum((c/len(sec_data))*math.log2(c/len(sec_data))
-                                for c in freq2 if c > 0)
-                    if ent2 > 7.5:
-                        suspicious_pe.append(f"Section {sec.Name.rstrip(b'\\x00').decode(errors='replace')} entropy={ent2:.2f}")
-
-            susp_apis = {"VirtualAllocEx","WriteProcessMemory","CreateRemoteThread",
-                         "IsDebuggerPresent","NtUnmapViewOfSection","SetWindowsHookEx"}
-            if hasattr(pe, "DIRECTORY_ENTRY_IMPORT"):
-                for entry in pe.DIRECTORY_ENTRY_IMPORT:
-                    for imp in entry.imports:
-                        if imp.name and imp.name.decode(errors="replace") in susp_apis:
-                            suspicious_pe.append(f"Suspicious API: {imp.name.decode(errors='replace')}")
-            if suspicious_pe:
-                result["pe_suspicious"] = True
-                result["score"] = max(result["score"], 1)
-                result["findings"].extend(suspicious_pe[:4])
-        except Exception:
-            pass
-
-
-    if _DEFENSE_SETTINGS.get("scan_strings", True):
-        try:
-            text = data.decode("latin-1")
-            susp_strings = [
-                ("mimikatz",   3, "Mimikatz string detected"),
-                ("sekurlsa",   3, "Mimikatz sekurlsa module"),
-                ("powershell -enc", 2, "Encoded PowerShell command"),
-                ("cmd.exe /c", 2, "CMD execution string"),
-                ("CreateObject",2, "COM CreateObject"),
-                ("WScript.Shell",2,"WScript shell"),
-                ("bitcoin",    1, "Bitcoin reference"),
-                ("ransom",     2, "Ransom string"),
-                ("encrypt",    1, "Encryption string"),
-                ("reverse_tcp",3, "Metasploit reverse_tcp"),
-                ("METERPRETER",3, "Meterpreter string"),
-            ]
-            for needle, sc, desc in susp_strings:
-                if needle.lower() in text.lower():
-                    result["score"] = max(result["score"], sc)
-                    result["findings"].append(desc)
-        except Exception:
-            pass
-
-
-    if _DEFENSE_SETTINGS.get("scan_vt", True) and API_KEYS:
-        try:
-            md5h = _hl.md5(data).hexdigest()
-            k    = API_KEYS[0]
-            r    = requests.get(f"https://www.virustotal.com/api/v3/files/{md5h}",
-                                headers={"x-apikey": k}, timeout=10)
-            if r.status_code == 200:
-                stats = r.json().get("data",{}).get("attributes",{}).get("last_analysis_stats",{})
-                mal   = stats.get("malicious", 0) + stats.get("suspicious", 0)
-                result["vt_positives"] = mal
-                if mal >= _DEFENSE_SETTINGS.get("alert_threshold", 1):
-                    result["score"] = max(result["score"], 3 if mal >= 5 else 2)
-                    result["findings"].append(f"VirusTotal: {mal} positivi")
-        except Exception:
-            pass
-
-    return result
 
 def _defense_auto_action(result: dict) -> str:
     path  = result["path"]
@@ -7997,7 +9689,7 @@ def _bg_nice():
             return
         if sys.platform == "win32":
             import ctypes as _ct
-            # THREAD_PRIORITY_BELOW_NORMAL = -1, THREAD_PRIORITY_LOWEST = -2
+
             _prio = -2 if _nice >= 15 else -1
             _ct.windll.kernel32.SetThreadPriority(
                 _ct.windll.kernel32.GetCurrentThread(), _prio)
@@ -8258,7 +9950,15 @@ def _check_critical_files():
     for rel in CRITICAL_FILES:
         fp = os.path.join(BASE_DIR, rel.replace("/", os.sep))
         if not os.path.exists(fp):
-            missing.append(rel)
+            try:
+                os.makedirs(os.path.dirname(fp), exist_ok=True)
+                if rel.endswith(".json"):
+                    with open(fp, "w", encoding="utf-8") as _cff:
+                        _cff.write("{}")
+                else:
+                    open(fp, "w").close()
+            except Exception:
+                missing.append(rel)
     return missing
 
 
@@ -8290,7 +9990,7 @@ _missing = _check_critical_files()
 if _missing:
     print(f"[RECOVERY] Missing files: {_missing} — will launch Recovery UI after full load")
 
-# Soft-warn if version metadata was missing (non-blocking)
+
 if not getattr(_vx_load_ver, "_from_file", True):
     def _warn_ver_missing():
         try: _write_crash_log(106, "VERSION_MISSING — .vx_meta/vx_version not found; using built-in fallback.")
@@ -8310,6 +10010,23 @@ try:
 except Exception:
     root = tk.Tk(); _DND = False
 
+def _early_crash_hook(exc_type, exc_val, exc_tb):
+    _pre_sl(f"EARLY CRASH: {exc_type.__name__}: {exc_val}", "CRASH")
+    try: _sl_copy_to_final()
+    except Exception: pass
+    import traceback as _etb
+    tb = "".join(_etb.format_exception(exc_type, exc_val, exc_tb))
+    try:
+        with open(os.path.join(DEBUG_DIR, "crash_log", "early_crash.txt"), "a", encoding="utf-8") as _ecf:
+            import datetime as _edt
+            _ecf.write(f"[{_edt.datetime.now()}] CRASH:\n{tb}\n{'='*60}\n")
+    except Exception:
+        pass
+    try: _session_log(f"CRASH: {exc_type.__name__}: {exc_val}", "ERR")
+    except Exception: pass
+
+
+_pre_sl("main window init", "BOOT")
 root.title(f"{_VX_NAME} v{_VX_VER} by {_VX_AUTH}")
 root.configure(bg=C["base"])
 root.withdraw()
@@ -8416,10 +10133,9 @@ _SPLASH_LINES = [
     ("[GUI]   Chart renderer: matplotlib Agg backend  ✓",    "#a6e3a1",    28),
     ("",                                                     "#cdd6f4",    10),
     ("╔══════════════════════════════════════════════╗",      "#cba6f7",    20),
-    (f"║   {_VX_NAME}  v{_VX_VER}  —  READY  ✓      ║",      "#cba6f7",    20),
+    (f"║   {_VX_NAME}  v{_VX_VER}  —  READY  ✓".ljust(46) + "║",  "#cba6f7",    20),
     ("╚══════════════════════════════════════════════╝",      "#cba6f7",    20),
     ("",                                                     "#cdd6f4",    10),
-    ("$ _",                                                   "#89b4fa",    30),
 ]
 
 
@@ -8654,7 +10370,7 @@ def _confirm_exit():
     popup = tk.Toplevel(root)
     popup.title(""); popup.resizable(False, False)
     popup.configure(bg=C["surface0"])
-    popup.geometry("340x140")
+    popup.geometry("360x170")
     popup.transient(root); popup.grab_set()
     root.update_idletasks()
     x = root.winfo_x() + root.winfo_width()//2 - 170
@@ -8692,7 +10408,6 @@ def _confirm_exit():
                     _pc[0].kill()
             except Exception: pass
         _safe_destroy_root()
-        os._exit(0)
 
     tk.Button(btns, text="  Exit  ", command=_do_exit,
               bg=C["red"], fg=C["base"], font=FB, relief="flat",
@@ -8857,9 +10572,268 @@ def _show_kill_terminal():
         except Exception:
             sys.exit(0)
 
+def _show_kill_terminal():
+    import signal as _sig
+    import time   as _kt
+
+    _KILL_BG  = "#08000a"
+    _KILL_RED = "#ff1a33"
+    _KILL_DIM = "#4d0015"
+    _KILL_YEL = "#ffaa00"
+    _KILL_GRN = "#00ff88"
+    _KILL_BRT = "#ff4466"
+
+
+    _KW, _KH = 460, 290
+
+    _KILL_CMDS = [
+        ("$ sudo kill -15 $(pgrep -f malware_lab_pro)",   0.10, "CMD"),
+        (f"[  0.001] SIGTERM → PID {os.getpid()}",        0.08, "YEL"),
+        ("[  0.008] Writing final session log ...",        0.10, "DIM"),
+        ("[  0.014] Stopping watchdog observer ...",       0.09, "DIM"),
+        ("[  0.021] Joining scan worker threads (4) ...",  0.11, "DIM"),
+        ("[  0.035] Flushing scan queue — 0 pending ...",  0.09, "DIM"),
+        ("[  0.042] Terminating VirusTotal workers ...",   0.10, "DIM"),
+        ("[  0.051] Stopping YARA engine ...",             0.09, "DIM"),
+        ("[  0.058] Unloading PE / entropy modules ...",   0.09, "DIM"),
+        ("[  0.064] Closing SQLite connections...",       0.10, "DIM"),
+        ("[  0.073] Flushing auto-backup state ...",       0.09, "DIM"),
+        ("[  0.079] Closing network monitor sockets ...",  0.09, "DIM"),
+        ("[  0.085] Stopping tshark subprocess ...",       0.10, "DIM"),
+        ("[  0.092] Saving notes.txt to disk ...",         0.09, "DIM"),
+        ("[  0.099] Unregistering tray icon...",          0.09, "DIM"),
+        ("[  0.106] Releasing 171 MB from heap ...",       0.10, "DIM"),
+        ("[  0.114] *** SIGKILL broadcast ***",            0.12, "RED"),
+        (f"[  0.116] PID {os.getpid():>6}: SIGKILL ✓",   0.07, "GRN"),
+        (f"[  0.117] PID {os.getpid()+1:>6}: SIGKILL ✓", 0.06, "GRN"),
+        (f"[  0.118] PID {os.getpid()+2:>6}: SIGKILL ✓", 0.06, "GRN"),
+        ("[  0.122] Unmounting sandbox filesystem...",    0.09, "DIM"),
+        ("[  0.129] Removing .lock files ...",             0.09, "DIM"),
+        ("[  0.135] Purging tmp scan artifacts ...",       0.09, "DIM"),
+        ("[  0.141] Destroying tkinter widget tree ...",   0.11, "DIM"),
+        ("[  0.148] All threads joined — clean shutdown",  0.11, "GRN"),
+        ("",                                               0.06, "DIM"),
+        ("[  0.152] ═══ PROCESS EXITED — code 0 ═══",     0.0,  "RED"),
+    ]
+
+    sw = root.winfo_screenwidth()
+    sh = root.winfo_screenheight()
+
+
+    _kx = sw - _KW - 24
+    _ky = 24
+
+
+    def _collect_melt_targets():
+        targets = []
+        try:
+            for child in root.winfo_children():
+                try:
+                    if child == win: continue
+                    if child.winfo_exists() and child.winfo_viewable():
+                        targets.append(child)
+                except Exception: pass
+        except Exception: pass
+        import random as _mr; _mr.shuffle(targets)
+        return targets
+
+
+    win = tk.Toplevel(root)
+    win.title("KILLING — V0RTEX")
+    win.geometry(f"{_KW}x{_KH}+{_kx}+{_ky}")
+    win.configure(bg=_KILL_BG)
+    win.attributes("-topmost", True)
+    win.resizable(False, False)
+    win.protocol("WM_DELETE_WINDOW", lambda: None)
+    win.lift()
+    win.focus_force()
+
+
+    tbar = tk.Frame(win, bg="#0f0008", pady=4, padx=10); tbar.pack(fill=tk.X)
+    tk.Label(tbar, text="  ● ● ●   KILLING — V0RTEX",
+             font=("Consolas",9), bg="#0f0008", fg=_KILL_DIM).pack(side=tk.LEFT)
+    tk.Label(tbar, text=f"PID {os.getpid()}",
+             font=("Consolas",8), bg="#0f0008", fg="#660022").pack(side=tk.RIGHT)
+    tk.Frame(win, bg=_KILL_RED, height=2).pack(fill=tk.X)
+
+
+    sc = tk.Scrollbar(win, orient="vertical", bg="#330011",
+                      troughcolor=_KILL_BG, relief="flat", bd=0, width=6)
+    txt = tk.Text(win, bg="#060004", fg=_KILL_BRT,
+                  font=("Consolas",9), relief="flat", bd=0,
+                  padx=12, pady=8, wrap="word", state="disabled",
+                  insertbackground=_KILL_RED, cursor="arrow")
+    def _sc_safe(f, l):
+        try: sc.set(f, l)
+        except tk.TclError: pass
+    txt.config(yscrollcommand=_sc_safe)
+    sc.config(command=txt.yview)
+    sc.pack(side=tk.RIGHT, fill=tk.Y)
+    txt.pack(fill=tk.BOTH, expand=True)
+
+    for tag, col in [("RED",_KILL_RED),("GRN",_KILL_GRN),("YEL",_KILL_YEL),
+                     ("CMD","#cc3355"),("DIM",_KILL_DIM),("BRT",_KILL_BRT)]:
+        txt.tag_configure(tag, foreground=col)
+
+
+    prog_frame = tk.Frame(win, bg="#0f0008", height=6); prog_frame.pack(fill=tk.X, side=tk.BOTTOM)
+    prog_bar = tk.Frame(prog_frame, bg=_KILL_RED, height=6)
+    prog_bar.place(relx=0, rely=0, relwidth=0, height=6)
+
+    def _write(line, tag):
+        try:
+            txt.config(state="normal")
+            txt.insert(tk.END, line + "\n", tag)
+            txt.see(tk.END)
+            txt.config(state="disabled")
+        except tk.TclError: pass
+
+    total_cmds = len(_KILL_CMDS)
+
+    def _run_cmds(ci=0):
+        if ci >= total_cmds:
+            try: prog_bar.place_configure(relwidth=1.0)
+            except Exception: pass
+            return
+        line, delay, tag = _KILL_CMDS[ci]
+        _write(line, tag)
+        try: prog_bar.place_configure(relwidth=(ci+1) / total_cmds)
+        except Exception: pass
+        ms = max(40, int(delay * 1000))
+        win.after(ms, lambda: _run_cmds(ci + 1))
+
+
+    def _start_melt():
+        targets = _collect_melt_targets()
+        total   = max(len(targets), 1)
+        base_interval = min(10000 // total, 900)
+
+        def _melt_one(idx=0):
+            if idx >= len(targets):
+                def _fade_root(step=0):
+                    alphas = [0.7, 0.5, 0.3, 0.15, 0.0]
+                    if step >= len(alphas):
+                        try: root.withdraw()
+                        except Exception: pass
+                        return
+                    try: root.attributes("-alpha", alphas[step])
+                    except Exception: pass
+                    root.after(120, lambda: _fade_root(step+1))
+                _fade_root(); return
+            try:
+                w = targets[idx]
+                if w.winfo_exists(): w.destroy()
+            except Exception: pass
+            import random as _jr
+            jitter = _jr.randint(-80, 150)
+            root.after(base_interval + jitter, lambda: _melt_one(idx+1))
+        _melt_one()
+
+    def _write_final_log():
+        try:
+            import datetime as _dtk
+            ts    = _dtk.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            lines = [
+                "", "━"*62,
+                f"  SESSION ENDED — {ts}",
+                f"  Exit: user-initiated clean shutdown via KILLING sequence",
+                f"  PID: {os.getpid()}  |  Platform: {sys.platform}",
+                "━"*62, "",
+            ]
+            entry = "\n".join(lines) + "\n"
+            sess_log = globals().get("_SESSION_LOG_PATH")
+            if sess_log:
+                try:
+                    with open(sess_log, "a", encoding="utf-8") as _sf: _sf.write(entry)
+                except Exception: pass
+            try:
+                import datetime as _dtk2
+                ddir = globals().get("DEBUG_DIR", os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)), "debug_log"))
+                os.makedirs(ddir, exist_ok=True)
+                ts_fn = _dtk2.datetime.now().strftime("%Y%m%d_%H%M%S")
+                with open(os.path.join(ddir, f"shutdown_{ts_fn}.txt"), "w", encoding="utf-8") as _sf2:
+                    _sf2.write(entry)
+            except Exception: pass
+        except Exception: pass
+
+    def _kill_all_subprocesses():
+        killed = []
+        try:
+            import psutil as _ps_die
+            parent = _ps_die.Process(os.getpid())
+            for ch in parent.children(recursive=True):
+                try: ch.kill(); killed.append(ch.pid)
+                except Exception: pass
+        except Exception: pass
+        for _vn in ["_sp_current_proc", "_wd_proc", "_net_capture_proc"]:
+            try:
+                _pc = globals().get(_vn)
+                if _pc and _pc[0]:
+                    _pc[0].kill(); killed.append(getattr(_pc[0], 'pid', '?'))
+            except Exception: pass
+        return killed
+
+
+    _DEADLINE_MS = 10_000
+
+    def _hard_die():
+        import time as _hdt, os as _hdo
+        try: _write_final_log()
+        except Exception: pass
+        try:
+            killed = _kill_all_subprocesses()
+            if killed:
+                _write(f"[{_hdt.strftime('%H:%M:%S')}] Killed PIDs: {', '.join(str(p) for p in killed)}", "GRN")
+            else:
+                _write(f"[{_hdt.strftime('%H:%M:%S')}] No child processes.", "DIM")
+        except Exception: pass
+        _write("", "DIM")
+        _write("  ⛔  TERMINATED — closing...  ⛔  ", "RED")
+        _write("", "DIM")
+        try: win.update_idletasks()
+        except Exception: pass
+
+
+        _hdt.sleep(1.0)
+        try:
+            pending = root.tk.eval("after info").split()
+            for _aid in pending:
+                try: root.after_cancel(_aid)
+                except Exception: pass
+        except Exception: pass
+        try: root.destroy()
+        except Exception: pass
+        try: win.destroy()
+        except Exception: pass
+        _hdo._exit(0)
+
+    win.after(80, _run_cmds)
+    root.after(1200, _start_melt)
+
+    root.after(_DEADLINE_MS, _hard_die)
 
 def _safe_destroy_root():
+    _sl("Safe destroy root called", "EXIT")
+    _sl_copy_to_final()
     _APP_DYING[0] = True
+    try:
+        globals()["_SILENT_LOG_READY"] = False
+        with _SILENT_LOG_LOCK:
+            pass
+        _silent_log_censor_flush()
+    except Exception:
+        try:
+            import traceback as _fbtb3
+            with open(os.path.join(DEBUG_DIR, "flush_error.txt"), "a", encoding="utf-8") as _ff3:
+                _ff3.write(f"flush in _safe_destroy_root failed:\n{_fbtb3.format_exc()}\n")
+        except Exception:
+            pass
+    try:
+        import os as _oe_lk
+        _oe_lk.remove(_oe_lk.path.join(_UTILS_DIR, "_v0rtex_running.lock"))
+    except Exception:
+        pass
     try:
 
         pending = root.tk.eval("after info").split()
@@ -9578,8 +11552,21 @@ root.after(300, lambda: _dash_nb.select(0))
 root.after(500, _dash_full_refresh)
 def _dash_on_tab_changed(event):
     try:
-        if str(_nb.select()) == str(_tab_dash):
+        sel = str(_nb.select())
+        if sel == str(_tab_dash):
             root.after(80, _dash_full_refresh)
+        try:
+            if sel == str(_tab_net):
+                root.after(200, _nc_refresh)
+        except Exception: pass
+        try:
+            if sel == str(_tab_chrt_host):
+                root.after(100, _update_charts)
+        except Exception: pass
+        try:
+            if sel == str(_tab_rep):
+                root.after(100, _rep_refresh)
+        except Exception: pass
     except Exception: pass
 _nb.bind("<<NotebookTabChanged>>", _dash_on_tab_changed)
 
@@ -9913,9 +11900,9 @@ def _rep_open_folder():
         raw = _rep_tree.item(iid, "text").strip().lstrip("\U0001f4c1 ").split("[")[0].strip()
         folder_path = os.path.join(REPORTS_DIR, raw)
     if os.path.isdir(folder_path):
-        if sys.platform == "win32": subprocess.Popen(["explorer", folder_path], creationflags=0x08000000 if sys.platform=="win32" else 0)
-        elif sys.platform == "darwin": subprocess.Popen(["open", folder_path], creationflags=0x08000000 if sys.platform=="win32" else 0)
-        else: subprocess.Popen(["xdg-open", folder_path], creationflags=0x08000000 if sys.platform=="win32" else 0)
+        if sys.platform == "win32": subprocess.Popen(["explorer", folder_path])
+        elif sys.platform == "darwin": subprocess.Popen(["open", folder_path])
+        else: subprocess.Popen(["xdg-open", folder_path])
 
 def _rep_export_txt():
     import shutil
@@ -10333,7 +12320,8 @@ def _try_compile_file(full_path):
 
 def _compile_all_rules():
     if not yara:
-        _checkpoint("YARA", "yara module not available — skipping compilation")
+        _sl("YARA event", "YARA"); _checkpoint("YARA", "yara module not available — skipping compilation")
+        _sl("yara module not available — skipping compilation", "YARA")
         return None
     try:
         with _rules_state_lock:
@@ -10351,6 +12339,7 @@ def _compile_all_rules():
                     fps[f"x_{fn}"] = full
         if not fps:
             _checkpoint("YARA", "No enabled/valid rule files found — YARA engine inactive")
+            _sl("No enabled/valid rule files found — YARA engine inactive", "YARA")
             return None
         try:
             result = yara.compile(filepaths=fps)
@@ -10516,8 +12505,8 @@ def _github_list_yar_new(owner, repo, path, _depth=0) -> list:
            if path else f"https://api.github.com/repos/{owner}/{repo}/contents")
     results = []
     try:
-        r = requests.get(url, timeout=20,
-                         headers={"Accept": "application/vnd.github.v3+json"})
+        r = requests.get(url, timeout=10,
+                         headers={"Accept": "application/vnd.github.v3+json", "User-Agent": "V0RTEX-YARA/1.0"})
         if r.status_code != 200: return []
         items = r.json()
         if not isinstance(items, list): return []
@@ -10673,7 +12662,7 @@ def _ym_download_checked():
     root.after(0, _ym_dl_btn_update)
 
     def _do():
-
+        _bg_nice()
         root.after(0, lambda: _dl_progress_var.set("Fetching file lists..."))
         all_files = []
         with ThreadPoolExecutor(max_workers=len(selected)) as ex:
@@ -10857,9 +12846,6 @@ _ym_dl_btn_update()
 
 _ym_nb = ttk.Notebook(_ym_right); _ym_nb.pack(fill=tk.BOTH, expand=True)
 
-def _yara_log(msg, cat="INFO"):
-    pass
-
 _sty.configure("TNotebook.Tab", padding=[10,5])
 
 
@@ -10920,7 +12906,6 @@ _ym_tree.heading("cat",    text="Category",   anchor="w")
 _ym_tree.heading("status", text="Status",     anchor="center")
 _ym_tree.heading("size",   text="Size",       anchor="e")
 
-
 _sty.configure("Treeview",
                background=C["mantle"], foreground=C["text"],
                fieldbackground=C["mantle"], font=FM,
@@ -10938,7 +12923,6 @@ _ym_tree.tag_configure("cat_hdr",  foreground=C["mauve"], font=FB)
 _ym_tree_sc_y.pack(side=tk.RIGHT,  fill=tk.Y)
 _ym_tree_sc_x.pack(side=tk.BOTTOM, fill=tk.X)
 _ym_tree.pack(fill=tk.BOTH, expand=True)
-
 
 def _ym_tree_dblclick(event):
     for iid in _ym_tree.selection():
@@ -11070,6 +13054,7 @@ def _ym_delete_selected():
 def _ym_recompile():
     _yara_log("Recompiling enabled rules...", "INFO")
     _checkpoint("RULES", "Manual YARA recompile triggered")
+    _sl("Manual YARA recompile triggered", "RULES")
     def _do():
         global _yara_rules
         new = _compile_all_rules()
@@ -11079,10 +13064,12 @@ def _ym_recompile():
             if new:
                 _yara_log("Rules active!", "INFO")
                 _checkpoint("RULES", "YARA recompile OK — rules loaded and active")
+                _sl("YARA recompile OK — rules loaded and active", "RULES")
                 _ym_library_refresh()
             else:
                 _yara_log("No valid rules enabled", "WARNING")
                 _checkpoint("RULES", "YARA recompile done — no valid rules loaded")
+                _sl("YARA recompile done — no valid rules loaded", "RULES")
         root.after(0, _upd)
     threading.Thread(target=_do, daemon=True).start()
 
@@ -11214,6 +13201,7 @@ def _ye_update_nums():
 def _ye_sync_scroll(*args):
     _ye_ed.yview(*args); _ye_nums.yview(*args)
 _ye_nums_sc.config(command=_ye_sync_scroll)
+_sl("BOOT: L11518", "BOOT")
 
 _ye_ed.bind("<KeyRelease>", _ye_highlight)
 _ye_ed.bind("<ButtonRelease>", _ye_highlight)
@@ -11256,6 +13244,7 @@ _ye_act = tk.Frame(_ye_out_frame, bg=C["surface0"], pady=6, padx=8)
 _ye_act.pack(side=tk.BOTTOM, fill=tk.X)
 
 def _ye_test():
+    _sl("YARA rule test triggered", "YARA")
     _ye_out_clear()
     code = _ye_ed.get("1.0", tk.END).strip()
     if not code:
@@ -11283,26 +13272,8 @@ def _ye_test():
             root.after(0, lambda: _ye_out_write(f"✗  Error: {e}", "ERR"))
     threading.Thread(target=_do, daemon=True).start()
 
-def _ye_save():
-    code = _ye_ed.get("1.0", tk.END).strip()
-    if not code:
-        _ye_out_write("Nothing to save.", "WARN"); return
-    name = _ye_name_var.get().strip()
-    if not name.endswith(".yar"): name += ".yar"
-
-    try:
-        yara.compile(source=code)
-    except yara.SyntaxError as e:
-        _ye_out_write(f"✗  Cannot save — fix syntax errors first:\n   {e}", "ERR"); return
-    dest = os.path.join(RULES_EXTERN_DIR, name)
-    with open(dest, "w", encoding="utf-8") as f: f.write(code)
-    _state_set(name, True, "local")
-    _ye_out_write(f"✓  Saved: {dest}", "OK")
-    _ye_out_write("   Recompiling ruleset...", "INFO")
-    _ym_recompile()
-    _ym_library_refresh()
-
 def _ye_load():
+    _sl("YARA rule loaded from file", "YARA")
     from tkinter import filedialog
     path = filedialog.askopenfilename(
         initialdir=RULES_DIR, title="Open YARA rule",
@@ -11349,6 +13320,10 @@ def _ye_new():
 def _ye_clear_out():
     _ye_out_clear()
 
+if "_ye_save" not in dir():
+    def _ye_save(): pass
+if "_ye_test" not in dir():
+    def _ye_test(): pass
 _ye_btns = [
     ("▶ Test",    _ye_test,    C["blue"]),
     ("💾 Save",   _ye_save,    C["green"]),
@@ -11510,6 +13485,7 @@ def _startup_compile():
     global _yara_rules
     _bg_nice()
     _checkpoint("INIT", "Background YARA compilation started")
+    _sl("Background YARA compilation started", "INIT")
     try:
         rules = _compile_all_rules()
         _startup_yara_queue.put(("ok", rules))
@@ -11529,10 +13505,12 @@ def _startup_yara_poll():
         if payload:
             _log_debug("YARA rules compiled OK", "INFO")
             _checkpoint("INIT", "Startup YARA compile complete — rules active")
+            _sl("Startup YARA compile complete — rules active", "INIT")
             _ym_library_refresh()
         else:
             _log_debug("No valid YARA rules found – scanning without YARA", "WARNING")
             _checkpoint("INIT", "Startup YARA compile complete — no rules found, YARA inactive")
+            _sl("Startup YARA compile complete — no rules found, YARA inactive", "INIT")
     else:
         _log_debug(f"YARA compile error: {payload}", "WARNING")
 
@@ -11540,6 +13518,23 @@ threading.Thread(target=_startup_compile, daemon=True).start()
 root.after(100, _startup_yara_poll)
 _log_debug("YARA compiling in background...", "INFO")
 _checkpoint("INIT", "UI ready — main window built, worker thread started, background YARA compiling")
+_sl("UI ready — main window built, worker thread started, background YARA compiling", "INIT")
+
+def _vx_debug_excepthook(exc_type, exc_val, exc_tb):
+    import traceback as _tbe2
+    tb = "".join(_tbe2.format_exception(exc_type, exc_val, exc_tb))
+    try: _sl(f"[CRASH] MODULE-LEVEL EXCEPTION: {exc_type.__name__}: {exc_val}", "CRASH")
+    except Exception: pass
+    try: _sl(f"[CRASH] TRACEBACK:\n{tb}", "CRASH")
+    except Exception: pass
+    try:
+        import os as _oe
+        _ef = _oe.path.join(_oe.path.dirname(_oe.path.abspath(__file__)), "vx_crash_dump.txt")
+        with open(_ef, "w", encoding="utf-8") as _f: _f.write(tb)
+    except Exception: pass
+sys.excepthook = _vx_debug_excepthook
+
+_sl("[DBG] INIT done — sys.excepthook armed, starting tab builds", "BOOT")
 
 
 _TI_TIMEOUT = 12
@@ -11550,7 +13545,7 @@ def _ti_abuseipdb(ip: str) -> dict:
             "https://api.abuseipdb.com/api/v2/check",
             params={"ipAddress": ip, "maxAgeInDays": 90},
             headers={"Accept": "application/json",
-                     "Key": CONFIG.get("abuseipdb_key","")},
+                     "Key": CONFIG.get("abuseipdb_key","", timeout=15)},
             timeout=_TI_TIMEOUT)
         if r.status_code == 200:
             d = r.json().get("data", {})
@@ -11714,6 +13709,7 @@ def _sandbox_dialog():
 
 
 _q       = queue.Queue()
+_sl("BOOT: L12025", "BOOT")
 _q_items = []; _q_lk = threading.Lock()
 
 def _sidebar_add(n):
@@ -12295,6 +14291,8 @@ def _worker():
         _auto_gc("scan_worker")
 
 threading.Thread(target=_worker, daemon=True).start()
+_sl("BOOT: L12606", "BOOT")
+_sl("[DBG] CP1 worker thread started", "BOOT")
 
 
 def _enqueue(path, base=None):
@@ -12404,6 +14402,7 @@ def _add_folder():
 
 if _DND:
     def _on_drop(event):
+        _sl(f"File drop event received", "DROP")
         for p in root.tk.splitlist(event.data):
             if os.path.isdir(p):
                 out = os.path.join(REPORTS_DIR, os.path.basename(p))
@@ -12449,8 +14448,9 @@ if _MATPLOTLIB_OK:
     _perf_canvas = FigureCanvasTkAgg(_perf_fig, master=_tab_perf)
 else:
     _perf_fig = None; _perf_canvas = None
-_perf_canvas.get_tk_widget().configure(bg=C["base"])
-_perf_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
+if _perf_canvas:
+    _perf_canvas.get_tk_widget().configure(bg=C["base"])
+    _perf_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
 
 def _update_perf_chart():
     with _perf_hist_lock:
@@ -12529,8 +14529,9 @@ if _MATPLOTLIB_OK:
     _tl_canvas = FigureCanvasTkAgg(_tl_fig, master=_tab_timeline)
 else:
     _tl_fig = None; _tl_canvas = None
-_tl_canvas.get_tk_widget().configure(bg=C["base"])
-_tl_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=8, pady=(4,0))
+if _tl_canvas:
+    _tl_canvas.get_tk_widget().configure(bg=C["base"])
+    _tl_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=8, pady=(4,0))
 
 
 _tl_list_frame = tk.Frame(_tab_timeline, bg=C["surface0"], height=140)
@@ -12672,6 +14673,7 @@ def _ye_do_highlight():
         _ye_editor.tag_add("rule_name", s, e)
 
 _ye_editor.tag_configure("kw",        foreground=C["mauve"],   font=("Consolas",10,"bold"))
+_sl("BOOT: L12987", "BOOT")
 _ye_editor.tag_configure("mod",       foreground=C["peach"])
 _ye_editor.tag_configure("str_tag",   foreground=C["green"])
 _ye_editor.tag_configure("hex_str",   foreground=C["teal"])
@@ -12692,6 +14694,7 @@ _ye_editor.insert(tk.END, """rule My_Rule {
 }
 """)
 _ye_do_highlight()
+_sl("[DBG] CP2 YARA editor ready", "BOOT")
 
 
 tk.Label(_ye_right, text="AZIONI", font=FB, bg=C["surface0"],
@@ -12742,6 +14745,7 @@ def _ye_test_on_file():
         _ye_status_lbl.config(fg=C["red"])
 
 def _ye_save():
+    _sl("YARA rule saved", "YARA")
     source = _ye_editor.get("1.0", tk.END).strip()
     if not source: return
     dest = filedialog.asksaveasfilename(
@@ -12852,12 +14856,12 @@ def _watcher_stop():
         _log_ops("[AutoScan] Stopped", "DIM")
 
 def _watcher_toggle():
+    _sl("Watcher toggled", "WATCH")
     if _watcher_observer[0]:
         _watcher_stop()
     else:
         folder = filedialog.askdirectory(title="Choose folder to watch")
         if folder: _watcher_start(folder)
-
 
 def _notify(title, msg, urgent=False):
     try:
@@ -13009,6 +15013,7 @@ def _watcher_start():
 
 
 _tab_sb_host = tk.Frame(_nb, bg=C["base"]); _nb.add(_tab_sb_host, text="🔬SB")
+_sl("[DBG] CP3 sandbox tab starting", "BOOT")
 _sb_host_nb = ttk.Notebook(_tab_sb_host); _sb_host_nb.pack(fill=tk.BOTH, expand=True)
 
 _tab_sandbox = tk.Frame(_sb_host_nb, bg=C["base"])
@@ -13020,6 +15025,7 @@ _sb_nb = ttk.Notebook(_tab_sandbox); _sb_nb.pack(fill=tk.BOTH, expand=True, padx
 _sb_watch_tab = tk.Frame(_sb_nb, bg=C["base"]); _sb_nb.add(_sb_watch_tab, text=" AUTO-SCAN ")
 _sw_top = tk.Frame(_sb_watch_tab, bg=C["surface0"], pady=10, padx=16); _sw_top.pack(fill=tk.X)
 tk.Label(_sw_top, text="AUTO-SCAN WATCHER", font=FB, bg=C["surface0"], fg=C["teal"]).pack(anchor="w")
+_sl("BOOT: L13338", "BOOT")
 tk.Label(_sw_top, text="Automatically scan new files dropped into a folder",
          font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
 tk.Frame(_sb_watch_tab, bg=C["surface2"], height=1).pack(fill=tk.X)
@@ -13036,7 +15042,7 @@ tk.Frame(_sb_watch_tab, bg=C["surface2"], height=1).pack(fill=tk.X)
 _sw_folder_row = tk.Frame(_sb_watch_tab, bg=C["surface0"], padx=16, pady=8); _sw_folder_row.pack(fill=tk.X)
 tk.Label(_sw_folder_row, text="Watching:", font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(side=tk.LEFT)
 tk.Label(_sw_folder_row, textvariable=_watch_folder_var,
-         font=FM, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT, padx=8)
+         font=FM, bg=C["surface0"], fg=C["text"], width=55, anchor="w").pack(side=tk.LEFT, padx=8)
 
 tk.Label(_sb_watch_tab, text="New files are queued automatically · temp/hidden files ignored · flat mode · requires: watchdog",
          font=FS, bg=C["surface0"], fg=C["overlay0"], padx=16, pady=3, wraplength=700, justify="left").pack(fill=tk.X)
@@ -13170,7 +15176,7 @@ for t,c in {"PROC":C["blue"],"FILE":C["teal"],"NET":C["mauve"],
             "WARN":C["yellow"],"BAD":C["red"],"OK":C["green"],"DIM":C["overlay0"]}.items():
     _sp_out.tag_configure(t, foreground=c)
 
-_SP_MAX_LINES = 28
+_SP_MAX_LINES = 500
 
 def _sp_log(msg, tag="DIM"):
     def _do():
@@ -13435,7 +15441,7 @@ def _sp_run():
         nf = len((snap_after - snap_before) if monitor_fs else set())
         nc = len((net_after - net_before) if monitor_net else set())
         if not nf and not nc:
-            _sp_log("\n>_ CLEAN — No changes detected", "OK")
+            _sp_log(f"\n>_ CLEAN — No file/network changes detected in {os.path.dirname(target) if monitor_fs else '(fs monitoring off)'}", "OK")
         else:
             _sp_log(f"\n>_ SUMMARY: {len(proc_names)} processes | {nf} file | {nc} connections", "WARN")
             if nf or nc:
@@ -13445,12 +15451,20 @@ def _sp_run():
 
     threading.Thread(target=_do, daemon=True).start()
 
-def _fs_snapshot(folder):
+def _fs_snapshot(folder, max_files=2000):
+    """Snapshot filesystem — capped at max_files to avoid timeout on large dirs."""
     result = set()
+    count = 0
     try:
-        for dirpath, _, files in os.walk(folder):
+        for dirpath, dirs, files in os.walk(folder):
+
+            dirs[:] = [d for d in dirs if d not in ('__pycache__', '.git', 'node_modules', '.tox')]
             for fn in files:
-                try: result.add(os.path.join(dirpath,fn))
+                try:
+                    result.add(os.path.join(dirpath, fn))
+                    count += 1
+                    if count >= max_files:
+                        return result
                 except Exception: pass
     except Exception: pass
     return result
@@ -13466,6 +15480,7 @@ def _net_snapshot():
     return result
 
 _mkbtn(_sp_run_btn_frame, "\u25ba Run & Monitor", _sp_run, C["mauve"], C["base"])
+_sl("BOOT: L13792", "BOOT")
 _mkbtn(_sp_kill_btn_f,   "\u23f9 Kill Process",   _sp_kill, C["red"],   C["base"])
 
 
@@ -13778,7 +15793,16 @@ _sbs_right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 _sbs_act = tk.Frame(_sbs_left, bg=C["surface0"], pady=10, padx=10)
 _sbs_act.pack(side=tk.BOTTOM, fill=tk.X)
 
+_sandbox_build_lock = [False]
 def _sandbox_build():
+    if _sandbox_build_lock[0]: return
+    _sandbox_build_lock[0] = True
+    try:
+        _sandbox_build_real()
+    finally:
+        _sandbox_build_lock[0] = False
+
+def _sandbox_build_real():
     sdir = _sandbox_dir_var.get().strip()
     drop = os.path.join(sdir, "drop")
     try:
@@ -13880,6 +15904,7 @@ def _sandbox_start_drop_watch(drop_folder):
     _sb_log(f"Drop watch active: {drop_folder}", "OK")
 
 _mkbtn(_sbs_act, "🔨 Build Sandbox",    _sandbox_build,    C["green"])
+_sl("BOOT: L14215", "BOOT")
 _mkbtn(_sbs_act, "💥 Dismantle",         _sandbox_dismantle, C["red"])
 
 tk.Frame(_sbs_left, bg=C["surface2"], height=1).pack(fill=tk.X)
@@ -14231,6 +16256,7 @@ _sk_vscroll = tk.Scrollbar(_stg_keys_tab, orient="vertical",
                             bg=C["surface1"], troughcolor=C["mantle"], relief="flat", bd=0, width=8)
 _sk_vscroll.pack(side=tk.RIGHT, fill=tk.Y)
 _sk_canvas = tk.Canvas(_stg_keys_tab, bg=C["base"], highlightthickness=0)
+_sl("BOOT: L14566", "BOOT")
 _sk_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 _sk_canvas.configure(yscrollcommand=_sk_vscroll.set)
 _sk_vscroll.configure(command=_sk_canvas.yview)
@@ -14722,6 +16748,7 @@ def _sk_clear_all():
     _sk_result_sv.set("Form cleared. Press 💾 Save to apply.")
 
 _sk_btns = tk.Frame(_sk_action_bar, bg=C["surface0"]); _sk_btns.pack(anchor="w")
+_sl("BOOT: L15057", "BOOT")
 _mkbtn(_sk_btns, "💾 Save All",   _sk_save,      C["green"])
 _mkbtn(_sk_btns, "🔌 Test All",   _sk_test_all,  C["blue"])
 _mkbtn(_sk_btns, "🗑 Clear Form",    _sk_clear_all, C["red"])
@@ -14788,8 +16815,8 @@ def _sk_save_cfg():
 
 def _cfg_open_editor():
     if sys.platform == "win32": os.startfile(CONFIG_PATH)
-    elif sys.platform == "darwin": subprocess.Popen(["open", CONFIG_PATH], creationflags=0x08000000 if sys.platform=="win32" else 0)
-    else: subprocess.Popen(["xdg-open", CONFIG_PATH], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    elif sys.platform == "darwin": subprocess.Popen(["open", CONFIG_PATH])
+    else: subprocess.Popen(["xdg-open", CONFIG_PATH])
 
 _cfg_btn_row = tk.Frame(_cfg_body, bg=C["base"]); _cfg_btn_row.pack(anchor="w", pady=4)
 _mkbtn(_cfg_btn_row, "💾 Save Config",     _sk_save_cfg,       C["green"])
@@ -14820,6 +16847,7 @@ _wl_txt.pack(fill=tk.BOTH, expand=True, pady=(4,0))
 for e in sorted(_whitelist_set): _wl_txt.insert(tk.END, e + "\n")
 _wl_btns = tk.Frame(_wl_body, bg=C["base"], pady=6); _wl_btns.pack(anchor="w")
 def _wl_save():
+    _sl("Whitelist saved", "CFG")
     global _whitelist_set
     entries = {l.strip().lower() for l in _wl_txt.get("1.0",tk.END).splitlines() if l.strip()}
     _whitelist_set = entries
@@ -15027,11 +17055,17 @@ def _ckpt_tab_poll():
     except Exception: pass
 root.after(3000, _ckpt_tab_poll)
 root.after(1500, _ckpt_flush_buffer)
+root.after(2000, _ckpt_flush_buffer)
 
 
 
 _stg_dblog_tab = tk.Frame(_stg_nb, bg=C["base"])
 _stg_nb.add(_stg_dblog_tab, text=" 🗂 DEBUG LOGS ")
+def _dbl_on_tab_focus(e=None):
+    try:
+        if _stg_nb.index("current") == _stg_nb.index(_stg_dblog_tab): _dbl_list_files()
+    except Exception: pass
+_stg_nb.bind("<<NotebookTabChanged>>", _dbl_on_tab_focus)
 
 _dbl_head = tk.Frame(_stg_dblog_tab, bg=C["surface0"], pady=8, padx=16)
 _dbl_head.pack(fill=tk.X)
@@ -15067,6 +17101,7 @@ _dbl_lb = tk.Listbox(_dbl_left, bg=C["mantle"], fg=C["text"],
                       font=("Consolas", 8), relief="flat", bd=0,
                       selectbackground=C["surface2"], activestyle="none",
                       yscrollcommand=_dbl_lb_sc.set)
+_sl("BOOT: L15406", "BOOT")
 _dbl_lb_sc.config(command=_dbl_lb.yview)
 _dbl_lb_sc.pack(side=tk.RIGHT, fill=tk.Y)
 _dbl_lb.pack(fill=tk.BOTH, expand=True)
@@ -15194,6 +17229,7 @@ tk.Label(_cfg_bottom, textvariable=_cfg_bottom_result_sv,
 
 def _cfg_save_all():
     _checkpoint("CONFIG", "Save All triggered — persisting API keys + config + whitelist to config.json")
+    _sl("Save All triggered — persisting API keys + config + whitelist to config.json", "CONFIG")
     try: _sk_save()
     except Exception: pass
     try: _sk_save_cfg()
@@ -15202,6 +17238,7 @@ def _cfg_save_all():
     except Exception: pass
     _cfg_bottom_result_sv.set("✓ API keys, config and whitelist saved to config.json")
     _checkpoint("CONFIG", "Save All complete — config.json written")
+    _sl("Save All complete — config.json written", "CONFIG")
 
 _mkbtn(_cfg_bottom, "💾 Save All", _cfg_save_all, C["green"])
 _mkbtn(_cfg_bottom, "⛔ Uninstall", lambda: _write_and_launch_uninstall(), C["red"])
@@ -15416,6 +17453,7 @@ _ls_txt.config(xscrollcommand=_ls_hsc.set)
 _ls_sc.config(command=_ls_txt.yview)
 _ls_hsc.pack(side=tk.BOTTOM, fill=tk.X)
 _ls_sc.pack(side=tk.RIGHT, fill=tk.Y)
+_sl("BOOT: L15760", "BOOT")
 _ls_txt.pack(fill=tk.BOTH, expand=True)
 _ls_txt.tag_configure("url", foreground=C["blue"])
 _ls_txt.tag_configure("ip",  foreground=C["red"])
@@ -15778,6 +17816,7 @@ _IOC_PATTERNS = {
     "File Paths":  (r'[A-Za-z]:\\(?:[^\\\/:*?"<>|\r\n]+\\)*[^\\\/:*?"<>|\r\n]*', "PATH"),
     "BTC Wallets": (r'\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b|\bbc1[a-z0-9]{6,87}\b', "BTC"),
 }
+_sl("BOOT: L16112", "BOOT")
 
 def _li_extract():
     import re as _re
@@ -15821,6 +17860,12 @@ _mkbtn(_li_ctrl2, "✕ Clear All",
 
 _tab_proc_host = tk.Frame(_nb, bg=C["base"]); _nb.add(_tab_proc_host, text="🖥PROC")
 _proc_nb = ttk.Notebook(_tab_proc_host); _proc_nb.pack(fill=tk.BOTH, expand=True)
+def _proc_on_tab_focus(e=None):
+    try:
+        _proc_refresh_current()
+    except Exception: pass
+_proc_nb.bind("<<NotebookTabChanged>>", _proc_on_tab_focus)
+root.after(500, lambda: _proc_nb.event_generate("<<NotebookTabChanged>>") if _proc_nb.winfo_exists() else None)
 
 _tab_proc = tk.Frame(_proc_nb, bg=C["base"]); _proc_nb.add(_tab_proc, text="🖥Processes")
 
@@ -16031,6 +18076,17 @@ tk.Checkbutton(_nc_ctrl, text="Auto 30s", variable=_nc_auto_var, font=FS,
                selectcolor=C["mantle"], relief="flat").pack(side=tk.LEFT, padx=8)
 _nc_status_sv = tk.StringVar(value="")
 tk.Label(_nc_ctrl, textvariable=_nc_status_sv, font=FS, bg=C["surface0"], fg=C["teal"]).pack(side=tk.LEFT, padx=12)
+_nc_filter_v = tk.StringVar()
+_nc_filter_row = tk.Frame(_net_conn_tab, bg=C["base"], padx=16, pady=3); _nc_filter_row.pack(fill=tk.X)
+tk.Label(_nc_filter_row, text="Filter process:", font=FS, bg=C["base"], fg=C["text"]).pack(side=tk.LEFT)
+tk.Entry(_nc_filter_row, textvariable=_nc_filter_v, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+         insertbackground=C["text"], relief="flat", bd=3, width=22).pack(side=tk.LEFT, padx=(4,8))
+tk.Label(_nc_filter_row, text="Filter port:", font=FS, bg=C["base"], fg=C["text"]).pack(side=tk.LEFT)
+_nc_port_filter_v = tk.StringVar()
+tk.Entry(_nc_filter_row, textvariable=_nc_port_filter_v, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+         insertbackground=C["text"], relief="flat", bd=3, width=8).pack(side=tk.LEFT, padx=(4,8))
+_mkbtn(_nc_filter_row, "Apply", lambda: _nc_scan(), C["sapphire"])
+_mkbtn(_nc_filter_row, "Clear", lambda: (_nc_filter_v.set(""), _nc_port_filter_v.set(""), _nc_scan()), C["surface2"])
 _nc_sc = tk.Scrollbar(_net_conn_tab, orient="vertical", bg=C["surface1"],
                        troughcolor=C["mantle"], relief="flat", bd=0, width=7)
 _nc_hsc = tk.Scrollbar(_net_conn_tab, orient="horizontal", bg=C["surface1"],
@@ -16074,10 +18130,14 @@ def _nc_refresh():
             _nc_out.insert(tk.END,"─"*110+"\n","DIM"),
             _nc_out.config(state="disabled"),
         ])
+        _nc_proc_flt = _nc_filter_v.get().strip().lower()
+        _nc_port_flt = _nc_port_filter_v.get().strip()
         for c in sorted(conns, key=lambda x: x.pid or 0):
             if not c.raddr: continue
             rip = c.raddr.ip; rport = c.raddr.port
             if ext_only and any(rip.startswith(p) for p in _PRIVATE_PREFIXES): continue
+            if _nc_proc_flt and _nc_proc_flt not in (pid_map.get(c.pid,"") or "").lower(): continue
+            if _nc_port_flt and _nc_port_flt.isdigit() and int(_nc_port_flt) not in (c.laddr.port if c.laddr else 0, rport): continue
             shown += 1
             proto = "TCP" if c.type==1 else "UDP"
             local = f"{c.laddr.ip}:{c.laddr.port}" if c.laddr else "-"
@@ -16105,6 +18165,8 @@ def _nc_refresh():
             try: root.after(30000, _nc_refresh)
             except Exception: pass
     threading.Thread(target=_do, daemon=True).start()
+
+_nc_scan = _nc_refresh
 
 def _nc_copy_sel():
     try:
@@ -16140,6 +18202,7 @@ def _nc_export():
         messagebox.showerror("Export", str(e))
 
 _mkbtn(_nc_ctrl, "🔄 Refresh", _nc_refresh, C["sapphire"])
+_sl("BOOT: L16490", "BOOT")
 _mkbtn(_nc_ctrl, "🔍 Lookup IP", _nc_lookup_sel, C["blue"])
 _mkbtn(_nc_ctrl, "📋 Copy", _nc_copy_sel, C["surface2"], C["text"])
 _mkbtn(_nc_ctrl, "💾 Export", _nc_export, C["surface2"], C["text"])
@@ -16348,6 +18411,7 @@ except Exception: pass
 _nt_ctrl = tk.Frame(_nt_pad_tab, bg=C["surface0"], padx=12, pady=6); _nt_ctrl.pack(fill=tk.X)
 
 def _nt_save():
+    _sl("Notes saved", "NOTE")
     try:
         with open(NOTES_PATH, "w", encoding="utf-8") as f: f.write(_nt_txt.get("1.0",tk.END))
         _nt_saved_sv.set(f"✓ Saved {time.strftime('%H:%M:%S')}")
@@ -16557,6 +18621,7 @@ def _quar_list() -> list:
 
 
 _DEFENSE_ACTIVE  = threading.Event()
+_sl("BOOT: L16908", "BOOT")
 _defense_results = []
 _defense_lock    = threading.Lock()
 
@@ -16762,10 +18827,10 @@ _dsv_scanned  = tk.StringVar(value="0")
 _dsv_threats  = tk.StringVar(value="0")
 _dsv_quarantine_count = tk.StringVar(value="0")
 _dsv_clean    = tk.StringVar(value="0")
-for _lbl, _var, _col in [("File analizzati", _dsv_scanned, C["blue"]),
-                          ("Minacce",         _dsv_threats, C["red"]),
-                          ("In Quarantena",   _dsv_quarantine_count, C["yellow"]),
-                          ("Puliti",          _dsv_clean,   C["green"])]:
+for _lbl, _var, _col in [("Files Analyzed", _dsv_scanned, C["blue"]),
+                          ("Threats",         _dsv_threats, C["red"]),
+                          ("Quarantined",   _dsv_quarantine_count, C["yellow"]),
+                          ("Clean",          _dsv_clean,   C["green"])]:
     _sf2 = tk.Frame(_def_stats_f, bg=C["crust"], padx=20, pady=8); _sf2.pack(side=tk.LEFT)
     tk.Label(_sf2, text=_lbl, font=("Consolas",7), bg=C["crust"], fg=C["overlay0"]).pack(anchor="w")
     tk.Label(_sf2, textvariable=_var, font=("Consolas",16,"bold"), bg=C["crust"], fg=_col).pack(anchor="w")
@@ -16864,6 +18929,7 @@ def _defense_scan_folder(folder=None):
     threading.Thread(target=_worker, daemon=True).start()
 
 def _defense_arm():
+    _sl("Defense mode ARMED", "DEFENSE")
     _DEFENSE_ACTIVE.set()
     _defense_set_status("ARMED")
     _defense_log(">_ Defense Mode ARMED — active monitoring", "GOOD")
@@ -16872,11 +18938,13 @@ def _defense_arm():
     _checkpoint("DEFENSE", f"Mode ARMED — interval: {_DEF_SETTINGS['monitor_interval']}s  entropy_check: {_DEF_SETTINGS.get('check_entropy',True)}  PE_check: {_DEF_SETTINGS.get('check_pe',True)}")
 
 def _defense_disarm():
+    _sl("Defense mode DISARMED", "DEFENSE")
     _DEFENSE_ACTIVE.clear()
     _defense_set_status("DISARMED")
     _defense_log(">_ Defense Mode DISARMED", "DIM")
     _session_log("[DEFENSE] Defense Mode disarmed", "INFO")
     _checkpoint("DEFENSE", "Mode DISARMED — real-time monitoring stopped")
+    _sl("Mode DISARMED — real-time monitoring stopped", "DEFENSE")
 
 def _defense_scan_now():
     folder = filedialog.askdirectory(title="Choose folder to analyze")
@@ -16912,6 +18980,7 @@ def _defense_clear_log():
     _def_log_txt.config(state="disabled")
 
 _mkbtn(_def_ctrl_f, "🛡 ARM",             _defense_arm,          C["green"])
+_sl("BOOT: L17266", "BOOT")
 _mkbtn(_def_ctrl_f, "⏹ Disarm",           _defense_disarm,       C["overlay0"])
 _mkbtn(_def_ctrl_f, "🔍 Scan Folder",_defense_scan_now,     C["blue"])
 _mkbtn(_def_ctrl_f, "🖥 Scan Processes",_defense_scan_running,  C["mauve"])
@@ -16999,7 +19068,7 @@ def _def_stg_section(title):
     return f
 
 
-s_action = _def_stg_section("AZIONE AUTOMATICA AL RILEVAMENTO")
+s_action = _def_stg_section("AUTOMATIC ACTION ON DETECTION")
 _def_action_var = tk.StringVar(value=_DEF_SETTINGS["action_on_detect"])
 for val, lbl in [("ask","❓ Ask every time (default)"),
                   ("quarantine","🔒 Quarantena automatica"),
@@ -17011,7 +19080,7 @@ for val, lbl in [("ask","❓ Ask every time (default)"),
                    relief="flat").pack(anchor="w", pady=2)
 
 
-s_thr = _def_stg_section("SOGLIE")
+s_thr = _def_stg_section("THRESHOLDS")
 _def_thr_var   = tk.StringVar(value=str(_DEF_SETTINGS["auto_quarantine_threshold"]))
 _def_ent_var   = tk.StringVar(value=str(_DEF_SETTINGS["entropy_threshold"]))
 _def_intvl_var = tk.StringVar(value=str(_DEF_SETTINGS["monitor_interval"]))
@@ -17050,7 +19119,7 @@ for var, lbl in [
                    selectcolor=C["mantle"], relief="flat").pack(anchor="w", pady=2)
 
 
-s_ext = _def_stg_section("ESTENSIONI MONITORATE")
+s_ext = _def_stg_section("MONITORED EXTENSIONS")
 _def_ext_var = tk.StringVar(value=" ".join(_DEF_SETTINGS["scan_extensions"]))
 tk.Label(s_ext, text="Space-separated list:", font=FS, bg=C["surface0"], fg=C["text"]).pack(anchor="w")
 tk.Entry(s_ext, textvariable=_def_ext_var, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
@@ -17142,11 +19211,11 @@ _gs_v_dark_bg       = tk.BooleanVar(value=CONFIG.get("ui_terminal_bg",True))
 _gs_v_status_anim   = tk.BooleanVar(value=CONFIG.get("ui_status_animation",True))
 _gs_v_toast_dur     = tk.StringVar(value=CONFIG.get("ui_toast_duration","3000"))
 
-_su = _gs_section(_gs_ui_inner, "ASPETTO", C["blue"])
+_su = _gs_section(_gs_ui_inner, "APPEARANCE", C["blue"])
 _gs_row(_su, "Base font size (pt):",        _gs_v_font_size,    "(requires restart)", 6)
 _gs_row(_su, "Max visible log lines:",     _gs_v_log_maxlines, "default: 2000", 8)
 _gs_row(_su, "Toast duration (ms):",          _gs_v_toast_dur,    "default: 3000", 8)
-_su2 = _gs_section(_gs_ui_inner, "COMPORTAMENTO", C["sapphire"])
+_su2 = _gs_section(_gs_ui_inner, "BEHAVIOR", C["sapphire"])
 _gs_check(_su2, "Confirm before exiting",                 _gs_v_confirm_exit)
 _gs_check(_su2, "Show system tray icon",             _gs_v_show_tray)
 _gs_check(_su2, "Minimize to tray instead of closing",   _gs_v_minimize_tray)
@@ -17203,18 +19272,18 @@ _gs_row(_ss, "VT timeout (sec):",               _gs_v_vt_timeout,     "default: 
 _gs_row(_ss, "Max file size VT upload (MB):",   _gs_v_max_file_mb,    "default: 32",  8)
 _gs_row(_ss, "Re-scan VT after N days:",        _gs_v_vt_rescan_days, "0 = always",  8)
 _gs_check(_ss, "Auto-submit file su VirusTotal",        _gs_v_auto_vt)
-_ss2 = _gs_section(_gs_sc_inner, "COMPORTAMENTO SCAN", C["green"])
+_ss2 = _gs_section(_gs_sc_inner, "SCAN BEHAVIOR", C["green"])
 _gs_check(_ss2, "Compile YARA rules in background on startup",  _gs_v_auto_yara)
 _gs_check(_ss2, "Auto-generate report after scan",    _gs_v_auto_report)
 _gs_check(_ss2, "Recursive folder scanning",    _gs_v_scan_recurse)
-_gs_check(_ss2, "Salta file vuoti (0 byte)",             _gs_v_skip_empty)
+_gs_check(_ss2, "Skip empty files (0 bytes)",            _gs_v_skip_empty)
 _gs_check(_ss2, "Extract and save IOCs automatically",    _gs_v_save_iocs)
 _gs_check(_ss2, "Compare with previous scan",    _gs_v_compare_prev)
 _ss3 = _gs_section(_gs_sc_inner, "NOTIFICATIONS & HASH", C["peach"])
 _gs_check(_ss3, "Notify when file is malicious",        _gs_v_notify_malicious)
 _gs_check(_ss3, "Notify when file is clean",         _gs_v_notify_clean)
 _gs_row(_ss3, "Hash display priority:",                  _gs_v_hash_priority, "md5/sha1/sha256", 10)
-_ss4 = _gs_section(_gs_sc_inner, "FORMATO REPORT", C["mauve"])
+_ss4 = _gs_section(_gs_sc_inner, "REPORT FORMAT", C["mauve"])
 _report_fmt_f = tk.Frame(_ss4, bg=C["surface0"]); _report_fmt_f.pack(anchor="w")
 for v, l in [("html","HTML (default)"),("pdf","PDF"),("json","JSON"),("txt","Testo")]:
     tk.Radiobutton(_report_fmt_f, text=l, variable=_gs_v_report_fmt, value=v,
@@ -17258,8 +19327,51 @@ _gs_check(_sp2, "Save file paths to database", _gs_v_store_paths)
 _gs_check(_sp2, "Anonymize paths (filename only)",  _gs_v_anon_paths)
 _gs_check(_sp2, "Never upload files to the cloud",       _gs_v_no_cloud)
 _gs_check(_sp2, "Encrypt local database (future)",       _gs_v_encrypt_db)
+
+_priv_autocensor_var = tk.BooleanVar(value=CONFIG.get("auto_censor_logs", False))
+
+def _priv_autocensor_toggle():
+    CONFIG["auto_censor_logs"] = _priv_autocensor_var.get()
+    _CENSOR_ENABLED_CACHE[0] = CONFIG["auto_censor_logs"]
+    _gs_save_all()
+    _sl(f"Auto-censor logs: {CONFIG['auto_censor_logs']}", "CFG")
 _sp3 = _gs_section(_gs_pv_inner, "CRASH & SESSION LOGS", C["blue"])
-_gs_check(_sp3, "Include system info in crash/session logs\n"          "  (CPU, RAM, OS, screen, admin status)",   _gs_v_log_sysinfo)
+_sl("BOOT: L17620", "BOOT")
+
+_autocensor_row = tk.Frame(_gs_pv_inner, bg=C["base"]); _autocensor_row.pack(fill=tk.X, pady=2)
+tk.Label(_autocensor_row, text="Auto-censor logs before writing",
+         font=FS, bg=C["base"], fg=C["text"]).pack(side=tk.LEFT, padx=(8,0))
+tk.Checkbutton(_autocensor_row, variable=_priv_autocensor_var,
+               command=_priv_autocensor_toggle,
+               font=FS, bg=C["base"], fg=C["subtext"],
+               selectcolor=C["surface0"], activebackground=C["base"],
+               relief="flat", bd=0).pack(side=tk.LEFT, padx=4)
+tk.Label(_autocensor_row,
+         text="(replaces IPs, usernames, paths with ██ in new log entries)",
+         font=("Consolas", 7), bg=C["base"], fg=C["muted"]).pack(side=tk.LEFT, padx=4)
+
+def _open_log_censor():
+    import subprocess as _spc
+    _censor_path = os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils", "v0rtex_log_censor.py")
+    if not os.path.isfile(_censor_path):
+        tmb_cens = tk.Toplevel(root)
+        tmb_cens.title("Not found")
+        tmb_cens.configure(bg=C["base"])
+        tk.Label(tmb_cens, text=f"v0rtex_log_censor.py not found:\n{_censor_path}",
+                 font=FS, bg=C["base"], fg=C["red"], padx=20, pady=20).pack()
+        return
+    _sl("Opening v0rtex_log_censor.py", "SYS")
+    _spc.Popen([sys.executable, _censor_path])
+
+_censor_row = tk.Frame(_gs_pv_inner, bg=C["base"]); _censor_row.pack(fill=tk.X, pady=(0,4))
+tk.Button(_censor_row, text="  ⬛  Open Log Censor Tool  ",
+          command=_open_log_censor,
+          font=FS, bg=C["surface0"], fg=C["accent"],
+          relief="flat", padx=10, pady=4, cursor="hand2", bd=0).pack(side=tk.LEFT, padx=8)
+tk.Label(_censor_row,
+         text="Censor private data from log files before sharing",
+         font=("Consolas", 7), bg=C["base"], fg=C["muted"]).pack(side=tk.LEFT)
+_gs_check(_sp3, "Include system info in crash/session logs\n"           "  (CPU, RAM, OS, screen, admin status)",   _gs_v_log_sysinfo)
 _gs_check(_sp3, "Include last 30 operations in crash logs",  _gs_v_log_last_ops)
 _gs_check(_sp3, "Include open file handles in crash logs",   _gs_v_log_open_handles)
 _sp4 = _gs_section(_gs_pv_inner, "CRASH REPORT ZIP", C["teal"])
@@ -17323,6 +19435,7 @@ _gs_result_sv = tk.StringVar(value="Press 💾 Save to apply settings")
 _gs_result_label_frame = tk.Frame(_gs_nb, bg=C["base"])
 
 def _gs_save_all():
+    _sl("Settings saved", "CFG")
     try:
         CONFIG.update({
 
@@ -17378,7 +19491,6 @@ def _gs_save_all():
     except Exception as e:
         _gs_result_sv.set(f"✗ Error: {e}")
 
-
 def _gs_scrollframe(parent):
     c = tk.Canvas(parent, bg=C["base"], highlightthickness=0)
     sb = tk.Scrollbar(parent, orient="vertical", command=c.yview,
@@ -17409,10 +19521,10 @@ _gs_row(sn1, "Proxy Username",                 _gs_v_proxy_user,  "", 24)
 _gs_row(sn1, "Proxy Password",                 _gs_v_proxy_pass,  "", 24, show="•")
 sn2 = _gs_section(_gsn, "API & RATE LIMITING")
 _gs_row(sn2, "Request timeout (sec)",          _gs_v_net_timeout, "", 6)
-_gs_row(sn2, "Max retries per chiamata",       _gs_v_net_retries, "", 4)
+_gs_row(sn2, "Max retries per call",           _gs_v_net_retries, "", 4)
 _gs_row(sn2, "VT rate limit (req/min)",        _gs_v_vt_rate,     "4=free, 1000=premium", 6)
 _gs_row(sn2, "User-Agent HTTP header",         _gs_v_ua,          "", 40)
-sn3 = _gs_section(_gsn, "CATTURA TRAFFICO")
+sn3 = _gs_section(_gsn, "CAPTURE TRAFFIC")
 _gs_row(sn3, "PCAP capture duration (sec)",      _gs_v_pcap_dur,    "0 = disabled", 6)
 _gs_row(sn3, "DNS resolve timeout (sec)",      _gs_v_dns_timeout, "", 4)
 
@@ -17444,7 +19556,7 @@ _gs_row(sd2,   "Max file size (MB)",              _gs_v_def_max_mb,  "", 6)
 _gs_row(sd2,   "Suspicious entropy threshold (0-8)",        _gs_v_entropy_thr, "default 7.0", 6)
 _gs_row(sd2,   "YARA timeout per file (sec)",           _gs_v_yara_to,     "", 6)
 sd3 = _gs_section(_gsd, "SANDBOX")
-_gs_row(sd3,   "Durata monitoraggio sandbox (sec)",     _gs_v_sandbox_dur, "", 6)
+_gs_row(sd3,   "Sandbox monitoring duration (sec)",     _gs_v_sandbox_dur, "", 6)
 _gs_check(sd3, "Submit to VT after sandbox if suspicious",   _gs_v_vt_after_sb)
 
 
@@ -17466,13 +19578,13 @@ _gs_check(sno1, "Toast in-app (angolo basso-destra)",   _gs_v_nt_toast)
 _gs_check(sno1, "System tray notification",              _gs_v_nt_tray)
 _gs_check(sno1, "Suono di sistema (beep)",               _gs_v_nt_sound)
 _gs_row(sno1,   "Durata toast (ms)",                     _gs_v_nt_dur_ms, "", 8)
-sno2 = _gs_section(_gsno, "EVENTI CHE SCATENANO NOTIFICA")
+sno2 = _gs_section(_gsno, "NOTIFICATION TRIGGERS")
 _gs_check(sno2, "MALICIOUS file detected",               _gs_v_nt_on_mal)
 _gs_check(sno2, "SUSPICIOUS file detected",              _gs_v_nt_on_sus)
 _gs_check(sno2, "Scan completed (clean)",               _gs_v_nt_on_done)
 _gs_check(sno2, "YARA hit found",                      _gs_v_nt_on_yara)
 _gs_check(sno2, "Crash / critical error",                _gs_v_nt_on_crash)
-sno3 = _gs_section(_gsno, "EMAIL ALERT  (opzionale)")
+sno3 = _gs_section(_gsno, "EMAIL ALERT  (optional)")
 _gs_row(sno3,   "Recipient email",                    _gs_v_nt_email, "leave empty = disabled", 36)
 _gs_row(sno3,   "SMTP server (host:porta)",              _gs_v_nt_smtp,  "es. smtp.gmail.com:587", 30)
 tk.Label(_gsno, text="  ⓘ  Email alerts require manual SMTP config in config.json",
@@ -17481,7 +19593,7 @@ tk.Label(_gsno, text="  ⓘ  Email alerts require manual SMTP config in config.j
 
 _gs_adv_tab = tk.Frame(_gs_nb, bg=C["base"]); _gs_nb.add(_gs_adv_tab, text=" ADVANCED ")
 
-# ─── PERFORMANCE TAB (dedicated) ────────────────────────────────────────────
+
 _gs_perf_tab = tk.Frame(_gs_nb, bg=C["base"]); _gs_nb.add(_gs_perf_tab, text=" ⚡ PERFORMANCE ")
 _gsp = _gs_scrollframe(_gs_perf_tab)
 
@@ -17536,7 +19648,7 @@ tk.Button(_sp4_row,
           relief="flat", bd=0, padx=14, pady=8, cursor="hand2",
           command=lambda: _nb.select(_tab_perf)
           ).pack(side="left")
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 _gsa = _gs_scrollframe(_gs_adv_tab)
 _gs_v_adv_queue     = tk.StringVar(value=str(CONFIG.get("max_queue_size",100)))
@@ -17583,6 +19695,7 @@ for _gv, _gl in [("gen0","⚡ gen0  (fast — young only)"),
 
 _gs_row(sa1b, "Cooldown minimo tra raccolte (sec):", _gs_v_gc_cooldown,
         "evita esecuzioni troppo frequenti  —  default: 2", 5)
+_sl("BOOT: L17977", "BOOT")
 
 tk.Label(_gsa,
          text="  ⓘ  gen0 is sufficient for normal use. full frees more memory but is slower.\n"
@@ -17617,7 +19730,7 @@ tk.Label(_gsa,
          font=("Consolas",8), bg=C["base"], fg=C["overlay0"],
          justify="left").pack(anchor="w", padx=16, pady=2)
 _gs_v_restart_keep_admin = tk.BooleanVar(value=CONFIG.get("restart_keep_admin", False))
-# "Keep admin on restart" kept in config but not shown in UI (advanced/unsafe option)
+
 
 sa6 = _gs_section(_gsa, "RECOVERY UI", C["blue"])
 tk.Label(_gsa,
@@ -17644,7 +19757,7 @@ def _open_recovery_from_settings():
         _RECOVERY_REQUESTED[0] = True
         try: root.quit()
         except Exception: pass
-        # Fallback: if quit didn't work, force the transition
+
         try:
             import time as _ts3; _ts3.sleep(0.3)
             if not _APP_DYING[0]:
@@ -17777,7 +19890,7 @@ def _gs_save_all():
             "auto_gc_enabled":      _gs_v_gc_enabled.get(),
             "auto_gc_mode":         _gs_v_gc_mode.get(),
             "auto_gc_cooldown_sec": float(_gs_v_gc_cooldown.get() or 2.0),
-            # Performance tab
+
             "perf_scan_nice":       int(_gs_v_perf_scan_nice.get()),
             "perf_max_workers":     int(_gs_v_perf_max_workers.get() or 2),
             "perf_chunk_kb":        int(_gs_v_perf_chunk_kb.get() or 256),
@@ -17803,145 +19916,15 @@ _mkbtn(_gs_bottom, "↺ Reload from File", lambda: (
 _mkbtn(_gs_bottom, "🔄 Restart App", lambda: _restart_app(), C["mauve"])
 _mkbtn(_gs_bottom, "📁 Open config.json", lambda: (
     os.startfile(CONFIG_PATH) if sys.platform=="win32" else
-    subprocess.Popen(["xdg-open" if sys.platform!="darwin" else "open", CONFIG_PATH], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    subprocess.Popen(["xdg-open" if sys.platform!="darwin" else "open", CONFIG_PATH])
 ), C["overlay0"])
 
 
-def _restart_app():
-    """Restart V0RTEX — relaunches the current script with the same Python."""
-    try:
-        ans = messagebox.askyesno(
-            "Restart V0RTEX",
-            "Save settings first, then restart?\n\nV0RTEX will close and relaunch immediately.",
-            parent=root)
-        if not ans: return
-        import subprocess as _rsp
-        _rsp.Popen(
-            [sys.executable, os.path.abspath(__file__)],
-            creationflags=0x00000010 if sys.platform=="win32" else 0
-        )
-        root.after(300, root.destroy)
-    except Exception as _re:
-        messagebox.showerror("Restart Failed", str(_re))
 
-_gs_nb.pack_forget()
-_gs_nb.pack(fill=tk.BOTH, expand=True, padx=6, pady=(6, 0))
-
-
-SOC_ERROR_CODES = {
-    -1:  "FORCED_DEBUG_CRASH    — Manual crash triggered for debug/testing",
-     0:  "UNKNOWN_CRASH         — Unclassified error; no saved crash context",
-     1:  "DB_CORRUPTION         — SQLite database corrupt or unreadable",
-     2:  "YARA_COMPILE_FATAL    — YARA ruleset failed to compile at startup",
-     3:  "VT_AUTH_FAILURE       — VirusTotal API key rejected (401/403)",
-     4:  "WORKER_THREAD_DEAD    — Background scan worker thread terminated",
-     5:  "CONFIG_MISSING        — config.json not found or unreadable",
-     6:  "REPORT_WRITE_FAIL     — Cannot write report to disk (permissions?)",
-     7:  "TSHARK_NOT_FOUND      — tshark binary missing or wrong PATH",
-     8:  "QUARANTINE_LOCKED     — Quarantine folder inaccessible",
-     9:  "WATCHER_CRASH         — Auto-scan folder watcher thread died",
-    10:  "SANDBOX_TIMEOUT       — Sandbox process monitor hung/timed out",
-    11:  "PDF_EXPORT_FAIL       — fpdf2 export raised an unhandled exception",
-    12:  "STIX_EXPORT_FAIL      — STIX 2.1 bundle serialization failed",
-    13:  "TI_ALL_FAIL           — All Threat Intelligence APIs unreachable",
-    14:  "PERF_MONITOR_DEAD     — psutil perf tick thread stopped",
-    15:  "SPLASH_TIMEOUT        — Boot splash took > 60 s (display issue?)",
-    16:  "DEFENSE_ENGINE_FAIL   — Advanced defense scan engine crashed",
-    17:  "GUI_RENDER_ERROR      — Tkinter widget render error (bad state)",
-    18:  "IMPORT_ERROR          — Required Python module failed to import",
-    19:  "NETWORK_UNAVAILABLE   — No network interface available",
-    20:  "FILE_ACCESS_DENIED    — Scan target file locked/unreadable",
-    21:  "MEMORY_OVERFLOW       — Scan queue RAM usage exceeded threshold",
-    22:  "HASH_COMPUTE_FAIL     — File hashing failed (corrupt file?)",
-    23:  "IOC_EXTRACT_FAIL      — IOC extraction raised unhandled exception",
-    24:  "RULE_STATE_CORRUPT    — rules_state.json unreadable or malformed",
-    25:  "QUARANTINE_MOVE_FAIL  — Moving file to quarantine failed",
-    26:  "DEFENSE_ACTION_FAIL   — Delete/repair action on infected file failed",
-    27:  "API_RATE_LIMIT        — VirusTotal 429 Too Many Requests",
-    28:  "SCAN_QUEUE_OVERFLOW   — Queue exceeded max_queue_size limit",
-    29:  "THREAD_DEADLOCK       — Potential deadlock detected in scan pipeline",
-    30:  "REINSTALL_SCRIPT_FAIL — Could not write v0rtex_reinstall.py",
-    31:  "UNINSTALL_SCRIPT_FAIL — Could not write v0rtex_uninstall.py",
-    32:  "BACKUP_WRITE_FAIL     — Backup ZIP creation failed",
-    33:  "RESTORE_FAIL          — Backup restore raised an exception",
-    34:  "CHECKPOINT_FAIL       — Checkpoint save/load operation failed",
-    35:  "YARA_SCAN_HANG        — YARA scan thread exceeded timeout",
-    36:  "YARA_DOWNLOAD_FAIL    — Rule repo download error (network/auth)",
-    37:  "YARA_RULE_NOT_FOUND   — Rule file referenced but missing on disk",
-    38:  "PE_PARSE_FAIL         — pefile raised exception on scan target",
-    39:  "PE_OVERLAY_ERROR      — PE overlay extraction/analysis failed",
-    40:  "ENTROPY_COMPUTE_ERROR — Shannon entropy calculation raised exception",
-    41:  "SIGNATURE_VERIFY_FAIL — Authenticode/PE signature check error",
-    42:  "PCAP_OPEN_FAIL        — tshark PCAP capture could not start",
-    43:  "PCAP_PARSE_ERROR      — PCAP file parsing returned invalid data",
-    44:  "DNS_RESOLVE_FAIL      — DNS lookup thread raised an exception",
-    45:  "WHOIS_FAIL            — WHOIS query timed out or returned error",
-    46:  "HTTP_HEADER_FAIL      — HTTP header fetch returned no response",
-    47:  "SSL_CHECK_FAIL        — SSL/TLS certificate inspection error",
-    48:  "PORT_SCAN_CRASH       — Port scanner thread died unexpectedly",
-    49:  "PING_FAIL             — ICMP ping subprocess failed to launch",
-    50:  "PROC_ENUM_FAIL        — Process enumeration (psutil) raised error",
-    51:  "SERVICE_ENUM_FAIL     — Windows service listing failed",
-    52:  "STARTUP_ENUM_FAIL     — Startup item enumeration failed",
-    53:  "REGISTRY_READ_FAIL    — Registry persistence scan raised exception",
-    54:  "REGISTRY_WRITE_FAIL   — Registry key write operation failed",
-    55:  "HANDLE_ENUM_FAIL      — Process handle enumeration failed",
-    56:  "PROC_TREE_FAIL        — Process tree build raised exception",
-    57:  "PROC_KILL_FAIL        — Process termination returned non-zero",
-    58:  "SANDBOX_BUILD_FAIL    — Sandbox environment creation failed",
-    59:  "SANDBOX_DESTROY_FAIL  — Sandbox wipe/dismantling raised error",
-    60:  "CUCKOO_CONNECT_FAIL   — Cuckoo sandbox API unreachable",
-    61:  "IOC_FEED_FAIL         — Threat feed fetch returned error/timeout",
-    62:  "MITRE_LOAD_FAIL       — MITRE ATT&CK matrix JSON load failed",
-    63:  "VT_UPLOAD_FAIL        — VirusTotal file upload returned error",
-    64:  "MB_API_FAIL           — MalwareBazaar API call failed",
-    65:  "ABUSEIPDB_FAIL        — AbuseIPDB lookup returned error",
-    66:  "URLSCAN_FAIL          — URLScan.io submission failed",
-    67:  "OTX_FAIL              — AlienVault OTX API call failed",
-    68:  "SHODAN_FAIL           — Shodan API call failed",
-    69:  "GREYNOISE_FAIL        — GreyNoise API call failed",
-    70:  "HYBRID_FAIL           — HybridAnalysis API call failed",
-    71:  "HEX_PARSE_FAIL        — HEX viewer failed to parse file",
-    72:  "MACRO_EXTRACT_FAIL    — Office macro extraction raised exception",
-    73:  "ARCHIVE_OPEN_FAIL     — Archive (ZIP/RAR/7z) could not be opened",
-    74:  "DIFF_COMPUTE_FAIL     — File diff computation raised exception",
-    75:  "B64_DECODE_FAIL       — Base64 decode raised invalid-padding error",
-    76:  "JWT_PARSE_FAIL        — JWT token parsing raised exception",
-    77:  "XOR_BRUTE_FAIL        — XOR brute-force thread raised exception",
-    78:  "CRYPT_ENCRYPT_FAIL    — AES-256 encryption raised exception",
-    79:  "CRYPT_DECRYPT_FAIL    — AES-256 decryption failed (wrong key?)",
-    80:  "CRYPT_INSPECT_FAIL    — Encrypted blob inspection raised error",
-    81:  "NOTE_SAVE_FAIL        — Notes autosave failed (disk full?)",
-    82:  "SNIPPET_SAVE_FAIL     — Code snippet save raised exception",
-    83:  "TODO_SAVE_FAIL        — TODO list save operation failed",
-    84:  "TRAY_ICON_FAIL        — System tray icon could not be created",
-    85:  "MINIMIZE_TO_TRAY_FAIL — Minimize-to-tray raised exception",
-    86:  "WATCHDOG_SUPPRESS     — Watchdog suppressed during recovery mode",
-    87:  "GC_FAIL               — Python garbage collection raised exception",
-    88:  "DB_SCHEMA_MISMATCH    — scan_history.db schema version mismatch",
-    89:  "DB_LOCKED             — SQLite DB locked by another process",
-    90:  "DB_MIGRATE_FAIL       — Database column migration failed",
-    91:  "REPORT_HTML_FAIL      — HTML report template render failed",
-    92:  "REPORT_JSON_FAIL      — JSON report serialization failed",
-    93:  "REPORT_OPEN_FAIL      — Could not open report in browser",
-    94:  "UPDATE_DOWNLOAD_FAIL  — Auto-updater script download failed",
-    95:  "UPDATE_APPLY_FAIL     — Auto-updater apply step raised error",
-    96:  "SIGMA_PARSE_FAIL      — Sigma rule YAML parsing raised exception",
-    97:  "STRINGS_EXTRACT_FAIL  — String extraction from binary failed",
-    98:  "BINPAT_SEARCH_FAIL    — Binary pattern search raised exception",
-    99:  "SELF_DEFENSE_FAIL     — Self-defense rule application failed",
-   100:  "FOLDER_PROTECT_FAIL   — Folder protection hook raised exception",
-   101:  "INTEGRITY_CHECK_FAIL  — Baseline integrity check raised exception",
-   102:  "TRAMPOLINE_FAIL       — Post-setup de-elevation trampoline failed",
-   103:  "MEDIA_SCRIPT_STALE    — installation_media script was outdated",
-   104:  "MEDIA_SCRIPT_SYNTERR  — installation_media script has SyntaxError",
-   105:  "RECOVERY_LAUNCH_FAIL  — Recovery UI could not be initialised",
-   106:  "VERSION_MISSING       — .vx_meta/vx_version not found or unreadable",
-}
-
-_crash_log_path = os.path.join(BASE_DIR, "crash_log.txt")
 
 def _write_crash_log(code, reason, tb=""):
+    _sl(f"CRASH LOG [{code}]: {reason}", "CRASH")
+    if tb: _sl(f"TRACEBACK: {tb[:200]}", "CRASH")
     try:
         ts = time.strftime("%Y-%m-%d %H:%M:%S")
         desc = SOC_ERROR_CODES.get(code, SOC_ERROR_CODES[0])
@@ -18027,7 +20010,7 @@ def _crash_popup(code, reason, tb=""):
                         logs = sorted([f for f in os.listdir(dbg) if f.endswith(".txt")], reverse=True)
                         if logs: log_to_open = os.path.join(dbg, logs[0])
                 if sys.platform == "win32": os.startfile(log_to_open)
-                else: subprocess.Popen(["xdg-open", log_to_open], creationflags=0x08000000 if sys.platform=="win32" else 0)
+                else: subprocess.Popen(["xdg-open", log_to_open])
             except Exception as _le:
                 messagebox.showinfo("Logs", f"Log path: {_crash_log_path}\n({_le})")
 
@@ -18134,6 +20117,7 @@ def _global_exc_hook(exc_type, exc_val, exc_tb):
         pass
 
 sys.excepthook = _global_exc_hook
+_sl("BOOT: L18399", "BOOT")
 
 
 import ctypes as _ctypes
@@ -18224,6 +20208,7 @@ def _schedule_ping():
     try: root.after(2000, _schedule_ping)
     except Exception: pass
 
+_sl("[DBG] CP4 watchdog+approt tab done", "BOOT")
 
 _tab_approt = tk.Frame(_nb, bg=C["base"]); _nb.add(_tab_approt, text="🔒PROT")
 
@@ -18374,7 +20359,7 @@ def _ap_build_defense():
                             baseline[rel] = {"sha256": _hl_bd.sha256(data).hexdigest(), "size": len(data)}
                             count += 1
                         except Exception: pass
-                root.after(0, lambda n=name, ct=count: _ap_bd_write(f"  ✓ {n}  →  {ct} file(s) indicizzati", "OK"))
+                root.after(0, lambda n=name, ct=count: _ap_bd_write(f"  ✓ {n}  →  {ct} file(s) indexed", "OK"))
 
 
         bp = os.path.join(BASE_DIR, "app_integrity_baseline.json")
@@ -18413,14 +20398,14 @@ def _ap_destroy_defense():
             try: os.remove(p); removed.append(os.path.basename(p))
             except Exception as e: _ap_bd_write(f"  ✗ {p}: {e}", "FAIL")
     if removed:
-        _ap_bd_write(f">_ Rimossi: {', '.join(removed)}", "OK")
+        _ap_bd_write(f">_ Removed: {', '.join(removed)}", "OK")
         _ap_bd_write(">_ Protection DESTROYED — the lab is no longer monitored", "WARN")
     else:
         _ap_bd_write(">_ No protection files found (already removed?)", "DIM")
 
 _ap_bd_ctrl_bottom = tk.Frame(_ap_build_tab, bg=C["surface0"], padx=12, pady=8)
 _ap_bd_ctrl_bottom.pack(fill=tk.X, side=tk.BOTTOM)
-_mkbtn(_ap_bd_ctrl_bottom, "🏗 BUILD — Costruisci Difesa Lab",  _ap_build_defense,  C["green"])
+_mkbtn(_ap_bd_ctrl_bottom, "🏗 BUILD — Build Defense Lab",  _ap_build_defense,  C["green"])
 _mkbtn(_ap_bd_ctrl_bottom, "💥 DESTROY — Remove Protection",   _ap_destroy_defense, C["red"])
 _mkbtn(_ap_bd_ctrl_bottom, "🗑 Clear Log",
        lambda: (_ap_bd_log.config(state="normal"),
@@ -18491,10 +20476,11 @@ def _ap_open_folder():
     if not sel: return
     folder = _ap_fold_lb.get(sel[0])
     if sys.platform == "win32": os.startfile(folder)
-    elif sys.platform == "darwin": subprocess.Popen(["open", folder], creationflags=0x08000000 if sys.platform=="win32" else 0)
-    else: subprocess.Popen(["xdg-open", folder], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    elif sys.platform == "darwin": subprocess.Popen(["open", folder])
+    else: subprocess.Popen(["xdg-open", folder])
 
 _mkbtn(_ap_fold_ctrl, "➕ Add Folder", _ap_add_folder,    C["green"])
+_sl("BOOT: L18761", "BOOT")
 _mkbtn(_ap_fold_ctrl, "➖ Remove",           _ap_remove_folder, C["red"])
 _mkbtn(_ap_fold_ctrl, "📂 Open",              _ap_open_folder,   C["blue"])
 
@@ -18581,7 +20567,7 @@ def _ap_verify_integrity():
             fp = os.path.join(BASE_DIR, rel)
             if not os.path.exists(fp):
                 missing += 1
-                root.after(0, lambda r=rel: _ap_int_write(f"  ✗ MANCANTE: {r}", "FAIL"))
+                root.after(0, lambda r=rel: _ap_int_write(f"  ✗ MISSING: {r}", "FAIL"))
                 continue
             try:
                 with open(fp, "rb") as _f: data = _f.read()
@@ -18644,10 +20630,10 @@ root.after(600, _pd_sync)
 
 
 _pd_stats_f = tk.Frame(_pd_dash, bg=C["crust"]); _pd_stats_f.pack(fill=tk.X, pady=2)
-for _lbl, _var, _col in [("File analizzati", _dsv_scanned, C["blue"]),
-                          ("Minacce",         _dsv_threats, C["red"]),
-                          ("In Quarantena",   _dsv_quarantine_count, C["yellow"]),
-                          ("Puliti",          _dsv_clean,   C["green"])]:
+for _lbl, _var, _col in [("Files Analyzed", _dsv_scanned, C["blue"]),
+                          ("Threats",         _dsv_threats, C["red"]),
+                          ("Quarantined",   _dsv_quarantine_count, C["yellow"]),
+                          ("Clean",          _dsv_clean,   C["green"])]:
     _sf = tk.Frame(_pd_stats_f, bg=C["crust"], padx=20, pady=8); _sf.pack(side=tk.LEFT)
     tk.Label(_sf, text=_lbl, font=("Consolas",7), bg=C["crust"], fg=C["overlay0"]).pack(anchor="w")
     tk.Label(_sf, textvariable=_var, font=("Consolas",16,"bold"), bg=C["crust"], fg=_col).pack(anchor="w")
@@ -18710,7 +20696,7 @@ _pd_qsc = tk.Scrollbar(_pd_qtr_f, orient="vertical", bg=C["surface1"],
 _pd_qtree = ttk.Treeview(_pd_qtr_f, columns=_pd_qcols, show="headings",
                            yscrollcommand=_pd_qsc.set, height=14,
                            style="Custom.Treeview")
-for col, hdr, w in [("name","File",220),("date","Data",130),("score","Score",60),("action","Azione",90)]:
+for col, hdr, w in [("name","File",220),("date","Date",130),("score","Score",60),("action","Action",90)]:
     _pd_qtree.heading(col, text=hdr); _pd_qtree.column(col, width=w, minwidth=40)
 _pd_qsc.config(command=_pd_qtree.yview)
 _pd_qsc.pack(side=tk.RIGHT, fill=tk.Y); _pd_qtree.pack(fill=tk.BOTH, expand=True)
@@ -18784,14 +20770,14 @@ def _pd_stg_sec(title, color=C["blue"]):
     tk.Frame(f, bg=color, height=1).pack(fill=tk.X, pady=(4,8))
     return f
 
-_pd_s1 = _pd_stg_sec("AZIONE AUTOMATICA", C["red"])
+_pd_s1 = _pd_stg_sec("AUTOMATIC ACTION", C["red"])
 _pd_action_var = tk.StringVar(value=_DEF_SETTINGS["action_on_detect"])
-for val, lbl in [("log","Log only (no action)"),("quarantine","Auto quarantine"),("delete","Auto deletematica")]:
+for val, lbl in [("log","Log only (no action)"),("quarantine","Auto quarantine"),("delete","Auto delete")]:
     tk.Radiobutton(_pd_s1, text=lbl, variable=_pd_action_var, value=val, font=FS,
                    bg=C["surface0"], fg=C["text"], activebackground=C["surface0"],
                    selectcolor=C["mantle"], relief="flat").pack(anchor="w", pady=2)
 
-_pd_s2 = _pd_stg_sec("SOGLIE", C["yellow"])
+_pd_s2 = _pd_stg_sec("THRESHOLDS", C["yellow"])
 for lbl, key, default in [("Quarantine score threshold:", "auto_quarantine_threshold", "2"),
                             ("Entropy threshold:", "entropy_threshold", "7.2"),
                             ("Monitor interval (s):", "monitor_interval", "30")]:
@@ -18814,7 +20800,7 @@ for key, lbl in [("check_entropy","Entropy analysis"),("check_pe","PE imports an
                    bg=C["surface0"], fg=C["text"], activebackground=C["surface0"],
                    selectcolor=C["mantle"], relief="flat").pack(anchor="w", pady=2)
 
-_pd_s4 = _pd_stg_sec("ESTENSIONI MONITORATE", C["mauve"])
+_pd_s4 = _pd_stg_sec("MONITORED EXTENSIONS", C["mauve"])
 _pd_ext_entry = tk.Entry(_pd_s4, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
                           insertbackground=C["text"], relief="flat", bd=4)
 _pd_ext_entry.insert(0, " ".join(_DEF_SETTINGS.get("scan_extensions", [".exe",".dll",".scr"])))
@@ -18846,6 +20832,7 @@ _ap_sd_canvas = tk.Canvas(_ap_self_tab, bg=C["base"], highlightthickness=0)
 _ap_sd_canvas.pack(fill=tk.BOTH, expand=True)
 _ap_sd_sb = tk.Scrollbar(_ap_self_tab, orient="vertical", command=_ap_sd_canvas.yview,
                            bg=C["surface1"], troughcolor=C["mantle"], relief="flat", bd=0, width=7)
+_sl("BOOT: L19111", "BOOT")
 _ap_sd_sb.pack(side=tk.RIGHT, fill=tk.Y); _ap_sd_canvas.configure(yscrollcommand=_ap_sd_sb.set)
 _ap_sd_inner = tk.Frame(_ap_sd_canvas, bg=C["base"])
 _ap_sd_win = _ap_sd_canvas.create_window((0,0), window=_ap_sd_inner, anchor="nw")
@@ -18904,7 +20891,7 @@ def _ap_apply_protection():
     if _ap_lock_config.get():
         try:
             if sys.platform == "win32":
-                subprocess.run(["attrib", "+R", CONFIG_PATH], capture_output=True, creationflags=0x08000000 if sys.platform=="win32" else 0)
+                subprocess.run(["attrib", "+R", CONFIG_PATH], capture_output=True)
             else:
                 import stat as _stat
                 current = os.stat(CONFIG_PATH).st_mode
@@ -18924,7 +20911,7 @@ def _ap_apply_protection():
 def _ap_unlock_config():
     try:
         if sys.platform == "win32":
-            subprocess.run(["attrib", "-R", CONFIG_PATH], capture_output=True, creationflags=0x08000000 if sys.platform=="win32" else 0)
+            subprocess.run(["attrib", "-R", CONFIG_PATH], capture_output=True)
         else:
             import stat as _stat2
             os.chmod(CONFIG_PATH, _stat2.S_IRUSR | _stat2.S_IWUSR | _stat2.S_IRGRP | _stat2.S_IROTH)
@@ -19040,12 +21027,38 @@ def _ap_bk_list():
 def _ap_bk_open_dir():
     d = BACKUPS_DIR if os.path.isdir(BACKUPS_DIR) else BASE_DIR
     if sys.platform == "win32": os.startfile(d)
-    elif sys.platform == "darwin": subprocess.Popen(["open", d], creationflags=0x08000000 if sys.platform=="win32" else 0)
-    else: subprocess.Popen(["xdg-open", d], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    elif sys.platform == "darwin": subprocess.Popen(["open", d])
+    else: subprocess.Popen(["xdg-open", d])
+
+def _ap_bk_emergency_rollback():
+    import glob as _glb, zipfile as _zfe, shutil as _shue
+    tmp = tempfile.gettempdir()
+    candidates = sorted(_glb.glob(os.path.join(tmp, "EMERGENCY_RESTORE_*.zip")), reverse=True)
+    if not candidates:
+        messagebox.showwarning("Emergency Rollback",
+            "No EMERGENCY_RESTORE_*.zip found in temp.\nRun an update first to create one.")
+        return
+    chosen = candidates[0]
+    if not messagebox.askyesno("Emergency Rollback",
+        f"Restore from:\n{os.path.basename(chosen)}\n\nThis will overwrite V0rtex_System. Continue?"):
+        return
+    _ap_bk_write(f"Rolling back from {os.path.basename(chosen)}...", "WARN")
+    def _do():
+        try:
+            vx_sys = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            _shue.rmtree(vx_sys, ignore_errors=True)
+            with _zfe.ZipFile(chosen, "r") as _z:
+                _z.extractall(vx_sys)
+            _ap_bk_write("\u2713 Rollback complete \u2014 restart V0RTEX.", "OK")
+            root.after(0, lambda: messagebox.showinfo("Rollback", "Rollback complete.\nPlease restart V0RTEX."))
+        except Exception as _re:
+            _ap_bk_write(f"\u2717 Rollback failed: {_re}", "FAIL")
+    threading.Thread(target=_do, daemon=True).start()
 
 _mkbtn(_ap_bk_ctrl, "💾 Create Full Backup",       _ap_bk_create,         C["teal"])
 _mkbtn(_ap_bk_ctrl, "🔄 Restore Latest Backup",   _ap_bk_restore_latest, C["blue"])
 _mkbtn(_ap_bk_ctrl, "📂 Choose ZIP to Restore", _ap_bk_restore_choose, C["sapphire"])
+_mkbtn(_ap_bk_ctrl, "\u26a0 Emergency Rollback",   _ap_bk_emergency_rollback, C["red"])
 _mkbtn(_ap_bk_ctrl, "📋 List Backups",                _ap_bk_list,           C["surface2"])
 _mkbtn(_ap_bk_ctrl, "📁 Open Folder",               _ap_bk_open_dir,       C["surface2"])
 _mkbtn(_ap_bk_ctrl, "🗑 Clear Log",
@@ -19188,9 +21201,14 @@ def _dsc_run():
             _ps_cmd = "power" + "shell"
             r = subprocess.run(
                 [_ps_cmd, "-NoProfile", "-NonInteractive", "-Command", _PS_DS],
-                capture_output=True, text=True, timeout=660, **_nw2)
-            out = r.stdout.strip()
-            _dsc_raw_write("Defender FullScan", out, r.stderr)
+                capture_output=True, timeout=660, **_nw2)
+            def _dec(b):
+                for enc in ("utf-8","utf-16-le","cp1252","latin-1"):
+                    try: return b.decode(enc)
+                    except Exception: pass
+                return b.decode("utf-8","replace")
+            out = _dec(r.stdout).strip()
+            _dsc_raw_write("Defender FullScan", out, _dec(r.stderr))
             if "CLEAN" in out or not out:
                 _dsc_write("  \u2713 Defender: No threats", "OK")
             elif "ThreatName" in out:
@@ -19211,8 +21229,13 @@ def _dsc_run():
             _sfc = "s" + "fc"
             r2 = subprocess.run(
                 [_sfc, "/" + "scannow"],
-                capture_output=True, text=True, timeout=600, **_nw2)
-            out2 = (r2.stdout + r2.stderr).strip()
+                capture_output=True, timeout=600, **_nw2)
+            def _dec2(b):
+                for enc in ("utf-16-le","utf-8","cp1252","latin-1"):
+                    try: return b.decode(enc)
+                    except Exception: pass
+                return b.decode("utf-8","replace")
+            out2 = (_dec2(r2.stdout) + _dec2(r2.stderr)).strip()
             _dsc_raw_write("sfc /scannow", out2)
             if "no integrity violations" in out2.lower():
                 _dsc_write("  \u2713 SFC: No violations", "OK")
@@ -19232,8 +21255,13 @@ def _dsc_run():
             _di = "d" + "ism"
             r3 = subprocess.run(
                 [_di, "/Online", "/Cleanup-Image", "/CheckHealth"],
-                capture_output=True, text=True, timeout=120, **_nw2)
-            out3 = (r3.stdout + r3.stderr).strip()
+                capture_output=True, timeout=120, **_nw2)
+            def _dec3(b):
+                for enc in ("utf-8","utf-16-le","cp1252","latin-1"):
+                    try: return b.decode(enc)
+                    except Exception: pass
+                return b.decode("utf-8","replace")
+            out3 = (_dec3(r3.stdout) + _dec3(r3.stderr)).strip()
             _dsc_raw_write("dism /CheckHealth", out3)
             if "healthy" in out3.lower():
                 _dsc_write("  \u2713 DISM: Healthy", "OK")
@@ -19295,6 +21323,7 @@ def _dsc_run():
     threading.Thread(target=_worker, daemon=True).start()
 
 _mkbtn(_dsc_ctrl, "🧬  Start Deep Scan", _dsc_run, C["red"])
+_sl("BOOT: L19576", "BOOT")
 _mkbtn(_dsc_ctrl, "🔧  System Fixer", lambda: _launch_system_fixer(), C["yellow"], C["base"])
 _mkbtn(_dsc_ctrl, "🗑  Clear",
        lambda: (_dsc_log.config(state="normal"),
@@ -19538,7 +21567,7 @@ def _syschk_run():
                       font=("Consolas",11,"bold"), bg=_RED, fg="#0d0d14",
                       relief="flat", bd=0, padx=20, pady=12,
                       cursor="hand2", command=_go_to_settings).pack(side="left", padx=(0,10))
-            tk.Button(_bf, text="  Run anyway (limited)  ",
+            tk.Button(_bf, text="  Run (limited)  ",
                       font=("Consolas",10), bg=_BRD, fg=_DIM,
                       relief="flat", bd=0, padx=16, pady=12,
                       cursor="hand2", command=_aw.destroy).pack(side="left")
@@ -19937,7 +21966,7 @@ def _open_system_fixer_ui(is_admin=False):
                  fg=_YEL if not is_admin else _GRN).pack(side="right", padx=14)
         tk.Frame(fw, bg=_BRD, height=1).pack(fill="x")
 
-        # Compact single-line warning
+
         warn_f = tk.Frame(fw, bg="#1a0008", padx=14, pady=3); warn_f.pack(fill="x")
         tk.Label(warn_f,
                  text="⚠  DANGER — modifies system files / removes malware / repairs Windows.  Backup first.  NOT fully tested.",
@@ -19946,7 +21975,7 @@ def _open_system_fixer_ui(is_admin=False):
 
         tk.Frame(fw, bg=_BRD, height=1).pack(fill="x")
 
-        # Compact single-line issues
+
         all_issues = _syschk_results["critical"] + _syschk_results["issues"]
         issues_f = tk.Frame(fw, bg=_PNL, padx=14, pady=3); issues_f.pack(fill="x")
         _iss_text = ("Issues: " + "  ·  ".join(i[:55] for i in all_issues[:4])
@@ -20341,6 +22370,7 @@ def _open_system_fixer_ui(is_admin=False):
 
 
 _mkbtn(_ap_syschk_ctrl, "🔍 Start System Scan",   _syschk_run,            C["red"])
+_sl("BOOT: L20622", "BOOT")
 _mkbtn(_ap_syschk_ctrl, "🔧 Open System Fixer",   _launch_system_fixer,   C["yellow"], C["base"])
 _mkbtn(_ap_syschk_ctrl, "🗑 Clear Log",
        lambda: (_ap_syschk_log.config(state="normal"),
@@ -20734,6 +22764,7 @@ def _cr_validate(target_path, pw_var, pw2_var=None, mode="encrypt"):
 
 
 _cr_enc_tab = tk.Frame(_cr_nb, bg=C["base"]); _cr_nb.add(_cr_enc_tab, text=" 🔒 ENCRYPT ")
+_sl("BOOT: L21015", "BOOT")
 
 
 _cr_enc_canvas = tk.Canvas(_cr_enc_tab, bg=C["surface0"], highlightthickness=0)
@@ -21086,6 +23117,7 @@ def _dz_vacuum_db():
         messagebox.showinfo("VACUUM", f"DB compacted — {size:.1f} KB")
     except Exception as e: messagebox.showerror("Error", str(e))
 _dz_btn(_dzs1, "Reset DB",            "Delete all scan history",            _reset_db)
+_sl("BOOT: L21367", "BOOT")
 _dz_btn(_dzs1, "Delete All Reports",  "Delete all report folders",          _reset_reports)
 _dz_btn(_dzs1, "Clear Logs",          "Clear debug and operation logs",            _reset_logs, C["yellow"])
 _dz_btn(_dzs1, "VACUUM DB",           "Compact SQLite — recover space",         _dz_vacuum_db, C["blue"])
@@ -21192,8 +23224,8 @@ def _reset_rules_state():
     _ym_library_refresh(); messagebox.showinfo("Done","All rules now active.")
 def _open_config():
     if sys.platform == "win32": os.startfile(CONFIG_PATH)
-    elif sys.platform == "darwin": subprocess.Popen(["open", CONFIG_PATH], creationflags=0x08000000 if sys.platform=="win32" else 0)
-    else: subprocess.Popen(["xdg-open", CONFIG_PATH], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    elif sys.platform == "darwin": subprocess.Popen(["open", CONFIG_PATH])
+    else: subprocess.Popen(["xdg-open", CONFIG_PATH])
 def _dz_clear_whitelist():
     if not messagebox.askyesno("Clear Whitelist","Clear the whitelist?"): return
     global _whitelist_set; _whitelist_set = set()
@@ -21270,8 +23302,8 @@ def _dz_quar_open():
     q = os.path.join(BASE_DIR, "quarantine")
     os.makedirs(q, exist_ok=True)
     if sys.platform == "win32": os.startfile(q)
-    elif sys.platform == "darwin": subprocess.Popen(["open", q], creationflags=0x08000000 if sys.platform=="win32" else 0)
-    else: subprocess.Popen(["xdg-open", q], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    elif sys.platform == "darwin": subprocess.Popen(["open", q])
+    else: subprocess.Popen(["xdg-open", q])
 
 def _dz_quar_restore_all():
     from tkinter import filedialog as _fd5
@@ -21437,10 +23469,15 @@ def _dz_restore_backup():
 
 _dz_btn(_dzs8, "💾 Full Backup (ZIP)",  "Save config, DB, whitelist, rules state",  _dz_full_backup,  C["green"])
 _dz_btn(_dzs8, "📥 Restore from Backup",    "Restore from previous ZIP file",             lambda: _dz_restore_backup(), C["blue"])
+_sl("BOOT: L21718", "BOOT")
 _dz_btn(_dzs8, "💾 Export Config",         "Save config.json only",                     lambda: _export_full_config(), C["surface2"])
 
 
 def _write_and_launch_uninstall():
+    if not messagebox.askyesno("Uninstall V0RTEX",
+            "This will remove V0RTEX.\n\nA backup will be created before deletion.\n\nContinue?",
+            parent=root):
+        return
     _media = os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils")
     os.makedirs(_media, exist_ok=True)
     script_path = os.path.join(_media, "v0rtex_uninstall.py")
@@ -21456,10 +23493,25 @@ def _write_and_launch_uninstall():
     except Exception as _e:
         messagebox.showerror("Uninstall", f"Could not write uninstall script:\n{_e}")
         return
+    try:
+        _APP_DYING[0] = True
+        try:
+            pending = root.tk.eval("after info").split()
+            for _aid in pending:
+                try: root.after_cancel(_aid)
+                except Exception: pass
+        except Exception: pass
+        try: _silent_log_censor_flush()
+        except Exception: pass
+    except Exception: pass
     _launch_script(script_path)
 
 
 def _launch_reinstall():
+    if not messagebox.askyesno("Reinstall V0RTEX",
+            "This will reinstall V0RTEX.\n\nA backup will be created before reinstalling.\n\nContinue?",
+            parent=root):
+        return
     _media = os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils")
     os.makedirs(_media, exist_ok=True)
     script_path = os.path.join(_media, "v0rtex_reinstall.py")
@@ -21475,6 +23527,15 @@ def _launch_reinstall():
     except Exception as _e:
         messagebox.showerror("Reinstall", f"Could not write reinstall script:\n{_e}")
         return
+    try:
+        _APP_DYING[0] = True
+        try:
+            pending = root.tk.eval("after info").split()
+            for _aid in pending:
+                try: root.after_cancel(_aid)
+                except Exception: pass
+        except Exception: pass
+    except Exception: pass
     _launch_script(script_path)
 
 
@@ -21730,7 +23791,7 @@ def _hex_load(path, offset=0):
     def _do():
         try:
             with open(path,"rb") as f:
-                f.seek(offset); data=f.read(_HEX_BPR*512)
+                f.seek(offset); data=f.read(_HEX_BPR*4096)
             fsize=os.path.getsize(path)
             root.after(0,lambda: _hex_render(data,offset,fsize,path))
         except Exception as e:
@@ -21800,6 +23861,7 @@ def _hex_find():
 
 
 _tab_regex = tk.Frame(_look_nb, bg=C["base"]); _look_nb.add(_tab_regex, text="🔎REGEX")
+_sl("BOOT: L22090", "BOOT")
 _rx_head = tk.Frame(_tab_regex, bg=C["surface0"], padx=16, pady=10); _rx_head.pack(fill=tk.X)
 tk.Label(_rx_head, text="IOC REGEX EXTRACTOR", font=FB, bg=C["surface0"], fg=C["sky"]).pack(anchor="w")
 tk.Label(_rx_head, text="Paste text or load a file — extract IPs, domains, URLs, hashes, emails, CVEs, registry keys and more",
@@ -21852,7 +23914,7 @@ tk.Label(_rx_res_hdr, text="● ● ●  RESULTS", font=FS, bg=C["surface0"], fg
 _rx_count_sv = tk.StringVar(value="")
 tk.Label(_rx_res_hdr, textvariable=_rx_count_sv, font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(side=tk.LEFT,padx=6)
 _mkbtn(_rx_res_hdr, "Copy", lambda: _rx_copy(), C["surface2"])
-_mkbtn(_rx_res_hdr, "Export CSV", lambda: _rx_export(), C["teal"])
+_mkbtn(_rx_res_hdr, "Export CSV  ", lambda: _rx_export(), C["teal"])
 _rx_res_sc = tk.Scrollbar(_rx_right, orient="vertical", bg=C["surface1"],
                            troughcolor=C["base"], relief="flat", bd=0, width=7)
 _rx_res_txt = tk.Text(_rx_right, bg=C["mantle"], fg=C["text"], font=("Consolas",9),
@@ -22035,9 +24097,9 @@ _doc_out = tk.Text(_doc_wrap, bg="#0a0005", fg=C["text"], font=("Consolas",9),
                    yscrollcommand=_doc_sc.set, relief="flat", bd=0, padx=12, pady=8, wrap="word", state="disabled")
 _doc_sc.config(command=_doc_out.yview)
 _doc_sc.pack(side=tk.RIGHT, fill=tk.Y); _doc_out.pack(fill=tk.BOTH, expand=True)
-for _dt, _dc in [("CRIT",C["red"]),("WARN",C["yellow"]),("OK",C["green"]),
+for _dtag, _dc in [("CRIT",C["red"]),("WARN",C["yellow"]),("OK",C["green"]),
                   ("HEAD",C["maroon"]),("INFO",C["sapphire"]),("DIM",C["overlay0"])]:
-    _doc_out.tag_configure(_dt, foreground=_dc)
+    _doc_out.tag_configure(_dtag, foreground=_dc)
 
 def _doc_log(msg, tag="DIM"):
     _doc_out.config(state="normal"); _doc_out.insert(tk.END, msg+"\n", tag)
@@ -22146,20 +24208,101 @@ def _doc_analyze():
     threading.Thread(target=_do,daemon=True).start()
 
 
+_crash_log_path = os.path.join(DEBUG_DIR, "crash_log", "crash_log.txt")
+
+SOC_ERROR_CODES = {
+    0:   "UNKNOWN_CRASH — Unclassified error",
+    1:   "DB_CORRUPTION — SQLite failure",
+    2:   "YARA_COMPILE_FATAL — Ruleset failure",
+    3:   "VT_AUTH_FAILURE — 401 Unauthorized",
+    4:   "WORKER_THREAD_DEAD — Worker exit",
+    5:   "CONFIG_MISSING — Missing config.json",
+    6:   "REPORT_WRITE_FAIL — Write permission error",
+    7:   "TSHARK_NOT_FOUND — Missing binary",
+    8:   "QUARANTINE_LOCKED — Locked folder",
+    9:   "WATCHER_CRASH — Watcher thread death",
+    10:  "SANDBOX_TIMEOUT — Sandbox hang",
+    14:  "PERF_MONITOR_DEAD — psutil thread stop",
+    16:  "DEFENSE_ENGINE_FAIL — Defense crash",
+    17:  "GUI_RENDER_ERROR — Tkinter bad state",
+    18:  "IMPORT_ERROR — Module import failure",
+    19:  "NETWORK_UNAVAILABLE — No interface",
+    20:  "FILE_ACCESS_DENIED — PermissionError",
+    21:  "MEMORY_OVERFLOW — MemoryError",
+    22:  "HASH_COMPUTE_FAIL — File hash error",
+    23:  "IOC_EXTRACT_FAIL — IOC exception",
+    24:  "RULE_STATE_CORRUPT — Bad JSON",
+    25:  "QUARANTINE_MOVE_FAIL — Move failure",
+    27:  "API_RATE_LIMIT — 429 Too Many Requests",
+    28:  "SCAN_QUEUE_OVERFLOW — Queue overflow",
+    29:  "THREAD_DEADLOCK — Pipeline deadlock",
+    30:  "REINSTALL_SCRIPT_FAIL — Reinstall write error",
+    31:  "UNINSTALL_SCRIPT_FAIL — Uninstall write error",
+    32:  "BACKUP_WRITE_FAIL — Backup ZIP error",
+    35:  "YARA_SCAN_HANG — YARA timeout",
+    38:  "PE_PARSE_FAIL — pefile exception",
+    40:  "ENTROPY_COMPUTE_ERROR — Entropy error",
+    42:  "PCAP_OPEN_FAIL — tshark capture fail",
+    44:  "DNS_RESOLVE_FAIL — DNS thread error",
+    47:  "SSL_CHECK_FAIL — TLS inspect error",
+    48:  "PORT_SCAN_CRASH — Port scanner death",
+    50:  "PROC_ENUM_FAIL — psutil enum error",
+    53:  "REGISTRY_READ_FAIL — Registry scan error",
+    57:  "PROC_KILL_FAIL — Kill non-zero exit",
+    58:  "SANDBOX_BUILD_FAIL — Sandbox create fail",
+    61:  "IOC_FEED_FAIL — Feed timeout",
+    63:  "VT_UPLOAD_FAIL — VT upload error",
+    71:  "HEX_PARSE_FAIL — Hex viewer error",
+    72:  "MACRO_EXTRACT_FAIL — Macro extract fail",
+    73:  "ARCHIVE_OPEN_FAIL — Archive open fail",
+    78:  "CRYPT_ENCRYPT_FAIL — AES encrypt error",
+    79:  "CRYPT_DECRYPT_FAIL — Wrong key decrypt",
+    84:  "TRAY_ICON_FAIL — Tray icon error",
+    88:  "DB_SCHEMA_MISMATCH — Schema version error",
+    89:  "DB_LOCKED — SQLite locked",
+    94:  "UPDATE_DOWNLOAD_FAIL — Updater error",
+    99:  "TK_CALLBACK_CRASH — Tkinter callback exception",
+    103: "MEDIA_SCRIPT_STALE — Stale install script",
+    104: "MEDIA_SCRIPT_SYNTERR — SyntaxError in script",
+    105: "RECOVERY_LAUNCH_FAIL — Recovery UI error",
+    106: "VERSION_MISSING — Missing vx_version",
+}
+_sl("BOOT: L22439", "BOOT")
+
 _dzs9 = _dz_section("🖥 SYSTEM", C["sapphire"])
 
 def _restart_app():
-    if not messagebox.askyesno("Restart", "Restart V0RTEX?"): return
+    _sl("App restart requested", "SYS")
+    if not messagebox.askyesno("Restart V0RTEX", "Restart V0RTEX now?", parent=root): return
+    _exe = sys.executable
+    _script = os.path.abspath(__file__)
     try:
-        python = sys.executable
-        os.execv(python, [python] + sys.argv)
-    except Exception as e:
-        messagebox.showerror("Error", f"Cannot restart: {e}")
+        import subprocess as _rsp
+        if sys.platform == "win32":
+            _rsp.Popen([_exe, _script], creationflags=0x00000008, close_fds=True)
+        else:
+            _rsp.Popen([_exe, _script], close_fds=True)
+        _sl(f"Restart launched: {_exe}", "SYS")
+    except Exception as _re:
+        messagebox.showerror("Error", f"Cannot launch new instance:\n{_re}")
+        return
+    def _shutdown():
+        import time as _trs
+        try: _silent_log_censor_flush()
+        except Exception: pass
+        _trs.sleep(0.3)
+        try: os._exit(0)
+        except Exception: pass
+    import threading as _trs2
+    _APP_DYING[0] = True
+    _trs2.Thread(target=_shutdown, daemon=True).start()
+    try: root.destroy()
+    except Exception: pass
 
 def _open_base_dir():
     if sys.platform == "win32": os.startfile(BASE_DIR)
-    elif sys.platform == "darwin": subprocess.Popen(["open", BASE_DIR], creationflags=0x08000000 if sys.platform=="win32" else 0)
-    else: subprocess.Popen(["xdg-open", BASE_DIR], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    elif sys.platform == "darwin": subprocess.Popen(["open", BASE_DIR])
+    else: subprocess.Popen(["xdg-open", BASE_DIR])
 
 def _export_full_config():
     from tkinter import filedialog
@@ -22306,12 +24449,12 @@ def _dz_gc():
         messagebox.showinfo("GC", f"Oggetti liberati: {collected}")
 def _dz_open_log_folder():
     if sys.platform == "win32": os.startfile(DEBUG_DIR)
-    elif sys.platform == "darwin": subprocess.Popen(["open", DEBUG_DIR], creationflags=0x08000000 if sys.platform=="win32" else 0)
-    else: subprocess.Popen(["xdg-open", DEBUG_DIR], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    elif sys.platform == "darwin": subprocess.Popen(["open", DEBUG_DIR])
+    else: subprocess.Popen(["xdg-open", DEBUG_DIR])
 def _dz_open_reports_folder():
     if sys.platform == "win32": os.startfile(REPORTS_DIR)
-    elif sys.platform == "darwin": subprocess.Popen(["open", REPORTS_DIR], creationflags=0x08000000 if sys.platform=="win32" else 0)
-    else: subprocess.Popen(["xdg-open", REPORTS_DIR], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    elif sys.platform == "darwin": subprocess.Popen(["open", REPORTS_DIR])
+    else: subprocess.Popen(["xdg-open", REPORTS_DIR])
 def _dz_sysinfo():
     import platform
     lines = [
@@ -22455,7 +24598,7 @@ def _show_all_codes():
         if not os.path.exists(_crash_log_path):
             messagebox.showinfo("Crash Log", "No crash recorded."); return
         if sys.platform == "win32": os.startfile(_crash_log_path)
-        else: subprocess.Popen(["xdg-open", _crash_log_path], creationflags=0x08000000 if sys.platform=="win32" else 0)
+        else: subprocess.Popen(["xdg-open", _crash_log_path])
     btn_f = tk.Frame(pop, bg=C["surface0"], pady=8)
     btn_f.pack(fill=tk.X, padx=14)
     tk.Button(btn_f, text="View crash_log.txt", command=_close_log,
@@ -22480,9 +24623,10 @@ def _open_crash_log():
     if not os.path.exists(_crash_log_path):
         messagebox.showinfo("Crash Log", "No crashes recorded yet."); return
     if sys.platform == "win32": os.startfile(_crash_log_path)
-    else: subprocess.Popen(["xdg-open", _crash_log_path], creationflags=0x08000000 if sys.platform=="win32" else 0)
+    else: subprocess.Popen(["xdg-open", _crash_log_path])
 
 _dz_btn(_dzs13, "📄 Open crash_log.txt",   "Open crash log",           _open_crash_log,   C["surface2"])
+_sl("BOOT: L22854", "BOOT")
 _dz_btn(_dzs13, "🗑 Delete crash_log.txt","Delete crash log file", _clear_crash_log,  C["yellow"])
 
 
@@ -22574,7 +24718,7 @@ def _sig_verify():
                 cmd=["power" + "shell","-NoProfile","-NonInteractive","-WindowStyle","Hidden","-Command",
                      f"$s=Get-AuthenticodeSignature '{p}'; $s|Select Status,SignerCertificate|Format-List; "
                      "$s.SignerCertificate|Select Subject,Issuer,NotBefore,NotAfter,Thumbprint|Format-List"]
-                r=subprocess.run(cmd,capture_output=True,text=True,timeout=15, creationflags=0x08000000 if sys.platform=="win32" else 0)
+                r=subprocess.run(cmd,capture_output=True,text=True,timeout=15)
                 out=r.stdout.strip()
                 if not out: raise RuntimeError("No output")
                 sm=re.search(r"Status\s*:\s*(\S+)",out)
@@ -22645,6 +24789,128 @@ def _sig_verify():
             root.after(0,lambda err=str(e): _sig_set_verdict("✗","Error",C["red"]))
             root.after(0,lambda err=str(e): _sig_log(f"  Error: {err}","WARN"))
     threading.Thread(target=_do,daemon=True).start()
+
+
+_tab_imphash = tk.Frame(_ioc_nb, bg=C["base"])
+_ioc_nb.add(_tab_imphash, text="📦 IMPHASH")
+
+_ih_head = tk.Frame(_tab_imphash, bg=C["surface0"], padx=16, pady=10); _ih_head.pack(fill=tk.X)
+tk.Label(_ih_head, text="IMPHASH — IMPORT HASH ANALYZER", font=FB, bg=C["surface0"], fg=C["sapphire"]).pack(anchor="w")
+tk.Label(_ih_head, text="Compute PE import hash (imphash) for malware family clustering — requires pefile",
+         font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_tab_imphash, bg=C["sapphire"], height=2).pack(fill=tk.X)
+
+_ih_ctrl = tk.Frame(_tab_imphash, bg=C["surface0"], padx=12, pady=8); _ih_ctrl.pack(fill=tk.X)
+_ih_file_v = tk.StringVar()
+tk.Label(_ih_ctrl, text="PE File:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
+tk.Entry(_ih_ctrl, textvariable=_ih_file_v, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+         insertbackground=C["text"], relief="flat", bd=4, width=48).pack(side=tk.LEFT, padx=4)
+_mkbtn(_ih_ctrl, "Browse", lambda: _ih_file_v.set(filedialog.askopenfilename(
+    filetypes=[("PE files","*.exe *.dll *.sys *.ocx *.drv"),("All","*.*")]) or _ih_file_v.get()), C["surface2"])
+_mkbtn(_ih_ctrl, "📦 Analyze", lambda: _ih_run(), C["sapphire"])
+
+_ih_bulk_row = tk.Frame(_tab_imphash, bg=C["base"], padx=12, pady=4); _ih_bulk_row.pack(fill=tk.X)
+_ih_dir_v = tk.StringVar()
+tk.Label(_ih_bulk_row, text="Bulk folder:", font=FS, bg=C["base"], fg=C["text"]).pack(side=tk.LEFT)
+tk.Entry(_ih_bulk_row, textvariable=_ih_dir_v, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+         insertbackground=C["text"], relief="flat", bd=4, width=40).pack(side=tk.LEFT, padx=4)
+_mkbtn(_ih_bulk_row, "Browse", lambda: _ih_dir_v.set(filedialog.askdirectory() or _ih_dir_v.get()), C["surface2"])
+_mkbtn(_ih_bulk_row, "📂 Bulk Scan", lambda: _ih_bulk(), C["teal"])
+_mkbtn(_ih_bulk_row, "Clear", lambda: (_ih_out.config(state="normal"),_ih_out.delete("1.0",tk.END),_ih_out.config(state="disabled")), C["surface1"])
+
+tk.Frame(_tab_imphash, bg=C["surface2"], height=1).pack(fill=tk.X)
+
+_ih_out = tk.Text(_tab_imphash, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+                  relief="flat", bd=0, padx=12, pady=8, wrap="none", state="disabled")
+_ih_sc_y = tk.Scrollbar(_tab_imphash, orient="vertical", command=_ih_out.yview,
+                          bg=C["surface1"], troughcolor=C["base"], relief="flat", width=7)
+_ih_sc_x = tk.Scrollbar(_tab_imphash, orient="horizontal", command=_ih_out.xview,
+                          bg=C["surface1"], troughcolor=C["base"], relief="flat", width=7)
+_ih_sc_y.pack(side=tk.RIGHT, fill=tk.Y)
+_ih_sc_x.pack(side=tk.BOTTOM, fill=tk.X)
+_ih_out.pack(fill=tk.BOTH, expand=True)
+_ih_out.configure(yscrollcommand=_ih_sc_y.set, xscrollcommand=_ih_sc_x.set)
+_ih_out.tag_configure("HEAD", foreground=C["sapphire"], font=("Consolas",9,"bold"))
+_ih_out.tag_configure("HASH", foreground=C["mauve"])
+_ih_out.tag_configure("IMP",  foreground=C["teal"])
+_ih_out.tag_configure("WARN", foreground=C["yellow"])
+_ih_out.tag_configure("DIM",  foreground=C["overlay0"])
+_ih_out.tag_configure("MATCH",foreground=C["red"], font=("Consolas",9,"bold"))
+
+def _ih_log(msg, tag="DIM"):
+    _ih_out.config(state="normal")
+    _ih_out.insert(tk.END, msg + "\n", tag)
+    _ih_out.see(tk.END)
+    _ih_out.config(state="disabled")
+
+def _ih_compute(path: str):
+    try:
+        import pefile as _pef
+    except ImportError:
+        _ih_log("pefile not available — install via pip", "WARN")
+        return None, []
+    try:
+        pe = _pef.PE(path, fast_load=False)
+    except Exception as e:
+        _ih_log(f"  pefile error: {e}", "WARN")
+        return None, []
+    imports = []
+    if hasattr(pe, "DIRECTORY_ENTRY_IMPORT"):
+        for entry in pe.DIRECTORY_ENTRY_IMPORT:
+            dll = entry.dll.decode("utf-8","replace").lower().split(".")[0] if entry.dll else "?"
+            for imp in entry.imports:
+                name = imp.name.decode("utf-8","replace").lower() if imp.name else f"ord_{imp.ordinal}"
+                imports.append(f"{dll}.{name}")
+    import hashlib as _hih
+    imphash = _hih.md5(",".join(imports).encode()).hexdigest() if imports else "N/A"
+    return imphash, imports
+
+def _ih_run():
+    p = _ih_file_v.get().strip()
+    if not p or not os.path.isfile(p):
+        messagebox.showerror("Imphash", "Select a valid PE file.")
+        return
+    _ih_out.config(state="normal"); _ih_out.delete("1.0", tk.END); _ih_out.config(state="disabled")
+    def _do():
+        _ih_log(f"File: {os.path.basename(p)}  ({os.path.getsize(p):,} bytes)", "HEAD")
+        imphash, imports = _ih_compute(p)
+        if imphash is None:
+            return
+        _ih_log(f"  Imphash  : {imphash}", "HASH")
+        _ih_log(f"  Imports  : {len(imports)} functions", "DIM")
+        _ih_log("", "DIM")
+        _ih_log("IMPORTED FUNCTIONS:", "HEAD")
+        for imp2 in imports[:150]:
+            _ih_log(f"  {imp2}", "IMP")
+        if len(imports) > 150:
+            _ih_log(f"  ... and {len(imports)-150} more", "DIM")
+        _ih_log("", "DIM")
+        _ih_log(f"VT search: https://www.virustotal.com/gui/search/{imphash}", "DIM")
+    threading.Thread(target=_do, daemon=True).start()
+
+def _ih_bulk():
+    d = _ih_dir_v.get().strip()
+    if not d or not os.path.isdir(d):
+        messagebox.showerror("Imphash", "Select a valid folder.")
+        return
+    _ih_out.config(state="normal"); _ih_out.delete("1.0", tk.END); _ih_out.config(state="disabled")
+    def _do_bulk():
+        _ih_log(f"Scanning: {d}", "HEAD")
+        seen = {}
+        exts = {".exe",".dll",".sys",".ocx",".drv"}
+        for fn in os.listdir(d):
+            fp = os.path.join(d, fn)
+            if not os.path.isfile(fp): continue
+            if os.path.splitext(fn)[1].lower() not in exts: continue
+            imphash, imports = _ih_compute(fp)
+            if imphash is None or imphash == "N/A": continue
+            _ih_log(f"  {fn:<40} {imphash}  ({len(imports)} imports)", "IMP")
+            if imphash in seen:
+                _ih_log(f"    ⚠ SAME IMPHASH as: {seen[imphash]} — possible variant!", "MATCH")
+            else:
+                seen[imphash] = fn
+        _ih_log(f"\nDone. {len(seen)} unique imphashes.", "HEAD")
+    threading.Thread(target=_do_bulk, daemon=True).start()
 
 
 _tab_reg = tk.Frame(_proc_nb, bg=C["base"]); _proc_nb.add(_tab_reg, text="🗝Registry")
@@ -22836,6 +25102,7 @@ _ck_left.pack_propagate(False)
 
 tk.Label(_ck_left, text="  🛠  QUICK INSTALL GUIDE", font=("Consolas",9,"bold"),
          bg=C["surface0"], fg=C["peach"]).pack(anchor="w", pady=(10,4), padx=10)
+_sl("BOOT: L23206", "BOOT")
 _ck_guide = tk.Text(_ck_left, font=("Consolas",8), bg=C["mantle"], fg=C["text"],
                     relief="flat", bd=0, padx=10, pady=8, wrap="word", state="normal")
 _ck_guide.pack(fill=tk.BOTH, expand=True, padx=6, pady=(0,6))
@@ -23226,6 +25493,7 @@ _bh_running = [False]
 _bh_stop    = [False]
 
 def _bh_start():
+    _sl("Bulk hash lookup started", "HASH")
     fpath = _bh_file_var.get().strip()
     if not fpath or not os.path.isfile(fpath):
         messagebox.showerror("Batch","Select a valid hash list file."); return
@@ -23427,6 +25695,7 @@ def _ps_parse_ports(s):
     return sorted(set(ports))
 
 def _ps_start():
+    _sl("Port scan started", "NET")
     import socket as _sk
     host = _ps_host_var.get().strip()
     try: ports = _ps_parse_ports(_ps_range_var.get())
@@ -23594,7 +25863,7 @@ _look_nb.add(_tab_archive, text="📦ARCHIV")
 
 _arc_head = tk.Frame(_tab_archive, bg=C["surface0"], padx=16, pady=10)
 _arc_head.pack(fill=tk.X)
-tk.Label(_arc_head, text="SPACCHETTATORE ARCHIVI / CRACKER PASSWORD", font=FB, bg=C["surface0"], fg=C["maroon"]).pack(anchor="w")
+tk.Label(_arc_head, text="ARCHIVE UNPACKER / PASSWORD CRACKER", font=FB, bg=C["surface0"], fg=C["maroon"]).pack(anchor="w")
 tk.Label(_arc_head, text="Extract password-protected ZIPs — try common passwords or a custom wordlist",
          font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
 tk.Frame(_tab_archive, bg=C["maroon"], height=2).pack(fill=tk.X)
@@ -24159,6 +26428,17 @@ _dns_out.tag_configure("ERR",  foreground=C["red"])
 def _dns_run():
     host = _dns_host_v.get().strip()
     if not host: return
+    import ipaddress as _ipa
+    try:
+        _ipa.ip_address(host)
+        _dns_out.config(state="normal")
+        _dns_out.insert(tk.END, f"  ⚠ {host} is an IP address — DNS type A queries target hostnames.\n"
+                        f"  Try PTR (reverse lookup) for IPs, or enter a domain name.\n", "WARN")
+        _dns_out.config(state="disabled")
+        return
+    except ValueError:
+        pass
+    if not host: return
     rtype = _dns_type_v.get()
     _dns_out.config(state="normal"); _dns_out.delete("1.0",tk.END); _dns_out.config(state="disabled")
     def _do():
@@ -24205,7 +26485,7 @@ tk.Label(_whoish, text="Query WHOIS data for domains and IPs via socket on port 
 tk.Frame(_tab_whois, bg=C["teal"], height=2).pack(fill=tk.X)
 _whois_ctrl = tk.Frame(_tab_whois, bg=C["surface0"], padx=12, pady=8); _whois_ctrl.pack(fill=tk.X)
 _whois_v = tk.StringVar()
-tk.Label(_whois_ctrl, text="Dominio / IP:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
+tk.Label(_whois_ctrl, text="Domain / IP:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
 tk.Entry(_whois_ctrl, textvariable=_whois_v, width=34, font=("Consolas",9),
          bg=C["mantle"], fg=C["text"], relief="flat", bd=4, insertbackground=C["text"]).pack(side=tk.LEFT, padx=6)
 _mkbtn(_whois_ctrl,"🔍 Query",lambda: _whois_run(),C["teal"])
@@ -24993,6 +27273,7 @@ _hm_ctrl = tk.Frame(_tab_heatmap, bg=C["surface0"], padx=12, pady=6); _hm_ctrl.p
 _hm_fig_frame = tk.Frame(_tab_heatmap, bg=C["base"]); _hm_fig_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
 def _hm_draw():
     for w in _hm_fig_frame.winfo_children(): w.destroy()
+    _hm_fig_frame.update_idletasks()
     try:
         import numpy as _np_hm
         categories   = ["EXE","DLL","Script","PDF","Office","Archive","Other"]
@@ -25063,7 +27344,7 @@ _sig_path_v = tk.StringVar()
 tk.Entry(_sig_ctrl, textvariable=_sig_path_v, width=46, font=("Consolas",9),
          bg=C["mantle"], fg=C["text"], relief="flat", bd=4,
          insertbackground=C["text"]).pack(side=tk.LEFT, padx=(0,6))
-def _sig_browse():
+def _sigma_browse():
     p = filedialog.askopenfilename(title="Open Sigma Rule",
         filetypes=[("YAML","*.yml *.yaml"),("All","*.*")])
     if p: _sig_path_v.set(p); _sig_load(p)
@@ -25112,6 +27393,12 @@ _sig_raw    = _sig_mktab(" RAW YAML ")
 
 _tab_scanhist = tk.Frame(_stg_nb, bg=C["base"])
 _stg_nb.add(_tab_scanhist, text=" SCAN HISTORY ")
+def _scanhist_tab_focus(e=None):
+    try:
+        if _stg_nb.index("current") == _stg_nb.index(_tab_scanhist):
+            root.after(100, _scan_history_refresh)
+    except Exception: pass
+_stg_nb.bind("<<NotebookTabChanged>>", _scanhist_tab_focus)
 _scanhisth = tk.Frame(_tab_scanhist, bg=C["surface0"], padx=16, pady=10); _scanhisth.pack(fill=tk.X)
 tk.Label(_scanhisth, text="SCAN HISTORY", font=FB, bg=C["surface0"], fg=C["green"]).pack(anchor="w")
 tk.Label(_scanhisth, text="Browse previously scanned files and verdicts from the SQLite database", font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
@@ -25715,62 +28002,1006 @@ _mkbtn(_ping_ctrl,"🗑 Clear",lambda:(
     _ping_out.config(state="normal"),_ping_out.delete("1.0",tk.END),
     _ping_out.config(state="disabled")),C["surface1"],C["text"])
 
-_tab_debuglog = tk.Frame(_stg_nb, bg=C["base"])
-_stg_nb.add(_tab_debuglog, text=" DEBUG LOG ")
-_dblogh = tk.Frame(_tab_debuglog, bg=C["surface0"], padx=16, pady=10); _dblogh.pack(fill=tk.X)
-tk.Label(_dblogh, text="DEBUG LOG VIEWER", font=FB, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
-tk.Label(_dblogh, text="Browse and search debug log files in the debug_log folder", font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
-tk.Frame(_tab_debuglog, bg=C["overlay0"], height=2).pack(fill=tk.X)
-_dlog_ctrl = tk.Frame(_tab_debuglog, bg=C["surface0"], padx=12, pady=8); _dlog_ctrl.pack(fill=tk.X)
-_dlog_file_v = tk.StringVar()
-_dlog_files_cb = ttk.Combobox(_tab_debuglog, textvariable=_dlog_file_v,
-                               width=42, font=("Consolas",9), state="readonly")
-_dlog_files_cb.pack(fill=tk.X, padx=12, pady=(0,4))
-_dlog_flt_v = tk.StringVar()
-tk.Label(_dlog_ctrl, text="Filter:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
-_dlog_flt_e = tk.Entry(_dlog_ctrl, textvariable=_dlog_flt_v, width=22, font=("Consolas",9),
-                        bg=C["mantle"], fg=C["text"], relief="flat", bd=4,
-                        insertbackground=C["text"])
-_dlog_flt_e.pack(side=tk.LEFT, padx=4)
-_LOG_DIR = DEBUG_DIR
-def _dlog_populate():
-    os.makedirs(_LOG_DIR, exist_ok=True)
-    files = sorted(
-        [f for f in os.listdir(_LOG_DIR) if os.path.isfile(os.path.join(_LOG_DIR,f))],
-        reverse=True)
-    _dlog_files_cb["values"] = files
-    if files and not _dlog_file_v.get():
-        _dlog_file_v.set(files[0])
-def _dlog_open():
-    fname = _dlog_file_v.get()
-    if not fname: return
-    fp = os.path.join(_LOG_DIR, fname)
-    flt = _dlog_flt_v.get().strip().lower()
-    _dlog_out.config(state="normal"); _dlog_out.delete("1.0",tk.END)
+
+_tab_net_proxy = tk.Frame(_net_nb, bg=C["base"])
+_net_nb.add(_tab_net_proxy, text=" 🔀 PROXY ")
+
+_prx_head = tk.Frame(_tab_net_proxy, bg=C["surface0"], padx=16, pady=10); _prx_head.pack(fill=tk.X)
+tk.Label(_prx_head, text="PROXY MANAGER", font=FB, bg=C["surface0"], fg=C["sapphire"]).pack(anchor="w")
+tk.Label(_prx_head, text="Configure HTTP/HTTPS/SOCKS5 proxy — applies to all V0RTEX network requests",
+         font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_tab_net_proxy, bg=C["sapphire"], height=2).pack(fill=tk.X)
+
+_prx_active    = [False]
+_prx_status_sv = tk.StringVar(value="⬛ PROXY: INACTIVE")
+_prx_type_var  = tk.StringVar(value="http")
+_prx_host_var  = tk.StringVar(value=(CONFIG.get("proxy","").split("//")[-1].rsplit(":",1)[0] if "@" not in CONFIG.get("proxy","") else CONFIG.get("proxy","").split("@")[-1].rsplit(":",1)[0]) if CONFIG.get("proxy") else "")
+_prx_port_var  = tk.StringVar(value=CONFIG.get("proxy","").rsplit(":",1)[-1] if CONFIG.get("proxy") else "8080")
+_prx_user_var  = tk.StringVar(value=CONFIG.get("proxy_user",""))
+_prx_pass_var  = tk.StringVar(value=CONFIG.get("proxy_pass",""))
+_prx_test_sv   = tk.StringVar(value="")
+
+_prx_body = tk.Frame(_tab_net_proxy, bg=C["base"]); _prx_body.pack(fill=tk.BOTH, expand=True, padx=10, pady=6)
+_prx_left  = tk.Frame(_prx_body, bg=C["base"], width=320); _prx_left.pack(side=tk.LEFT, fill=tk.Y, padx=(0,8))
+_prx_left.pack_propagate(False)
+_prx_right = tk.Frame(_prx_body, bg=C["base"]); _prx_right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+_prx_stat_card = tk.Frame(_prx_left, bg=C["surface0"], padx=12, pady=10); _prx_stat_card.pack(fill=tk.X, pady=(0,6))
+_prx_status_lbl = tk.Label(_prx_stat_card, textvariable=_prx_status_sv,
+    font=("Consolas",11,"bold"), bg=C["surface0"], fg=C["overlay0"]); _prx_status_lbl.pack(anchor="w")
+_prx_test_lbl = tk.Label(_prx_stat_card, textvariable=_prx_test_sv,
+    font=FS, bg=C["surface0"], fg=C["subtext"]); _prx_test_lbl.pack(anchor="w", pady=(4,0))
+
+_prx_cfg_card = tk.Frame(_prx_left, bg=C["surface0"], padx=12, pady=10); _prx_cfg_card.pack(fill=tk.X, pady=(0,6))
+tk.Label(_prx_cfg_card, text="CONFIGURATION", font=("Consolas",7,"bold"),
+         bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_prx_cfg_card, bg=C["surface2"], height=1).pack(fill=tk.X, pady=(2,6))
+
+def _prx_cfg_row(lbl, widget_fn):
+    r = tk.Frame(_prx_cfg_card, bg=C["surface0"]); r.pack(fill=tk.X, pady=2)
+    tk.Label(r, text=f"{lbl}:", font=FS, bg=C["surface0"], fg=C["text"], width=12, anchor="w").pack(side=tk.LEFT)
+    widget_fn(r)
+
+def _prx_type_w(p):
+    for v,l in (("http","HTTP"),("https","HTTPS"),("socks5","SOCKS5")):
+        tk.Radiobutton(p, text=l, variable=_prx_type_var, value=v,
+            font=FS, bg=C["surface0"], fg=C["text"], activebackground=C["surface0"],
+            selectcolor=C["mantle"], relief="flat").pack(side=tk.LEFT, padx=3)
+
+_prx_cfg_row("Type",     _prx_type_w)
+_prx_cfg_row("Host",     lambda p: tk.Entry(p, textvariable=_prx_host_var, width=22,
+    font=("Consolas",9), bg=C["mantle"], fg=C["text"], insertbackground=C["text"],
+    relief="flat", bd=3).pack(side=tk.LEFT, padx=2))
+_prx_cfg_row("Port",     lambda p: tk.Entry(p, textvariable=_prx_port_var, width=7,
+    font=("Consolas",9), bg=C["mantle"], fg=C["text"], insertbackground=C["text"],
+    relief="flat", bd=3).pack(side=tk.LEFT, padx=2))
+_prx_cfg_row("Username", lambda p: tk.Entry(p, textvariable=_prx_user_var, width=18,
+    font=("Consolas",9), bg=C["mantle"], fg=C["text"], insertbackground=C["text"],
+    relief="flat", bd=3).pack(side=tk.LEFT, padx=2))
+_prx_cfg_row("Password", lambda p: tk.Entry(p, textvariable=_prx_pass_var, width=18, show="*",
+    font=("Consolas",9), bg=C["mantle"], fg=C["text"], insertbackground=C["text"],
+    relief="flat", bd=3).pack(side=tk.LEFT, padx=2))
+
+def _prx_build_url():
+    t = _prx_type_var.get(); h = _prx_host_var.get().strip(); p = _prx_port_var.get().strip()
+    u = _prx_user_var.get().strip(); pw = _prx_pass_var.get().strip()
+    if not h or not p: return ""
+    auth = f"{u}:{pw}@" if u else ""
+    return f"{t}://{auth}{h}:{p}"
+
+def _prx_arm():
+    url = _prx_build_url()
+    if not url: messagebox.showwarning("Proxy","Host and port are required."); return
+    CONFIG["proxy"] = url; CONFIG["proxy_user"] = _prx_user_var.get(); CONFIG["proxy_pass"] = _prx_pass_var.get()
     try:
-        with open(fp,"r",encoding="utf-8",errors="replace") as f:
-            for line in f:
-                if flt and flt not in line.lower(): continue
-                _dlog_out.insert(tk.END, line)
+        with open(CONFIG_PATH,"w",encoding="utf-8") as _f: json.dump(CONFIG,_f,indent=2)
+    except Exception: pass
+    _prx_active[0] = True
+    _prx_status_sv.set(f"● PROXY: {_prx_type_var.get().upper()} ACTIVE")
+    _prx_status_lbl.config(fg=C["green"])
+    _prx_arm_btn.config(state="disabled", bg=C["surface2"])
+    _prx_dis_btn.config(state="normal", bg=C["red"])
+    _sl(f"Proxy armed: {url}", "PROXY")
+    _prx_test_sv.set(f"→ {url}")
+
+def _prx_disarm():
+    CONFIG.pop("proxy",""); CONFIG.pop("proxy_user",""); CONFIG.pop("proxy_pass","")
+    try:
+        with open(CONFIG_PATH,"w",encoding="utf-8") as _f: json.dump(CONFIG,_f,indent=2)
+    except Exception: pass
+    _prx_active[0] = False
+    _prx_status_sv.set("⬛ PROXY: INACTIVE"); _prx_status_lbl.config(fg=C["overlay0"])
+    _prx_arm_btn.config(state="normal", bg=C["sapphire"])
+    _prx_dis_btn.config(state="disabled", bg=C["surface2"])
+    _prx_test_sv.set("Proxy removed from config.")
+    _sl("Proxy disarmed", "PROXY")
+
+def _prx_test():
+    url = _prx_build_url()
+    if not url: _prx_test_sv.set("No proxy configured."); return
+    _prx_test_sv.set("Testing...")
+    def _do():
+        try:
+            import urllib.request as _ur2
+            handler = _ur2.ProxyHandler({"http": url, "https": url})
+            opener  = _ur2.build_opener(handler)
+            r = opener.open("https://api.ipify.org", timeout=8)
+            ip = r.read().decode().strip()
+            root.after(0, lambda: _prx_test_sv.set(f"OK — external IP: {ip}"))
+        except Exception as e:
+            root.after(0, lambda: _prx_test_sv.set(f"Failed: {str(e)[:60]}"))
+    threading.Thread(target=_do, daemon=True).start()
+
+_prx_btn_row = tk.Frame(_prx_left, bg=C["base"]); _prx_btn_row.pack(fill=tk.X)
+_prx_arm_btn = tk.Button(_prx_btn_row, text="  ARM PROXY  ", command=_prx_arm,
+    font=FB, bg=C["sapphire"], fg=C["base"], relief="flat", padx=10, pady=7, cursor="hand2", bd=0)
+_prx_arm_btn.pack(side=tk.LEFT, padx=(0,6))
+_prx_dis_btn = tk.Button(_prx_btn_row, text="  STOP  ", command=_prx_disarm,
+    font=FB, bg=C["surface2"], fg=C["text"], relief="flat", padx=10, pady=7, cursor="hand2", bd=0, state="disabled")
+_prx_dis_btn.pack(side=tk.LEFT, padx=(0,6))
+tk.Button(_prx_btn_row, text="Test", command=_prx_test,
+    font=FS, bg=C["surface1"], fg=C["teal"], relief="flat", padx=8, pady=7, cursor="hand2", bd=0).pack(side=tk.LEFT)
+
+if CONFIG.get("proxy"):
+    root.after(100, _prx_arm)
+
+_prx_info_sc = tk.Scrollbar(_prx_right, orient="vertical", bg=C["surface1"],
+    troughcolor=C["mantle"], relief="flat", bd=0, width=6)
+_prx_info = tk.Text(_prx_right, bg=C["mantle"], fg=C["text"], font=("Consolas",8),
+    yscrollcommand=_prx_info_sc.set, relief="flat", bd=0, padx=10, pady=8, wrap="word", state="normal")
+_prx_info_sc.config(command=_prx_info.yview)
+_prx_info_sc.pack(side=tk.RIGHT, fill=tk.Y); _prx_info.pack(fill=tk.BOTH, expand=True)
+_prx_info.insert("1.0", "PROXY TYPES\n\nHTTP  — Routes HTTP traffic. Fast, simple.\n        Format: http://host:port\n\nHTTPS — Routes HTTP+HTTPS through TLS tunnel.\n        Format: https://host:port\n\nSOCKS5 — Protocol-agnostic TCP/UDP tunnel.\n         Supports remote DNS resolution.\n         Format: socks5://host:port\n\nAPPLIES TO\n  All V0RTEX network requests:\n  VirusTotal, AbuseIPDB, OTX, URLScan,\n  MalwareBazaar, Shodan, DNS Noise, etc.\n\nNOTE\n  Does NOT apply to tshark captures\n  (system-level) or Tor (uses its own\n  SOCKS5 on 127.0.0.1:9050).\n")
+_prx_info.config(state="disabled")
+
+
+_tab_net_tor = tk.Frame(_net_nb, bg=C["base"])
+_net_nb.add(_tab_net_tor, text=" 🧅 TOR ")
+
+_tor_head = tk.Frame(_tab_net_tor, bg=C["surface0"], padx=16, pady=10); _tor_head.pack(fill=tk.X)
+tk.Label(_tor_head, text="TOR ANONYMOUS ROUTING", font=FB, bg=C["surface0"], fg=C["mauve"]).pack(anchor="w")
+tk.Label(_tor_head, text="Route all V0RTEX traffic through the Tor network — no API key or account required",
+         font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_tab_net_tor, bg=C["mauve"], height=2).pack(fill=tk.X)
+
+_tor_active    = [False]
+_tor_proc      = [None]
+_tor_status_sv = tk.StringVar(value="TOR: INACTIVE")
+_tor_ip_sv     = tk.StringVar(value="External IP: —")
+_tor_newid_sv  = tk.StringVar(value="")
+_tor_port_var  = tk.IntVar(value=9050)
+_tor_ctrl_var  = tk.IntVar(value=9051)
+
+_tor_body = tk.Frame(_tab_net_tor, bg=C["base"]); _tor_body.pack(fill=tk.BOTH, expand=True, padx=10, pady=6)
+_tor_left  = tk.Frame(_tor_body, bg=C["base"], width=360); _tor_left.pack(side=tk.LEFT, fill=tk.Y, padx=(0,8))
+_tor_right = tk.Frame(_tor_body, bg=C["base"]); _tor_right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+_tor_stat_card = tk.Frame(_tor_left, bg=C["surface0"], padx=12, pady=10); _tor_stat_card.pack(fill=tk.X, pady=(0,6))
+_tor_status_lbl = tk.Label(_tor_stat_card, textvariable=_tor_status_sv,
+    font=("Consolas",11,"bold"), bg=C["surface0"], fg=C["overlay0"]); _tor_status_lbl.pack(anchor="w")
+tk.Label(_tor_stat_card, textvariable=_tor_ip_sv, font=FS, bg=C["surface0"], fg=C["subtext"]).pack(anchor="w", pady=(4,0))
+tk.Label(_tor_stat_card, textvariable=_tor_newid_sv, font=FS, bg=C["surface0"], fg=C["green"]).pack(anchor="w", pady=(2,0))
+
+_tor_cfg_card = tk.Frame(_tor_left, bg=C["surface0"], padx=12, pady=10); _tor_cfg_card.pack(fill=tk.X, pady=(0,6))
+tk.Label(_tor_cfg_card, text="PORTS", font=("Consolas",7,"bold"), bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_tor_cfg_card, bg=C["surface2"], height=1).pack(fill=tk.X, pady=(2,6))
+for _tlbl, _tvar in (("SOCKS5 Port", _tor_port_var), ("Control Port", _tor_ctrl_var)):
+    _tr = tk.Frame(_tor_cfg_card, bg=C["surface0"]); _tr.pack(fill=tk.X, pady=2)
+    tk.Label(_tr, text=f"{_tlbl}:", font=FS, bg=C["surface0"], fg=C["text"], width=14, anchor="w").pack(side=tk.LEFT)
+    tk.Spinbox(_tr, from_=1024, to=65535, textvariable=_tvar, width=6,
+        font=FS, bg=C["mantle"], fg=C["text"], relief="flat", bd=0).pack(side=tk.LEFT, padx=4)
+
+def _tor_log(msg, tag="DIM"):
+    import datetime as _tld
+    ts = _tld.datetime.now().strftime("%H:%M:%S")
+    def _d():
+        _tor_out.config(state="normal")
+        _tor_out.insert(tk.END, f"[{ts}] {msg}\n", tag)
+        _tor_out.see(tk.END)
+        _tor_out.config(state="disabled")
+    root.after(0, _d)
+
+def _tor_start():
+    import shutil as _tsh
+    tor_exe = globals().get("CONFIG", {}).get("tor_path", "")
+    if tor_exe and not os.path.isfile(str(tor_exe)):
+        tor_exe = None
+    if not tor_exe:
+        tor_exe = _tsh.which("tor")
+    if not tor_exe and sys.platform == "win32":
+        _uname = os.environ.get("USERNAME", "")
+        _lapp = os.environ.get("LOCALAPPDATA", f"C:\\Users\\{_uname}\\AppData\\Local")
+        _upro = os.environ.get("USERPROFILE", f"C:\\Users\\{_uname}")
+        for _p in [
+            r"C:\Program Files\Tor Browser\Browser\TorBrowser\Tor\tor.exe",
+            r"C:\Program Files (x86)\Tor Browser\Browser\TorBrowser\Tor\tor.exe",
+            os.path.join(_lapp, "Programs", "Tor Browser", "Browser", "TorBrowser", "Tor", "tor.exe"),
+            os.path.join(_upro, "Desktop", "Tor Browser", "Browser", "TorBrowser", "Tor", "tor.exe"),
+            os.path.join(_upro, "Downloads", "Tor Browser", "Browser", "TorBrowser", "Tor", "tor.exe"),
+        ]:
+            if os.path.isfile(_p): tor_exe = _p; break
+    if not tor_exe or not os.path.isfile(tor_exe):
+        _tor_log("tor binary not found.", "BAD")
+        _tor_log("Install Tor: https://www.torproject.org/download/", "DIM")
+        _tor_log("Linux: sudo apt install tor  |  macOS: brew install tor", "DIM")
+        return
+    port = _tor_port_var.get(); ctrl = _tor_ctrl_var.get()
+    _tor_log(f"Starting Tor on SOCKS5 :{port}  control :{ctrl}", "HEAD")
+    try:
+        kw = {"creationflags": 0x08000000} if sys.platform == "win32" else {}
+        proc = subprocess.Popen(
+            [tor_exe, "--SocksPort", str(port), "--ControlPort", str(ctrl), "--Log", "notice stdout"],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, **kw)
+        _tor_proc[0] = proc
     except Exception as e:
-        _dlog_out.insert(tk.END, f"Error: {e}\n")
-    _dlog_out.config(state="disabled")
-def _dlog_open_folder():
-    if os.path.isdir(_LOG_DIR):
-        if sys.platform=="win32": os.startfile(_LOG_DIR)
-        else: subprocess.Popen(["xdg-open",_LOG_DIR], creationflags=0x08000000 if sys.platform=="win32" else 0)
-_mkbtn(_dlog_ctrl,"🔄 Refresh List",lambda:_dlog_populate(),C["surface2"],C["text"])
-_mkbtn(_dlog_ctrl,"📖 Open",lambda:_dlog_open(),C["overlay0"])
-_mkbtn(_dlog_ctrl,"📂 Folder",lambda:_dlog_open_folder(),C["surface1"],C["text"])
-_dlog_flt_e.bind("<Return>", lambda e: _dlog_open())
-_dlog_sc = tk.Scrollbar(_tab_debuglog, orient="vertical", bg=C["surface1"],
-                         troughcolor=C["base"], relief="flat", width=7)
-_dlog_out = tk.Text(_tab_debuglog, bg="#0a0a10", fg=C["subtext"], font=("Consolas",8),
-                    relief="flat", bd=0, padx=10, pady=8, state="disabled", wrap="none",
-                    yscrollcommand=_dlog_sc.set)
-_dlog_sc.config(command=_dlog_out.yview)
-_dlog_sc.pack(side=tk.RIGHT, fill=tk.Y); _dlog_out.pack(fill=tk.BOTH, expand=True, padx=8, pady=(4,8))
-_dlog_populate()
+        _tor_log(f"Failed to start Tor: {e}", "BAD"); return
+    _tor_status_sv.set("TOR: CONNECTING..."); _tor_status_lbl.config(fg=C["yellow"])
+    _tor_arm_btn.config(state="disabled", bg=C["surface2"])
+    def _read():
+        for line in proc.stdout:
+            line = line.strip()
+            if not line: continue
+            tag = "OK" if "Bootstrapped 100%" in line else ("WARN" if "warn" in line.lower() else "DIM")
+            _tor_log(line, tag)
+            if "Bootstrapped 100%" in line:
+                _tor_active[0] = True
+                url = f"socks5://127.0.0.1:{port}"
+                CONFIG["proxy"] = url
+                root.after(0, lambda: (
+                    _tor_status_sv.set(f"TOR: ACTIVE :{port}"),
+                    _tor_status_lbl.config(fg=C["mauve"]),
+                    _tor_dis_btn.config(state="normal", bg=C["red"]),
+                ))
+                _sl(f"Tor active — proxy: {url}", "TOR")
+                threading.Thread(target=_tor_check_ip, daemon=True).start()
+        root.after(0, lambda: _tor_arm_btn.config(state="normal", bg=C["mauve"]))
+    threading.Thread(target=_read, daemon=True).start()
+
+def _tor_stop():
+    _tor_active[0] = False
+    try:
+        if _tor_proc[0]: _tor_proc[0].terminate(); _tor_proc[0] = None
+    except Exception: pass
+    CONFIG.pop("proxy", None)
+    _tor_status_sv.set("TOR: INACTIVE"); _tor_status_lbl.config(fg=C["overlay0"])
+    _tor_ip_sv.set("External IP: —"); _tor_newid_sv.set("")
+    _tor_arm_btn.config(state="normal", bg=C["mauve"])
+    _tor_dis_btn.config(state="disabled", bg=C["surface2"])
+    _tor_log("Tor stopped.", "DIM")
+
+def _tor_check_ip():
+    try:
+        port = _tor_port_var.get()
+        proxies = {"https": f"socks5://127.0.0.1:{port}", "http": f"socks5://127.0.0.1:{port}"}
+        r = requests.get("https://api.ipify.org", proxies=proxies, timeout=10)
+        ip = r.text.strip()
+        root.after(0, lambda: _tor_ip_sv.set(f"External IP (Tor): {ip}"))
+    except Exception as e:
+        root.after(0, lambda _e=e: _tor_ip_sv.set(f"IP check failed: {_e}"))
+
+def _tor_new_identity():
+    if not _tor_active[0]:
+        _tor_log("Tor is not active — ARM TOR first", "WARN")
+        return
+    try:
+        import socket as _ts2
+        ctrl = _tor_ctrl_var.get()
+        with _ts2.socket(_ts2.AF_INET, _ts2.SOCK_STREAM) as _s:
+            _s.settimeout(5)
+            _s.connect(("127.0.0.1", ctrl))
+            _s.sendall(b'AUTHENTICATE ""\r\nSIGNAL NEWNYM\r\n')
+            _tor_newid_sv.set("New identity requested")
+            _tor_log("NEWNYM signal sent — new Tor circuit", "OK")
+    except Exception as e:
+        _tor_log(f"New identity failed: {e}", "WARN")
+
+_tor_btn_row = tk.Frame(_tor_left, bg=C["base"]); _tor_btn_row.pack(fill=tk.X, pady=(0,4))
+_tor_arm_btn = tk.Button(_tor_btn_row, text="  ARM TOR  ", command=_tor_start,
+    font=FB, bg=C["mauve"], fg=C["base"], relief="flat", padx=10, pady=7, cursor="hand2", bd=0)
+_tor_arm_btn.pack(side=tk.LEFT, padx=(0,6))
+_tor_dis_btn = tk.Button(_tor_btn_row, text="  STOP  ", command=_tor_stop,
+    font=FB, bg=C["surface2"], fg=C["text"], relief="flat", padx=10, pady=7, cursor="hand2", bd=0, state="disabled")
+_tor_dis_btn.pack(side=tk.LEFT, padx=(0,6))
+tk.Button(_tor_btn_row, text="New ID", command=_tor_new_identity,
+    font=FS, bg=C["surface1"], fg=C["green"], relief="flat", padx=8, pady=7, cursor="hand2", bd=0).pack(side=tk.LEFT)
+tk.Button(_tor_btn_row, text="Check IP", command=lambda: threading.Thread(target=_tor_check_ip, daemon=True).start(),
+    font=FS, bg=C["surface1"], fg=C["blue"], relief="flat", padx=8, pady=7, cursor="hand2", bd=0).pack(side=tk.LEFT, padx=(6,0))
+
+
+_tor_sc = tk.Scrollbar(_tor_right, orient="vertical", bg=C["surface1"],
+    troughcolor=C["mantle"], relief="flat", bd=0, width=7)
+_tor_out = tk.Text(_tor_right, bg=C["mantle"], fg=C["text"], font=("Consolas",8),
+    yscrollcommand=_tor_sc.set, relief="flat", bd=0, padx=8, pady=6, wrap="word", state="disabled")
+_tor_sc.config(command=_tor_out.yview); _tor_sc.pack(side=tk.RIGHT, fill=tk.Y); _tor_out.pack(fill=tk.BOTH, expand=True)
+for _tt, _tc in [("OK",C["green"]),("WARN",C["yellow"]),("BAD",C["red"]),("DIM",C["overlay0"]),("HEAD",C["mauve"])]:
+    _tor_out.tag_configure(_tt, foreground=_tc)
+_tor_log("Tor manager ready. Press ARM TOR to start.", "HEAD")
+_tor_log("Requires Tor Browser or standalone Tor installed.", "DIM")
+
+
+
+_NOISE_ACTIVE     = threading.Event()
+_noise_stats      = {"sent": 0, "errors": 0, "last_domain": ""}
+_noise_stats_lock = threading.Lock()
+_noise_rate_var   = tk.IntVar(value=20)
+_noise_threads_var= tk.IntVar(value=2)
+_noise_interval_v = tk.StringVar(value="random")
+_noise_proto_var  = tk.StringVar(value="dns")
+_noise_custom_var = tk.BooleanVar(value=False)
+_noise_domains_v  = tk.StringVar(value="")
+_noise_thread_list= []
+
+_NOISE_DOMAINS = [
+    "google.com","youtube.com","facebook.com","twitter.com","reddit.com","wikipedia.org",
+    "amazon.com","instagram.com","linkedin.com","github.com","microsoft.com","apple.com",
+    "netflix.com","cloudflare.com","mozilla.org","stackoverflow.com","medium.com",
+    "wordpress.com","twitch.tv","discord.com","telegram.org","signal.org","spotify.com",
+    "dropbox.com","archive.org","bbc.com","cnn.com","reuters.com","theguardian.com",
+    "wired.com","arstechnica.com","techcrunch.com","theverge.com","ebay.com","etsy.com",
+    "paypal.com","weather.com","imdb.com","steampowered.com","python.org","docker.com",
+    "nginx.com","apache.org","letsencrypt.org","godaddy.com","w3.org","ietf.org",
+    "slack.com","zoom.us","webex.com","gnu.org","nodejs.org","kubernetes.io",
+]
+
+def _noise_worker():
+    import socket as _nsk, random as _nr, time as _nt2
+    while _NOISE_ACTIVE.is_set():
+        try:
+            rate   = max(1, _noise_rate_var.get())
+            n_thr  = max(1, _noise_threads_var.get())
+            base   = 60.0 / rate / n_thr
+            if _noise_custom_var.get():
+                raw = _noise_domains_v.get().strip()
+                pool = [d.strip() for d in raw.replace(",","\n").splitlines() if d.strip()] or _NOISE_DOMAINS
+            else:
+                pool = _NOISE_DOMAINS
+            domain = _nr.choice(pool)
+            sub    = "".join(_nr.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=_nr.randint(3,8)))
+            fqdn   = f"{sub}.{domain}"
+            try: _nsk.getaddrinfo(fqdn, None, _nsk.AF_INET, _nsk.SOCK_DGRAM)
+            except Exception: pass
+            proto = _noise_proto_var.get()
+            if proto == "dns_http":
+                try:
+                    import urllib.request as _nur
+                    _nur.urlopen(_nur.Request(f"http://{domain}/",
+                        headers={"User-Agent":"Mozilla/5.0"}), timeout=3)
+                except Exception: pass
+            elif proto == "dns_https":
+                try:
+                    import urllib.request as _nur2
+                    _nur2.urlopen(_nur2.Request(f"https://{domain}/",
+                        headers={"User-Agent":"Mozilla/5.0"}), timeout=3)
+                except Exception: pass
+            with _noise_stats_lock:
+                _noise_stats["sent"] += 1
+                _noise_stats["last_domain"] = fqdn
+            sleep_t = base * _nr.uniform(0.3, 2.5) if _noise_interval_v.get() == "random" else base
+            _nt2.sleep(max(0.1, sleep_t))
+        except Exception:
+            with _noise_stats_lock: _noise_stats["errors"] += 1
+
+def _noise_arm():
+    global _noise_thread_list
+    if _NOISE_ACTIVE.is_set(): return
+    with _noise_stats_lock:
+        _noise_stats["sent"] = 0; _noise_stats["errors"] = 0; _noise_stats["last_domain"] = ""
+    with _noise_stats_lock:
+        _noise_stats["sent"] = 0
+        _noise_stats["errors"] = 0
+        _noise_stats["last_domain"] = ""
+    _NOISE_ACTIVE.set()
+    n = max(1, min(4, _noise_threads_var.get()))
+    _noise_thread_list = [threading.Thread(target=_noise_worker, daemon=True) for _ in range(n)]
+    for t in _noise_thread_list: t.start()
+    _noise_status_sv.set("ACTIVE"); _noise_status_lbl.config(fg=C["green"])
+    _noise_arm_btn.config(state="disabled", bg=C["surface2"])
+    _noise_dis_btn.config(state="normal", bg=C["red"])
+    _sl("Noise Generator armed", "NOISE")
+
+def _noise_disarm():
+    _NOISE_ACTIVE.clear()
+    _noise_status_sv.set("INACTIVE"); _noise_status_lbl.config(fg=C["overlay0"])
+    _noise_arm_btn.config(state="normal", bg=C["teal"])
+    _noise_dis_btn.config(state="disabled", bg=C["surface2"])
+    _sl("Noise Generator stopped", "NOISE")
+
+def _noise_stats_tick():
+    with _noise_stats_lock:
+        s = _noise_stats["sent"]; e = _noise_stats["errors"]; l = _noise_stats["last_domain"]
+    _noise_sent_sv.set(f"Sent: {s}")
+    _noise_err_sv.set(f"Errors: {e}")
+    _noise_last_sv.set(f"Last: {l or '—'}")
+    root.after(1000, _noise_stats_tick)
+
+def _noise_info_popup():
+    _w = tk.Toplevel(root); _w.title("DNS Noise Generator — Info")
+    _w.configure(bg=C["base"]); _w.resizable(False, False)
+    W, H = 540, 400
+    _w.geometry(f"{W}x{H}+{(root.winfo_screenwidth()-W)//2}+{(root.winfo_screenheight()-H)//2}")
+    _w.attributes("-topmost", True)
+    tk.Frame(_w, bg=C["teal"], height=3).pack(fill="x")
+    tk.Label(_w, text="DNS TRAFFIC NOISE GENERATOR", font=FB, bg=C["base"], fg=C["teal"], pady=10).pack(anchor="w", padx=16)
+    tk.Frame(_w, bg=C["surface2"], height=1).pack(fill="x", padx=16)
+    sc = tk.Scrollbar(_w, orient="vertical"); sc.pack(side="right", fill="y")
+    txt = tk.Text(_w, bg=C["mantle"], fg=C["text"], font=("Consolas",8), wrap="word",
+        relief="flat", bd=0, padx=14, pady=8, yscrollcommand=sc.set, state="normal")
+    sc.config(command=txt.yview); txt.pack(fill="both", expand=True, padx=8, pady=8)
+    txt.insert("1.0",
+        "WHAT IT DOES\n"
+        "  Sends random DNS queries in background threads to a pool of\n"
+        "  well-known public domains. This creates noise in your DNS\n"
+        "  traffic, making it harder for passive observers (ISP) to\n"
+        "  profile which domains you actually visit.\n\n"
+        "LEGALITY\n"
+        "  Fully legal everywhere. You are making standard DNS lookups\n"
+        "  from your own machine to public DNS servers. No spoofing,\n"
+        "  no hacking, no interference with other systems.\n\n"
+        "SETTINGS\n"
+        "  Rate     — queries per minute per thread\n"
+        "  Threads  — parallel workers (more = denser noise)\n"
+        "  Interval — Random varies timing to avoid patterns\n"
+        "  Protocol — DNS only / + HTTP / + HTTPS\n"
+        "  Domains  — built-in list (52 domains) or custom\n\n"
+        "LIMITATIONS\n"
+        "  Does NOT hide your real traffic. Use VPN or Tor for that.\n"
+        "  Effective only against passive DNS logging/profiling.\n"
+        "  ISPs with deep packet inspection can still see hostnames.\n"
+    )
+    txt.config(state="disabled")
+    tk.Button(_w, text=" Close ", command=_w.destroy,
+        bg=C["surface2"], fg=C["text"], font=FS, relief="flat", padx=10, pady=5,
+        cursor="hand2", bd=0).pack(pady=8)
+
+_tab_net_noise = tk.Frame(_net_nb, bg=C["base"])
+_net_nb.add(_tab_net_noise, text=" 📡 NOISE GEN ")
+
+_nng_head = tk.Frame(_tab_net_noise, bg=C["surface0"], padx=16, pady=10); _nng_head.pack(fill=tk.X)
+tk.Label(_nng_head, text="DNS TRAFFIC NOISE GENERATOR", font=FB, bg=C["surface0"], fg=C["teal"]).pack(anchor="w")
+tk.Label(_nng_head, text="Generates background DNS queries to mask your real traffic pattern",
+         font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_tab_net_noise, bg=C["teal"], height=2).pack(fill=tk.X)
+
+_nng_body = tk.Frame(_tab_net_noise, bg=C["base"]); _nng_body.pack(fill=tk.BOTH, expand=True, padx=10, pady=6)
+_nng_left  = tk.Frame(_nng_body, bg=C["base"], width=320); _nng_left.pack(side=tk.LEFT, fill=tk.Y, padx=(0,8))
+_nng_left.pack_propagate(False)
+_nng_right = tk.Frame(_nng_body, bg=C["base"]); _nng_right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+_noise_status_sv = tk.StringVar(value="INACTIVE")
+_noise_sent_sv   = tk.StringVar(value="Sent: 0")
+_noise_err_sv    = tk.StringVar(value="Errors: 0")
+_noise_last_sv   = tk.StringVar(value="Last: —")
+
+_nng_stat = tk.Frame(_nng_left, bg=C["surface0"], padx=12, pady=10); _nng_stat.pack(fill=tk.X, pady=(0,6))
+_noise_status_lbl = tk.Label(_nng_stat, textvariable=_noise_status_sv,
+    font=("Consolas",12,"bold"), bg=C["surface0"], fg=C["overlay0"]); _noise_status_lbl.pack(anchor="w")
+for _sv in (_noise_sent_sv, _noise_err_sv, _noise_last_sv):
+    tk.Label(_nng_stat, textvariable=_sv, font=FS, bg=C["surface0"], fg=C["subtext"]).pack(anchor="w", pady=1)
+
+_nng_btn_row = tk.Frame(_nng_left, bg=C["base"]); _nng_btn_row.pack(fill=tk.X, pady=(0,6))
+_noise_arm_btn = tk.Button(_nng_btn_row, text="  ARM  ", command=_noise_arm,
+    font=FB, bg=C["teal"], fg=C["base"], relief="flat", padx=10, pady=7, cursor="hand2", bd=0)
+_noise_arm_btn.pack(side=tk.LEFT, padx=(0,6))
+_noise_dis_btn = tk.Button(_nng_btn_row, text="  STOP  ", command=_noise_disarm,
+    font=FB, bg=C["surface2"], fg=C["text"], relief="flat", padx=10, pady=7, cursor="hand2", bd=0, state="disabled")
+_noise_dis_btn.pack(side=tk.LEFT, padx=(0,6))
+tk.Button(_nng_btn_row, text="i", command=_noise_info_popup,
+    font=("Consolas",11,"bold"), bg=C["surface1"], fg=C["blue"],
+    relief="flat", padx=8, pady=7, cursor="hand2", bd=0).pack(side=tk.LEFT)
+
+_nng_cfg = tk.Frame(_nng_left, bg=C["surface0"], padx=12, pady=10); _nng_cfg.pack(fill=tk.X, pady=(0,6))
+tk.Label(_nng_cfg, text="SETTINGS", font=("Consolas",7,"bold"), bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_nng_cfg, bg=C["surface2"], height=1).pack(fill=tk.X, pady=(2,6))
+
+def _nng_row(lbl, wfn):
+    r = tk.Frame(_nng_cfg, bg=C["surface0"]); r.pack(fill=tk.X, pady=2)
+    tk.Label(r, text=f"{lbl}:", font=FS, bg=C["surface0"], fg=C["text"], width=12, anchor="w").pack(side=tk.LEFT)
+    wfn(r)
+
+_nng_row("Rate q/min", lambda p: (
+    tk.Scale(p, variable=_noise_rate_var, from_=1, to=120, orient="horizontal",
+        bg=C["surface0"], fg=C["text"], troughcolor=C["mantle"], highlightthickness=0,
+        length=110, showvalue=True).pack(side=tk.LEFT)
+))
+_nng_row("Threads", lambda p: [
+    tk.Radiobutton(p, text=str(v), variable=_noise_threads_var, value=v, font=FS,
+        bg=C["surface0"], fg=C["text"], activebackground=C["surface0"],
+        selectcolor=C["mantle"], relief="flat").pack(side=tk.LEFT, padx=2)
+    for v in (1,2,3,4)
+])
+_nng_row("Interval", lambda p: [
+    tk.Radiobutton(p, text=l, variable=_noise_interval_v, value=v, font=FS,
+        bg=C["surface0"], fg=C["text"], activebackground=C["surface0"],
+        selectcolor=C["mantle"], relief="flat").pack(side=tk.LEFT, padx=4)
+    for v,l in (("random","Random"),("fixed","Fixed"))
+])
+_nng_row("Protocol", lambda p: [
+    tk.Radiobutton(p, text=l, variable=_noise_proto_var, value=v, font=FS,
+        bg=C["surface0"], fg=C["text"], activebackground=C["surface0"],
+        selectcolor=C["mantle"], relief="flat").pack(side=tk.LEFT, padx=2)
+    for v,l in (("dns","DNS"),("dns_http","+HTTP"),("dns_https","+HTTPS"))
+])
+
+_nng_dom = tk.Frame(_nng_left, bg=C["surface0"], padx=12, pady=8); _nng_dom.pack(fill=tk.X)
+_noise_custom_cb = tk.Checkbutton(_nng_dom, text="Custom domain list", variable=_noise_custom_var,
+    font=FS, bg=C["surface0"], fg=C["text"], activebackground=C["surface0"],
+    selectcolor=C["mantle"], relief="flat"); _noise_custom_cb.pack(anchor="w")
+_nng_dom_sc = tk.Scrollbar(_nng_dom, orient="vertical", bg=C["surface1"],
+    troughcolor=C["mantle"], relief="flat", bd=0, width=6)
+_nng_dom_txt = tk.Text(_nng_dom, bg=C["mantle"], fg=C["text"], font=("Consolas",7),
+    relief="flat", bd=0, padx=4, pady=3, height=4, wrap="none",
+    yscrollcommand=_nng_dom_sc.set, state="disabled")
+_nng_dom_sc.config(command=_nng_dom_txt.yview)
+_nng_dom_sc.pack(side=tk.RIGHT, fill=tk.Y); _nng_dom_txt.pack(fill=tk.X)
+def _nng_toggle_custom(*_):
+    _nng_dom_txt.config(state="normal" if _noise_custom_var.get() else "disabled")
+    _noise_domains_v.set(_nng_dom_txt.get("1.0", tk.END).strip())
+_noise_custom_var.trace_add("write", _nng_toggle_custom)
+_nng_dom_txt.bind("<KeyRelease>", lambda e: _noise_domains_v.set(_nng_dom_txt.get("1.0", tk.END).strip()))
+
+_nng_right_card = tk.Frame(_nng_right, bg=C["surface0"], padx=10, pady=8)
+_nng_right_card.pack(fill=tk.BOTH, expand=True)
+tk.Label(_nng_right_card, text="BUILT-IN DOMAIN POOL (52 domains)", font=("Consolas",7,"bold"),
+    bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_nng_right_card, bg=C["surface2"], height=1).pack(fill=tk.X, pady=(2,4))
+_nng_pool_sc = tk.Scrollbar(_nng_right_card, orient="vertical", bg=C["surface1"],
+    troughcolor=C["mantle"], relief="flat", bd=0, width=6)
+_nng_pool_txt = tk.Text(_nng_right_card, bg=C["mantle"], fg=C["overlay0"], font=("Consolas",7),
+    yscrollcommand=_nng_pool_sc.set, relief="flat", bd=0, padx=6, pady=4, state="normal", wrap="none")
+_nng_pool_sc.config(command=_nng_pool_txt.yview)
+_nng_pool_sc.pack(side=tk.RIGHT, fill=tk.Y); _nng_pool_txt.pack(fill=tk.BOTH, expand=True)
+_nng_pool_txt.insert("1.0", "\n".join(_NOISE_DOMAINS))
+_nng_pool_txt.config(state="disabled")
+
+root.after(1200, _noise_stats_tick)
+
+
+_tab_net_live = tk.Frame(_net_nb, bg=C["base"])
+_net_nb.add(_tab_net_live, text=" 📡 LIVE TRAFFIC ")
+
+_lt_head = tk.Frame(_tab_net_live, bg=C["surface0"], padx=16, pady=10); _lt_head.pack(fill=tk.X)
+tk.Label(_lt_head, text="LIVE TRAFFIC MONITOR — tshark", font=FB, bg=C["surface0"], fg=C["sapphire"]).pack(anchor="w")
+tk.Label(_lt_head, text="Real-time packet capture and analysis via tshark — requires tshark installed",
+         font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_tab_net_live, bg=C["sapphire"], height=2).pack(fill=tk.X)
+
+_lt_running  = [False]
+_lt_proc     = [None]
+_lt_stats    = {"packets":0, "bytes":0, "flows":set(), "tcp":0, "udp":0, "dns":0, "start":None}
+_lt_slk      = threading.Lock()
+_lt_iface_v  = tk.StringVar(value="")
+_lt_filter_v = tk.StringVar(value="not host 127.0.0.1")
+_lt_count_v  = tk.IntVar(value=100)
+_lt_status_v = tk.StringVar(value="IDLE")
+_lt_pkts_v   = tk.StringVar(value="Pkts: 0")
+_lt_bw_v     = tk.StringVar(value="BW: —")
+_lt_flows_v  = tk.StringVar(value="Flows: 0")
+
+_lt_ctrl = tk.Frame(_tab_net_live, bg=C["surface0"], padx=12, pady=6); _lt_ctrl.pack(fill=tk.X)
+tk.Label(_lt_ctrl, text="Interface:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT, padx=(8,2))
+_lt_iface_cb = ttk.Combobox(_lt_ctrl, textvariable=_lt_iface_v, width=22,
+    font=("Consolas",9), state="readonly")
+_lt_iface_cb.pack(side=tk.LEFT, padx=(0,4))
+
+_LT_VIRTUAL_KEYWORDS = ("virtual", "loopback", "lan*", "bluetooth", "vmware",
+                         "virtualbox", "vpn", "tap", "tun", "npcap loopback")
+
+def _lt_detect_ifaces():
+    tshark = CONFIG.get("tshark_path", "tshark")
+    try:
+        r = subprocess.run([tshark, "-D"], capture_output=True, text=True, timeout=5,
+                           creationflags=0x08000000 if sys.platform=="win32" else 0)
+        lines = (r.stdout or r.stderr or "").strip().splitlines()
+        physical = []
+        virtual  = []
+        for ln in lines:
+            ln = ln.strip()
+            if not ln: continue
+            parts = ln.split(" ", 1)
+            desc = parts[1].strip() if len(parts) >= 2 else parts[0].strip()
+            desc_l = desc.lower()
+            if any(k in desc_l for k in _LT_VIRTUAL_KEYWORDS):
+                virtual.append(desc)
+            else:
+                physical.append(desc)
+        ifaces = physical + virtual
+        if ifaces:
+            _lt_iface_cb["values"] = ifaces
+            _lt_iface_v.set(ifaces[0])
+            if physical:
+                _lt_append(f"  ✓ {len(physical)} physical + {len(virtual)} virtual interfaces detected", "DIM")
+    except Exception as e:
+        _lt_append(f"Interface detect error: {e}", "WARN")
+
+tk.Button(_lt_ctrl, text="⟳ Detect", command=_lt_detect_ifaces,
+    font=FS, bg=C["surface2"], fg=C["text"], relief="flat", padx=6, pady=2,
+    cursor="hand2", bd=0).pack(side=tk.LEFT, padx=(0,10))
+
+tk.Label(_lt_ctrl, text="BPF Filter:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT, padx=(0,2))
+tk.Entry(_lt_ctrl, textvariable=_lt_filter_v, width=26, font=("Consolas",9),
+    bg=C["mantle"], fg=C["text"], insertbackground=C["text"], relief="flat", bd=3).pack(side=tk.LEFT, padx=(0,4))
+tk.Label(_lt_ctrl, text="Count:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT, padx=(4,2))
+tk.Spinbox(_lt_ctrl, from_=10, to=10000, textvariable=_lt_count_v, width=6,
+    font=FS, bg=C["mantle"], fg=C["text"], relief="flat", bd=0).pack(side=tk.LEFT)
+
+_lt_log_path  = [None]
+_lt_save_var  = tk.BooleanVar(value=True)
+tk.Checkbutton(_lt_ctrl, text="Save log", variable=_lt_save_var,
+    font=FS, bg=C["surface0"], fg=C["text"], selectcolor=C["surface1"],
+    activebackground=C["surface0"], relief="flat").pack(side=tk.LEFT, padx=(12,0))
+
+_lt_ind = tk.Frame(_tab_net_live, bg=C["crust"], pady=4, padx=12); _lt_ind.pack(fill=tk.X)
+_lt_status_lbl2 = tk.Label(_lt_ind, textvariable=_lt_status_v, font=("Consolas",9,"bold"),
+    bg=C["crust"], fg=C["overlay0"]); _lt_status_lbl2.pack(side=tk.LEFT, padx=(0,12))
+for _sv5, _c5 in ((_lt_pkts_v,C["blue"]),(_lt_bw_v,C["teal"]),(_lt_flows_v,C["green"])):
+    tk.Label(_lt_ind, textvariable=_sv5, font=FS, bg=C["crust"], fg=_c5).pack(side=tk.LEFT, padx=8)
+
+_lt_body = tk.Frame(_tab_net_live, bg=C["base"]); _lt_body.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+_lt_left  = tk.Frame(_lt_body, bg=C["base"]); _lt_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0,4))
+_lt_right = tk.Frame(_lt_body, bg=C["base"], width=240); _lt_right.pack(side=tk.LEFT, fill=tk.Y)
+_lt_right.pack_propagate(False)
+
+_lt_sc2 = tk.Scrollbar(_lt_left, orient="vertical", bg=C["surface1"], troughcolor=C["mantle"], relief="flat", bd=0, width=7)
+_lt_out = tk.Text(_lt_left, bg=C["mantle"], fg=C["text"], font=("Consolas",8),
+    yscrollcommand=_lt_sc2.set, relief="flat", bd=0, padx=8, pady=6, wrap="none", state="disabled")
+_lt_sc2.config(command=_lt_out.yview); _lt_sc2.pack(side=tk.RIGHT, fill=tk.Y); _lt_out.pack(fill=tk.BOTH, expand=True)
+for _tt2,_tc2 in [("TCP",C["sapphire"]),("UDP",C["teal"]),("DNS",C["mauve"]),
+                   ("HTTP",C["yellow"]),("TLS",C["green"]),("WARN",C["red"]),("DIM",C["overlay0"])]:
+    _lt_out.tag_configure(_tt2, foreground=_tc2)
+
+_lt_stat_card = tk.Frame(_lt_right, bg=C["surface0"], padx=8, pady=8); _lt_stat_card.pack(fill=tk.BOTH, expand=True)
+tk.Label(_lt_stat_card, text="SESSION STATS", font=("Consolas",7,"bold"),
+    bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_lt_stat_card, bg=C["surface2"], height=1).pack(fill=tk.X, pady=(2,4))
+_lt_svars = {}
+for _m2 in ("Packets","Bytes","Flows","TCP","UDP","DNS","Pkt/s","KB/s","Time"):
+    _v2 = tk.StringVar(value="—"); _lt_svars[_m2] = _v2
+    _mr2 = tk.Frame(_lt_stat_card, bg=C["surface0"]); _mr2.pack(fill=tk.X, pady=1)
+    tk.Label(_mr2, text=f"{_m2}:", font=("Consolas",7), bg=C["surface0"], fg=C["overlay0"],
+        width=10, anchor="w").pack(side=tk.LEFT)
+    tk.Label(_mr2, textvariable=_v2, font=("Consolas",7,"bold"), bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
+
+def _lt_append(msg, tag="DIM"):
+    def _d():
+        _lt_out.config(state="normal")
+        _lt_out.insert(tk.END, msg+"\n", tag)
+        if int(_lt_out.index("end-1c").split(".")[0]) > 600:
+            _lt_out.delete("1.0","150.0")
+        _lt_out.see(tk.END); _lt_out.config(state="disabled")
+    root.after(0, _d)
+
+def _lt_upd_stats():
+    import time as _lt3
+    with _lt_slk:
+        p = _lt_stats["packets"]; b = _lt_stats["bytes"]
+        f = len(_lt_stats["flows"])
+        tc = _lt_stats["tcp"]; uc = _lt_stats["udp"]; dc = _lt_stats["dns"]
+        st = _lt_stats["start"]
+    el = (_lt3.monotonic() - st) if st else 0
+    pps = p/el if el > 0 else 0; kbps = (b/1024)/el if el > 0 else 0
+    sess = f"{int(el//60):02d}:{int(el%60):02d}" if el else "—"
+    def _upd():
+        for k3, v3 in (("Packets",str(p)),("Bytes",f"{b:,}"),("Flows",str(f)),
+                        ("TCP",str(tc)),("UDP",str(uc)),("DNS",str(dc)),
+                        ("Pkt/s",f"{pps:.1f}"),("KB/s",f"{kbps:.1f}"),("Time",sess)):
+            if k3 in _lt_svars: _lt_svars[k3].set(v3)
+        _lt_pkts_v.set(f"Pkts: {p}"); _lt_bw_v.set(f"BW: {kbps:.1f} KB/s"); _lt_flows_v.set(f"Flows: {f}")
+    root.after(0, _upd)
+
+def _lt_worker():
+    import time as _lt4
+    tshark = CONFIG.get("tshark_path","tshark")
+    _iface_raw = _lt_iface_v.get().strip()
+    iface = _iface_raw.split(" (")[0].strip() if " (" in _iface_raw else _iface_raw
+    filt   = _lt_filter_v.get().strip()
+    count  = _lt_count_v.get()
+    cmd = [tshark,"-l","-n","-T","fields",
+           "-e","frame.number","-e","frame.len","-e","ip.src","-e","ip.dst",
+           "-e","tcp.srcport","-e","tcp.dstport","-e","udp.srcport","-e","udp.dstport",
+           "-e","_ws.col.Protocol","-e","_ws.col.Info",
+           "-E","separator=|","-E","occurrence=f"]
+    if iface: cmd += ["-i", iface]
+    if filt:  cmd += ["-f", filt]
+    cmd += ["-c", str(count)]
+    if _lt_save_var.get():
+        _lt_log_path[0], _ = _app_log_open("live_traffic", "live_traffic")
+        _app_log_write(_lt_log_path[0], f"Session started — iface={iface or 'auto'} filter={filt!r} count={count}")
+        _app_log_write(_lt_log_path[0], f"tshark cmd: {' '.join(cmd)}")
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        _lt_proc[0] = proc
+        with _lt_slk: _lt_stats["start"] = _lt4.monotonic()
+        for line in proc.stdout:
+            if not _lt_running[0]: break
+            parts = line.strip().split("|")
+            if len(parts) < 10: continue
+            fnum,flen,si,di,tsp,tdp,usp,udp2,proto,info = (parts[i] if i<len(parts) else "" for i in range(10))
+            try: bn = int(flen)
+            except: bn = 0
+            sp2 = tsp or usp; dp2 = tdp or udp2
+            pu = proto.upper()
+            with _lt_slk:
+                _lt_stats["packets"] += 1; _lt_stats["bytes"] += bn
+                _lt_stats["flows"].add(f"{proto}|{si}:{sp2}->{di}:{dp2}")
+                if "TCP" in pu: _lt_stats["tcp"] += 1
+                elif "UDP" in pu: _lt_stats["udp"] += 1
+                if "DNS" in pu: _lt_stats["dns"] += 1
+            tag6 = "DNS" if "DNS" in pu else "TLS" if pu in("TLS","SSL") else "HTTP" if "HTTP" in pu else "TCP" if "TCP" in pu else "UDP" if "UDP" in pu else "DIM"
+            log_line = f"[{fnum:>5}] {proto:<8} {si}:{sp2} -> {di}:{dp2}  {info[:55]}"
+            _lt_append(log_line, tag6)
+            if _lt_log_path[0]:
+                _app_log_write(_lt_log_path[0], log_line)
+            root.after(0, _lt_upd_stats)
+        proc.wait()
+    except FileNotFoundError:
+        _lt_append("tshark not found — check Settings > Config > tshark path", "WARN")
+    except Exception as e:
+        _lt_append(f"Error: {e}", "WARN")
+    finally:
+        _lt_running[0] = False
+        if _lt_log_path[0]:
+            _app_log_write(_lt_log_path[0], "Session ended")
+        root.after(0, lambda: (_lt_status_v.set("IDLE"), _lt_status_lbl2.config(fg=C["overlay0"]),
+            _lt_start_btn.config(state="normal",bg=C["sapphire"]),
+            _lt_stop_btn.config(state="disabled",bg=C["surface2"])))
+
+def _lt_start():
+    if _lt_running[0]: return
+    _lt_running[0] = True
+    with _lt_slk: _lt_stats.update({"packets":0,"bytes":0,"flows":set(),"tcp":0,"udp":0,"dns":0,"start":None})
+    for v7 in _lt_svars.values(): v7.set("—")
+    _lt_out.config(state="normal"); _lt_out.delete("1.0",tk.END); _lt_out.config(state="disabled")
+    _lt_status_v.set("CAPTURING"); _lt_status_lbl2.config(fg=C["green"])
+    _lt_start_btn.config(state="disabled",bg=C["surface2"])
+    _lt_stop_btn.config(state="normal",bg=C["red"])
+    threading.Thread(target=_lt_worker, daemon=True).start()
+
+def _lt_stop():
+    _lt_running[0] = False
+    try:
+        if _lt_proc[0]: _lt_proc[0].terminate()
+    except Exception: pass
+
+root.after(800, _lt_detect_ifaces)
+
+_lt_btn_row2 = tk.Frame(_lt_ind, bg=C["crust"]); _lt_btn_row2.pack(side=tk.RIGHT)
+_lt_start_btn = tk.Button(_lt_btn_row2, text="  START  ", command=_lt_start,
+    font=FB, bg=C["sapphire"], fg=C["base"], relief="flat", padx=10, pady=4, cursor="hand2", bd=0)
+_lt_start_btn.pack(side=tk.LEFT, padx=2)
+_lt_stop_btn = tk.Button(_lt_btn_row2, text="  STOP  ", command=_lt_stop,
+    font=FB, bg=C["surface2"], fg=C["text"], relief="flat", padx=10, pady=4, cursor="hand2", bd=0, state="disabled")
+_lt_stop_btn.pack(side=tk.LEFT, padx=2)
+
+
+_tab_net_stats = tk.Frame(_net_nb, bg=C["base"])
+_net_nb.add(_tab_net_stats, text=" 📊 CONN STATS ")
+
+_nst_head = tk.Frame(_tab_net_stats, bg=C["surface0"], padx=16, pady=10); _nst_head.pack(fill=tk.X)
+tk.Label(_nst_head, text="CONNECTION QUALITY STATISTICS", font=FB, bg=C["surface0"], fg=C["peach"]).pack(anchor="w")
+tk.Label(_nst_head, text="Track latency, DNS response time and detect degradation over time",
+         font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_tab_net_stats, bg=C["peach"], height=2).pack(fill=tk.X)
+
+_nst_running  = [False]
+_nst_data     = {"ping":[], "dns":[], "loss":[]}
+_nst_dlk      = threading.Lock()
+_nst_target_v = tk.StringVar(value="8.8.8.8")
+_nst_interval_v2 = tk.IntVar(value=5)
+_nst_status_v2 = tk.StringVar(value="IDLE")
+_nst_ping_v   = tk.StringVar(value="Ping: —")
+_nst_dns_v    = tk.StringVar(value="DNS: —")
+_nst_loss_v   = tk.StringVar(value="Loss: —")
+_nst_deg_v    = tk.StringVar(value="Degradation: —")
+_NST_DNS_HOSTS= ["google.com","cloudflare.com","amazon.com","github.com"]
+
+_nst_ctrl2 = tk.Frame(_tab_net_stats, bg=C["surface0"], padx=12, pady=6); _nst_ctrl2.pack(fill=tk.X)
+tk.Label(_nst_ctrl2, text="Ping target:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
+tk.Entry(_nst_ctrl2, textvariable=_nst_target_v, width=18, font=("Consolas",9),
+    bg=C["mantle"], fg=C["text"], insertbackground=C["text"], relief="flat", bd=3).pack(side=tk.LEFT, padx=4)
+tk.Label(_nst_ctrl2, text="Interval:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT, padx=(8,2))
+tk.Spinbox(_nst_ctrl2, from_=2, to=60, textvariable=_nst_interval_v2, width=4,
+    font=FS, bg=C["mantle"], fg=C["text"], relief="flat", bd=0).pack(side=tk.LEFT, padx=4)
+tk.Label(_nst_ctrl2, text="s", font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(side=tk.LEFT)
+
+_nst_ind2 = tk.Frame(_tab_net_stats, bg=C["crust"], pady=4, padx=12); _nst_ind2.pack(fill=tk.X)
+_nst_status_lbl2 = tk.Label(_nst_ind2, textvariable=_nst_status_v2, font=("Consolas",9,"bold"),
+    bg=C["crust"], fg=C["overlay0"]); _nst_status_lbl2.pack(side=tk.LEFT, padx=(0,12))
+for _sv8,_c8 in ((_nst_ping_v,C["green"]),(_nst_dns_v,C["blue"]),
+                  (_nst_loss_v,C["yellow"]),(_nst_deg_v,C["peach"])):
+    tk.Label(_nst_ind2, textvariable=_sv8, font=FS, bg=C["crust"], fg=_c8).pack(side=tk.LEFT, padx=8)
+
+_nst_body2 = tk.Frame(_tab_net_stats, bg=C["base"]); _nst_body2.pack(fill=tk.BOTH, expand=True, padx=6, pady=4)
+
+_nst_graph_frame = tk.Frame(_nst_body2, bg=C["mantle"], height=180)
+_nst_graph_frame.pack(fill=tk.X, pady=(0, 4))
+_nst_graph_frame.pack_propagate(False)
+
+_nst_metrics_row = tk.Frame(_nst_body2, bg=C["surface0"], padx=10, pady=4)
+_nst_metrics_row.pack(fill=tk.X, pady=(0, 4))
+
+_nst_lower = tk.Frame(_nst_body2, bg=C["base"])
+_nst_lower.pack(fill=tk.BOTH, expand=True)
+_nst_left2  = _nst_lower
+_nst_right2 = tk.Frame(_nst_lower, bg=C["base"], width=0)
+_nst_canvas_ref = [None]
+_nst_fig_ref    = [None]
+
+def _nst_init_graph():
+    try:
+        from matplotlib.figure import Figure
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+        fig = Figure(figsize=(6, 1.6), dpi=90, facecolor="#1e1e2e")
+        ax  = fig.add_subplot(111)
+        ax.set_facecolor("#181825")
+        ax.tick_params(colors="#6c7086", labelsize=6)
+        ax.spines[:].set_color("#313244")
+        ax.set_ylabel("ms", color="#6c7086", fontsize=6)
+        ax.set_xlabel("sample", color="#6c7086", fontsize=6)
+        fig.tight_layout(pad=0.5)
+        canvas = FigureCanvasTkAgg(fig, master=_nst_graph_frame)
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        _nst_canvas_ref[0] = canvas
+        _nst_fig_ref[0] = fig
+    except Exception:
+        tk.Label(_nst_graph_frame, text="Graph unavailable (matplotlib required)",
+                 font=("Consolas",8), bg=C["mantle"], fg=C["overlay0"]).pack(expand=True)
+
+_nst_init_graph()
+
+def _nst_redraw_graph():
+    if not _nst_canvas_ref[0] or not _nst_fig_ref[0]: return
+    try:
+        with _nst_dlk:
+            pings = list(_nst_data["ping"][-60:])
+            dns   = list(_nst_data["dns"][-60:])
+        fig = _nst_fig_ref[0]
+        ax  = fig.axes[0]
+        ax.clear()
+        ax.set_facecolor("#181825")
+        ax.tick_params(colors="#6c7086", labelsize=6)
+        ax.spines[:].set_color("#313244")
+        ax.set_ylabel("ms", color="#6c7086", fontsize=6)
+        xs = list(range(len(pings)))
+        p_vals = [v if v is not None else float("nan") for v in pings]
+        d_vals = [v if v is not None else float("nan") for v in dns]
+        if any(v == v for v in p_vals):
+            ax.plot(xs, p_vals, color="#a6e3a1", linewidth=1, label="Ping")
+        if any(v == v for v in d_vals):
+            ax.plot(xs, d_vals, color="#89b4fa", linewidth=1, label="DNS")
+        ax.legend(fontsize=6, facecolor="#313244", edgecolor="#45475a", labelcolor="#cdd6f4")
+        fig.tight_layout(pad=0.5)
+        _nst_canvas_ref[0].draw_idle()
+    except Exception:
+        pass
+
+_nst_log_sc2 = tk.Scrollbar(_nst_left2, orient="vertical", bg=C["surface1"],
+    troughcolor=C["mantle"], relief="flat", bd=0, width=7)
+_nst_log2 = tk.Text(_nst_left2, bg=C["mantle"], fg=C["text"], font=("Consolas",8),
+    yscrollcommand=_nst_log_sc2.set, relief="flat", bd=0, padx=8, pady=6, wrap="none", state="disabled")
+_nst_log_sc2.config(command=_nst_log2.yview)
+_nst_log_sc2.pack(side=tk.RIGHT, fill=tk.Y); _nst_log2.pack(fill=tk.BOTH, expand=True)
+for _t9,_c9 in [("OK",C["green"]),("WARN",C["yellow"]),("BAD",C["red"]),
+                 ("DIM",C["overlay0"]),("HEAD",C["peach"])]:
+    _nst_log2.tag_configure(_t9, foreground=_c9)
+
+_nst_mvars = {}
+for _mk, _mc in [
+    ("Ping avg", C["green"]), ("Ping min", C["teal"]), ("Ping max", C["yellow"]),
+    ("Jitter", C["peach"]), ("DNS avg", C["blue"]), ("DNS max", C["sapphire"]),
+    ("Loss avg", C["red"]), ("Samples", C["overlay0"]),
+    ("Baseline", C["overlay0"]), ("Degradation", C["flamingo"]),
+]:
+    _mv2 = tk.StringVar(value="—"); _nst_mvars[_mk] = _mv2
+    _mc2 = tk.Frame(_nst_metrics_row, bg=C["surface0"], padx=8)
+    _mc2.pack(side=tk.LEFT, expand=True, fill=tk.X)
+    tk.Label(_mc2, text=f"{_mk}:", font=("Consolas",7), bg=C["surface0"],
+             fg=C["overlay0"]).pack(anchor="w")
+    tk.Label(_mc2, textvariable=_mv2, font=("Consolas",8,"bold"),
+             bg=C["surface0"], fg=_mc).pack(anchor="w")
+
+def _nst_log_add(msg, tag="DIM"):
+    import datetime as _nd9
+    ts = _nd9.datetime.now().strftime("%H:%M:%S")
+    def _d():
+        _nst_log2.config(state="normal")
+        _nst_log2.insert(tk.END, f"[{ts}] {msg}\n", tag)
+        _nst_log2.see(tk.END); _nst_log2.config(state="disabled")
+    root.after(0, _d)
+
+def _nst_ping_host(host):
+    import time as _ptm
+    if sys.platform == "win32":
+        try:
+            t0 = _ptm.monotonic()
+            r = _subprocess_orig.run(
+                ["ping", "-n", "1", "-w", "1500", host],
+                capture_output=True, text=True, timeout=4,
+                creationflags=0x08000000)
+            elapsed = (_ptm.monotonic() - t0) * 1000
+            if r.returncode == 0:
+                import re as _pre
+                m = _pre.search(r"[=<](\d+)ms", r.stdout)
+                return float(m.group(1)) if m else elapsed
+            return None
+        except Exception:
+            return None
+    else:
+        import socket as _psk
+        for _port in (80, 443, 53):
+            try:
+                t0 = _ptm.monotonic()
+                with _psk.create_connection((host, _port), timeout=2): pass
+                return (_ptm.monotonic() - t0) * 1000
+            except OSError: continue
+            except Exception: return None
+        return None
+
+def _nst_dns_ms(host):
+    import socket as _dsk, time as _dtm
+    t0 = _dtm.monotonic()
+    try:
+        _dsk.getaddrinfo(host, None)
+        return (_dtm.monotonic() - t0) * 1000
+    except Exception:
+        return None
+
+def _nst_update_metrics():
+    with _nst_dlk:
+        pings = [x for x in _nst_data["ping"] if x is not None]
+        dns   = [x for x in _nst_data["dns"]  if x is not None]
+        loss  = _nst_data["loss"]; n = len(_nst_data["ping"])
+    if n == 0: return
+    if not pings: pings = [0.0]
+    pa=sum(pings)/len(pings); pm=min(pings); px=max(pings)
+    jit=px-pm; da=sum(dns)/len(dns) if dns else 0; dx=max(dns) if dns else 0
+    la=sum(loss)/len(loss) if loss else 0
+    base=sum(pings[:min(5,len(pings))])/min(5,len(pings))
+    deg=(pa-base)/base*100 if base>0 else 0
+    def _upd():
+        for k10,v10 in (("Ping avg",f"{pa:.1f} ms"),("Ping min",f"{pm:.1f} ms"),
+                ("Ping max",f"{px:.1f} ms"),("Jitter",f"{jit:.1f} ms"),
+                ("DNS avg",f"{da:.1f} ms"),("DNS max",f"{dx:.1f} ms"),
+                ("Loss avg",f"{la:.0f}%"),("Samples",str(n)),
+                ("Baseline",f"{base:.1f} ms"),("Degradation",f"{deg:+.1f}%")):
+            if k10 in _nst_mvars: _nst_mvars[k10].set(v10)
+        _nst_ping_v.set(f"Ping: {pa:.0f} ms")
+        _nst_dns_v.set(f"DNS: {da:.0f} ms")
+        _nst_loss_v.set(f"Loss: {la:.0f}%")
+        _nst_deg_v.set(f"Degradation: {deg:+.1f}%")
+    root.after(0, _upd)
+    root.after(0, _nst_redraw_graph)
+
+def _nst_worker():
+    import time as _nt10, random as _nr10
+    _nst_log_add("Monitoring started.", "HEAD")
+    while _nst_running[0]:
+        host = _nst_target_v.get().strip() or "8.8.8.8"
+        dns_host = _nr10.choice(_NST_DNS_HOSTS)
+        pm = _nst_ping_host(host)
+        dm = _nst_dns_ms(dns_host)
+        lo = 0 if pm is not None else 100
+        with _nst_dlk:
+            _nst_data["ping"].append(pm); _nst_data["dns"].append(dm); _nst_data["loss"].append(lo)
+            for k11 in ("ping","dns","loss"):
+                if len(_nst_data[k11]) > 200: _nst_data[k11] = _nst_data[k11][-200:]
+        tag11 = "OK" if pm and pm<80 else ("WARN" if pm and pm<200 else ("DIM" if not pm else "BAD"))
+        ps = f"{pm:.1f} ms" if pm else "TIMEOUT"
+        ds = f"{dm:.1f} ms" if dm else "FAIL"
+        _nst_log_add(f"ping {host}: {ps}  |  dns {dns_host}: {ds}", tag11)
+        _nst_update_metrics()
+        _nt10.sleep(max(2, _nst_interval_v2.get()))
+    _nst_log_add("Monitoring stopped.", "DIM")
+
+def _nst_start():
+    if _nst_running[0]: return
+    _nst_running[0] = True
+    with _nst_dlk:
+        for k12 in _nst_data: _nst_data[k12] = []
+    for v12 in _nst_mvars.values(): v12.set("—")
+    _nst_status_v2.set("MONITORING"); _nst_status_lbl2.config(fg=C["green"])
+    _nst_start_btn.config(state="disabled",bg=C["surface2"])
+    _nst_stop_btn.config(state="normal",bg=C["red"])
+    root.after(200, _nst_redraw_graph)
+    threading.Thread(target=_nst_worker, daemon=True).start()
+
+def _nst_stop():
+    _nst_running[0] = False
+    _nst_status_v2.set("IDLE"); _nst_status_lbl2.config(fg=C["overlay0"])
+    _nst_start_btn.config(state="normal",bg=C["peach"])
+    _nst_stop_btn.config(state="disabled",bg=C["surface2"])
+
+_nst_btn_row2 = tk.Frame(_nst_ind2, bg=C["crust"]); _nst_btn_row2.pack(side=tk.RIGHT)
+_nst_start_btn = tk.Button(_nst_btn_row2, text="  START  ", command=_nst_start,
+    font=FB, bg=C["peach"], fg=C["base"], relief="flat", padx=10, pady=4, cursor="hand2", bd=0)
+_nst_start_btn.pack(side=tk.LEFT, padx=2)
+_nst_stop_btn = tk.Button(_nst_btn_row2, text="  STOP  ", command=_nst_stop,
+    font=FB, bg=C["surface2"], fg=C["text"], relief="flat", padx=10, pady=4, cursor="hand2", bd=0, state="disabled")
+_nst_stop_btn.pack(side=tk.LEFT, padx=2)
+tk.Button(_nst_btn_row2, text="Clear", command=lambda: (
+    _nst_log2.config(state="normal"), _nst_log2.delete("1.0",tk.END), _nst_log2.config(state="disabled")),
+    font=FS, bg=C["surface1"], fg=C["text"], relief="flat", padx=8, pady=4, cursor="hand2", bd=0
+).pack(side=tk.LEFT, padx=2)
+
 
 _tab_binpat = tk.Frame(_look_nb, bg=C["base"])
 _look_nb.add(_tab_binpat, text="🔎BINPAT")
@@ -25867,58 +29098,271 @@ _bpan_pat_e.bind("<Return>", lambda e: _bpan_run())
 
 
 
-_VORTEX_VERSION      = _VX_VER   # synced from .vx_meta/vx_version
-_GITHUB_REPO_RAW     = "https://raw.githubusercontent.com/Vider06/V0rtex/main"
+_tab_fuzzy = tk.Frame(_look_nb, bg=C["base"])
+_look_nb.add(_tab_fuzzy, text="🧬 FUZZY")
+
+_fz_head = tk.Frame(_tab_fuzzy, bg=C["surface0"], padx=16, pady=10); _fz_head.pack(fill=tk.X)
+tk.Label(_fz_head, text="FUZZY HASH / SIMILARITY", font=FB, bg=C["surface0"], fg=C["flamingo"]).pack(anchor="w")
+tk.Label(_fz_head, text="Compute rolling fuzzy hashes and similarity score between two files (ssdeep-style, no extra deps)",
+         font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_tab_fuzzy, bg=C["flamingo"], height=2).pack(fill=tk.X)
+
+_fz_ctrl = tk.Frame(_tab_fuzzy, bg=C["surface0"], padx=12, pady=8); _fz_ctrl.pack(fill=tk.X)
+_fz_f1 = tk.StringVar(); _fz_f2 = tk.StringVar()
+tk.Label(_fz_ctrl, text="File A:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
+tk.Entry(_fz_ctrl, textvariable=_fz_f1, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+         insertbackground=C["text"], relief="flat", bd=4, width=30).pack(side=tk.LEFT, padx=4)
+_mkbtn(_fz_ctrl, "Browse A", lambda: _fz_f1.set(filedialog.askopenfilename() or _fz_f1.get()), C["surface2"])
+tk.Label(_fz_ctrl, text="  File B:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT, padx=(10,0))
+tk.Entry(_fz_ctrl, textvariable=_fz_f2, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+         insertbackground=C["text"], relief="flat", bd=4, width=30).pack(side=tk.LEFT, padx=4)
+_mkbtn(_fz_ctrl, "Browse B", lambda: _fz_f2.set(filedialog.askopenfilename() or _fz_f2.get()), C["surface2"])
+_mkbtn(_fz_ctrl, "🧬 Compute", lambda: _fz_run(), C["flamingo"])
+
+_fz_single_row = tk.Frame(_tab_fuzzy, bg=C["base"], padx=12, pady=4); _fz_single_row.pack(fill=tk.X)
+_fz_single_v = tk.StringVar()
+tk.Label(_fz_single_row, text="Single file hash:", font=FS, bg=C["base"], fg=C["text"]).pack(side=tk.LEFT)
+tk.Entry(_fz_single_row, textvariable=_fz_single_v, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+         insertbackground=C["text"], relief="flat", bd=4, width=40).pack(side=tk.LEFT, padx=4)
+_mkbtn(_fz_single_row, "Browse", lambda: _fz_single_v.set(filedialog.askopenfilename() or _fz_single_v.get()), C["surface2"])
+_mkbtn(_fz_single_row, "Hash Only", lambda: _fz_single(), C["mauve"])
+
+tk.Frame(_tab_fuzzy, bg=C["surface2"], height=1).pack(fill=tk.X)
+
+_fz_out = tk.Text(_tab_fuzzy, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+                  relief="flat", bd=0, padx=12, pady=8, wrap="word", state="disabled")
+_fz_sc = tk.Scrollbar(_tab_fuzzy, orient="vertical", command=_fz_out.yview,
+                       bg=C["surface1"], troughcolor=C["base"], relief="flat", width=7)
+_fz_sc.pack(side=tk.RIGHT, fill=tk.Y)
+_fz_out.pack(fill=tk.BOTH, expand=True)
+_fz_out.configure(yscrollcommand=_fz_sc.set)
+_fz_out.tag_configure("HEAD", foreground=C["flamingo"],  font=("Consolas",9,"bold"))
+_fz_out.tag_configure("OK",   foreground=C["green"])
+_fz_out.tag_configure("WARN", foreground=C["yellow"])
+_fz_out.tag_configure("VAL",  foreground=C["mauve"])
+_fz_out.tag_configure("DIM",  foreground=C["overlay0"])
+
+def _fz_rolling_hash(data: bytes, block_size: int = 64) -> str:
+    import hashlib as _hlib
+    if not data:
+        return ""
+    out = []
+    for i in range(0, len(data), block_size):
+        chunk = data[i:i + block_size]
+        h = _hlib.md5(chunk).hexdigest()[:6]
+        out.append(h)
+    return ":".join(out)
+
+def _fz_similarity(h1: str, h2: str) -> float:
+    if not h1 or not h2:
+        return 0.0
+    parts1 = set(h1.split(":"))
+    parts2 = set(h2.split(":"))
+    if not parts1 or not parts2:
+        return 0.0
+    intersection = len(parts1 & parts2)
+    union = len(parts1 | parts2)
+    return (intersection / union) * 100 if union > 0 else 0.0
+
+def _fz_log(msg, tag="DIM"):
+    _fz_out.config(state="normal")
+    _fz_out.insert(tk.END, msg + "\n", tag)
+    _fz_out.see(tk.END)
+    _fz_out.config(state="disabled")
+
+def _fz_single():
+    p = _fz_single_v.get().strip()
+    if not p or not os.path.isfile(p):
+        messagebox.showerror("Fuzzy Hash", "Select a valid file.")
+        return
+    _fz_out.config(state="normal"); _fz_out.delete("1.0", tk.END); _fz_out.config(state="disabled")
+    try:
+        data = open(p, "rb").read()
+    except Exception as e:
+        _fz_log(f"Read error: {e}", "WARN"); return
+    import hashlib as _hlib2
+    fhash = _fz_rolling_hash(data)
+    md5   = _hlib2.md5(data).hexdigest()
+    sha1  = _hlib2.sha1(data).hexdigest()
+    sha256= _hlib2.sha256(data).hexdigest()
+    _fz_log(f"File: {os.path.basename(p)}  ({len(data):,} bytes)", "HEAD")
+    _fz_log(f"  MD5    : {md5}", "DIM")
+    _fz_log(f"  SHA1   : {sha1}", "DIM")
+    _fz_log(f"  SHA256 : {sha256}", "DIM")
+    _fz_log(f"  Fuzzy  : {fhash[:120]}{'...' if len(fhash)>120 else ''}", "VAL")
+    _fz_log(f"  Blocks : {len(fhash.split(':'))}", "DIM")
+
+def _fz_run():
+    p1, p2 = _fz_f1.get().strip(), _fz_f2.get().strip()
+    if not p1 or not p2 or not os.path.isfile(p1) or not os.path.isfile(p2):
+        messagebox.showerror("Fuzzy Hash", "Select two valid files.")
+        return
+    _fz_out.config(state="normal"); _fz_out.delete("1.0", tk.END); _fz_out.config(state="disabled")
+    try:
+        d1 = open(p1, "rb").read()
+        d2 = open(p2, "rb").read()
+    except Exception as e:
+        _fz_log(f"Read error: {e}", "WARN"); return
+    h1 = _fz_rolling_hash(d1)
+    h2 = _fz_rolling_hash(d2)
+    sim = _fz_similarity(h1, h2)
+    import hashlib as _hlib3
+    _fz_log("FILE A", "HEAD")
+    _fz_log(f"  {os.path.basename(p1)}  ({len(d1):,} bytes)", "DIM")
+    _fz_log(f"  SHA256 : {_hlib3.sha256(d1).hexdigest()}", "DIM")
+    _fz_log(f"  Fuzzy  : {h1[:100]}{'...' if len(h1)>100 else ''}", "VAL")
+    _fz_log("", "DIM")
+    _fz_log("FILE B", "HEAD")
+    _fz_log(f"  {os.path.basename(p2)}  ({len(d2):,} bytes)", "DIM")
+    _fz_log(f"  SHA256 : {_hlib3.sha256(d2).hexdigest()}", "DIM")
+    _fz_log(f"  Fuzzy  : {h2[:100]}{'...' if len(h2)>100 else ''}", "VAL")
+    _fz_log("", "DIM")
+    _fz_log(f"SIMILARITY SCORE:  {sim:.1f}%", "HEAD")
+    if sim >= 80:
+        _fz_log("  ⚠ HIGH similarity — likely variants of the same sample", "WARN")
+    elif sim >= 40:
+        _fz_log("  ~ MODERATE similarity — possible code reuse or shared packer", "WARN")
+    else:
+        _fz_log("  ✓ LOW similarity — files appear unrelated", "OK")
+    size_diff = abs(len(d1) - len(d2))
+    _fz_log(f"  Size delta: {size_diff:,} bytes", "DIM")
+
+
+_VORTEX_VERSION      = _VX_VER
+
+
+def _detect_platform_branch():
+    import sys as _bsys
+    if _bsys.platform == "win32":
+        return "Windows_Release"
+    if _bsys.platform == "darwin":
+        return "MacOS_Release"
+    return "Linux_release"
+_PLATFORM_BRANCH     = _detect_platform_branch()
+_GITHUB_BASE         = "https://raw.githubusercontent.com/Vider06/V0rtex"
+_GITHUB_REPO_RAW     = f"{_GITHUB_BASE}/{_PLATFORM_BRANCH}"
 _GITHUB_PAGE_URL     = "https://github.com/Vider06/V0rtex"
 _GITHUB_API_RELEASE  = "https://api.github.com/repos/Vider06/V0rtex/releases/latest"
 _GITHUB_VERSION_URL  = f"{_GITHUB_REPO_RAW}/version.txt"
-_GITHUB_SCRIPT_URL   = f"{_GITHUB_REPO_RAW}/v0rtex.py"
+_REMOTE_SCRIPT_NAME  = "v0rtex.py"
+_GITHUB_SCRIPT_URL   = f"{_GITHUB_REPO_RAW}/{_REMOTE_SCRIPT_NAME}"
 _GITHUB_MANIFEST_URL = f"{_GITHUB_REPO_RAW}/update_manifest.json"
+
+_GITHUB_ADAPTER_URL  = f"{_GITHUB_BASE}/{_PLATFORM_BRANCH}/Adapters/v0rtex_adapter.py"
+_ADAPTER_LOCAL_NAME  = "v0rtex_adapter.py"
 _UPDATE_STATE        = {"available": False, "remote_version": None, "changelog": ""}
 _UPDATE_CHECK_LOCK   = threading.Lock()
+
+_tab_upd_log = tk.Frame(_stg_nb, bg=C["base"])
+_stg_nb.add(_tab_upd_log, text=" 📜 UPDATE LOG ")
+
+_ul_head = tk.Frame(_tab_upd_log, bg=C["surface0"], padx=16, pady=8); _ul_head.pack(fill=tk.X)
+tk.Label(_ul_head, text="UPDATE LOG", font=FB, bg=C["surface0"], fg=C["sapphire"]).pack(anchor="w")
+tk.Label(_ul_head, text="History of all updates applied to V0RTEX", font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_tab_upd_log, bg=C["sapphire"], height=2).pack(fill=tk.X)
+
+_ul_ctrl = tk.Frame(_tab_upd_log, bg=C["surface0"], padx=12, pady=6); _ul_ctrl.pack(fill=tk.X)
+
+_ul_out_f = tk.Frame(_tab_upd_log, bg=C["base"]); _ul_out_f.pack(fill=tk.BOTH, expand=True, padx=6, pady=4)
+_ul_sc = tk.Scrollbar(_ul_out_f, orient="vertical", bg=C["surface1"], troughcolor=C["base"], relief="flat", width=7)
+_ul_out = tk.Text(_ul_out_f, bg=C["mantle"], fg=C["text"], font=("Consolas",9),
+                  relief="flat", bd=0, padx=10, pady=8, wrap="none", state="disabled",
+                  yscrollcommand=_ul_sc.set)
+_ul_sc.config(command=_ul_out.yview)
+_ul_sc.pack(side=tk.RIGHT, fill=tk.Y); _ul_out.pack(fill=tk.BOTH, expand=True)
+_ul_out.tag_configure("HEAD", foreground=C["sapphire"], font=("Consolas",9,"bold"))
+_ul_out.tag_configure("OK",   foreground=C["green"])
+_ul_out.tag_configure("ERR",  foreground=C["red"])
+_ul_out.tag_configure("DIM",  foreground=C["overlay0"])
+_ul_out.tag_configure("VER",  foreground=C["mauve"], font=("Consolas",9,"bold"))
+
+_UL_LOG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "v0rtex_utils", "debug_log", "update_log")
+
+def _ul_load():
+    _ul_out.config(state="normal"); _ul_out.delete("1.0", tk.END)
+    entries = []
+    if os.path.isdir(_UL_LOG_PATH):
+        import glob as _ulg
+        for _lf in sorted(_ulg.glob(os.path.join(_UL_LOG_PATH, "adapter_*.log")), reverse=True):
+            try:
+                with open(_lf, encoding="utf-8", errors="replace") as _f:
+                    content = _f.read()
+                date = os.path.basename(_lf).replace("adapter_","").replace(".log","")
+                entries.append((date, content))
+            except Exception:
+                pass
+    if not entries:
+        _ul_out.insert(tk.END, "No update logs found.\n", "DIM")
+        _ul_out.config(state="disabled")
+        return
+    for date, content in entries:
+        _ul_out.insert(tk.END, f"\u2500\u2500 {date} \u2500\u2500\n", "HEAD")
+        old_ver = "?"; new_ver = "?"
+        for line in content.splitlines():
+            if "old=" in line:
+                import re as _ulre
+                m = _ulre.search(r"old=([\w.]+)", line)
+                if m: old_ver = m.group(1)
+                m2 = _ulre.search(r"new=([\w.]+)", line)
+                if m2: new_ver = m2.group(1)
+        _ul_out.insert(tk.END, f"  v{old_ver}  \u2192  v{new_ver}\n", "VER")
+        for line in content.splitlines():
+            l = line.strip()
+            if not l: continue
+            tag = "OK" if "\u2713" in l else ("ERR" if "\u2717" in l else "DIM")
+            _ul_out.insert(tk.END, f"  {l}\n", tag)
+        _ul_out.insert(tk.END, "\n", "DIM")
+    _ul_out.config(state="disabled")
+
+_mkbtn(_ul_ctrl, "\U0001f504 Refresh", _ul_load, C["sapphire"])
+_mkbtn(_ul_ctrl, "\U0001f5d1 Clear Log Files",
+    lambda: [os.remove(f) for f in __import__("glob").glob(os.path.join(_UL_LOG_PATH,"adapter_*.log"))
+             if os.path.isfile(f)] or _ul_load(),
+    C["surface2"])
+
+root.after(1500, _ul_load)
 
 _tab_updater = tk.Frame(_stg_nb, bg=C["base"])
 _stg_nb.add(_tab_updater, text=" 🔄 UPDATER ")
 
-_upd_h = tk.Frame(_tab_updater, bg=C["surface0"], padx=16, pady=10); _upd_h.pack(fill=tk.X)
-tk.Label(_upd_h, text="V0RTEX UPDATER", font=FB, bg=C["surface0"], fg=C["blue"]).pack(anchor="w")
+_upd_h = tk.Frame(_tab_updater, bg=C["surface0"], padx=16, pady=6); _upd_h.pack(fill=tk.X)
+_upd_h_row = tk.Frame(_upd_h, bg=C["surface0"]); _upd_h_row.pack(fill=tk.X)
+tk.Label(_upd_h_row, text="V0RTEX UPDATER", font=FB, bg=C["surface0"], fg=C["blue"]).pack(side=tk.LEFT, anchor="w")
+tk.Label(_upd_h_row, text=f"  ·  Branch: {_PLATFORM_BRANCH}",
+         font=("Consolas",8), bg=C["surface0"], fg=C["teal"]).pack(side=tk.LEFT, anchor="w", pady=(4,0))
 tk.Label(_upd_h, text="Check for updates on GitHub and apply them automatically",
          font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
 tk.Frame(_tab_updater, bg=C["blue"], height=2).pack(fill=tk.X)
 
-_upd_statbar = tk.Frame(_tab_updater, bg=C["crust"], padx=16, pady=8); _upd_statbar.pack(fill=tk.X)
+_upd_statbar = tk.Frame(_tab_updater, bg=C["crust"], padx=16, pady=5); _upd_statbar.pack(fill=tk.X)
 _upd_status_sv   = tk.StringVar(value=f"Current version: v{_VORTEX_VERSION}")
 _upd_remote_sv   = tk.StringVar(value="Remote version: — (not checked)")
-_upd_indicator_l = tk.Label(_upd_statbar, text="●", font=("Consolas",16),
+_upd_indicator_l = tk.Label(_upd_statbar, text="●", font=("Consolas",14),
                               bg=C["crust"], fg=C["overlay0"])
 _upd_indicator_l.pack(side=tk.LEFT, padx=(0,8))
 _upd_stat_col = tk.Frame(_upd_statbar, bg=C["crust"]); _upd_stat_col.pack(side=tk.LEFT, fill=tk.X)
-tk.Label(_upd_stat_col, textvariable=_upd_status_sv, font=("Consolas",10,"bold"),
+tk.Label(_upd_stat_col, textvariable=_upd_status_sv, font=("Consolas",9,"bold"),
          bg=C["crust"], fg=C["text"]).pack(anchor="w")
-tk.Label(_upd_stat_col, textvariable=_upd_remote_sv, font=("Consolas",9),
+tk.Label(_upd_stat_col, textvariable=_upd_remote_sv, font=("Consolas",8),
          bg=C["crust"], fg=C["overlay0"]).pack(anchor="w")
 tk.Frame(_tab_updater, bg=C["surface2"], height=1).pack(fill=tk.X)
 
-_upd_cfg = tk.Frame(_tab_updater, bg=C["surface0"], padx=14, pady=8); _upd_cfg.pack(fill=tk.X)
+_upd_cfg = tk.Frame(_tab_updater, bg=C["surface0"], padx=14, pady=5); _upd_cfg.pack(fill=tk.X)
 tk.Label(_upd_cfg, text="GitHub raw URL:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
 _upd_repo_v = tk.StringVar(value=_GITHUB_REPO_RAW)
-tk.Entry(_upd_cfg, textvariable=_upd_repo_v, width=52, font=("Consolas",9),
+tk.Entry(_upd_cfg, textvariable=_upd_repo_v, font=("Consolas",9),
          bg=C["mantle"], fg=C["text"], relief="flat", bd=4,
-         insertbackground=C["text"]).pack(side=tk.LEFT, padx=6)
+         insertbackground=C["text"]).pack(side=tk.LEFT, padx=6, fill=tk.X, expand=True)
 def _upd_open_github():
     import webbrowser; webbrowser.open(_GITHUB_PAGE_URL)
-tk.Button(_upd_cfg, text="🔗 GitHub", font=("Consolas",9), bg=C["surface1"], fg=C["blue"],
-          relief="flat", bd=0, padx=8, pady=3, cursor="hand2",
-          command=_upd_open_github).pack(side=tk.LEFT, padx=(2,0))
 
-_upd_optrow = tk.Frame(_tab_updater, bg=C["base"], padx=14, pady=4); _upd_optrow.pack(fill=tk.X)
+_upd_bottom_row = tk.Frame(_tab_updater, bg=C["surface0"], padx=14, pady=5); _upd_bottom_row.pack(fill=tk.X)
 _upd_auto_v = tk.BooleanVar(value=CONFIG.get("auto_update_check", True))
-_upd_auto_chk = tk.Checkbutton(_upd_optrow, text="Check for updates on startup",
-    variable=_upd_auto_v, font=FS, bg=C["base"], fg=C["text"],
-    selectcolor=C["surface1"], activebackground=C["base"])
+_upd_auto_chk = tk.Checkbutton(_upd_bottom_row, text="Check for updates on startup",
+    variable=_upd_auto_v, font=FS, bg=C["surface0"], fg=C["text"],
+    selectcolor=C["surface1"], activebackground=C["surface0"])
 _upd_auto_chk.pack(side=tk.LEFT)
-
-_upd_btnrow = tk.Frame(_tab_updater, bg=C["surface0"], padx=14, pady=8); _upd_btnrow.pack(fill=tk.X)
+_upd_btnrow = _upd_bottom_row
 
 _upd_out_frame = tk.Frame(_tab_updater, bg=C["base"]); _upd_out_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=(2,4))
 _upd_out_sc_y = tk.Scrollbar(_upd_out_frame, orient="vertical", bg=C["surface1"],
@@ -25949,7 +29393,10 @@ def _upd_log(msg, tag="DIM"):
     root.after(0, _d)
 
 def _upd_set_indicator(color):
-    root.after(0, lambda: _upd_indicator_l.config(fg=color))
+    try:
+        root.after(0, lambda c=color: _upd_indicator_l.config(fg=c))
+    except Exception:
+        pass
 
 def _upd_fetch_text(url, timeout=12):
     """Fetch plain text from URL — always uses urllib to avoid requests rate-limit quirks."""
@@ -25987,7 +29434,8 @@ def _upd_version_newer(remote, local):
     except Exception:
         return False
 
-def _upd_check(silent=False):
+def _upd_check(
+silent=False):
     """Check GitHub for a newer version — tries Releases API first, falls back to version.txt."""
     if not _UPDATE_CHECK_LOCK.acquire(blocking=False): return
     _upd_set_indicator(C["yellow"])
@@ -26052,7 +29500,7 @@ def _upd_check(silent=False):
                 _UPDATE_STATE["available"] = True
                 _upd_set_indicator(C["red"])
                 root.after(0, lambda: _upd_status_sv.set(f"UPDATE AVAILABLE — v{raw_ver}"))
-                _upd_log(f"\n  ⚡ Update available: v{_VORTEX_VERSION} → v{raw_ver}", "NEW")
+                _sl("Update available", "UPDATE"); _upd_log(f"\n  ⚡ Update available: v{_VORTEX_VERSION} → v{raw_ver}", "NEW")
 
                 if release_notes.strip():
                     _UPDATE_STATE["changelog"] = release_notes
@@ -26075,7 +29523,7 @@ def _upd_check(silent=False):
                 _UPDATE_STATE["available"] = False
                 _upd_set_indicator(C["green"])
                 root.after(0, lambda: _upd_status_sv.set(f"Up to date — v{_VORTEX_VERSION}"))
-                _upd_log(f"\n  ✓ V0RTEX is up to date (v{_VORTEX_VERSION})", "OK")
+                _sl("Up to date", "UPDATE"); _upd_log(f"\n  ✓ V0RTEX is up to date (v{_VORTEX_VERSION})", "OK")
 
         except Exception as e:
             _UPDATE_STATE["available"] = False
@@ -26135,9 +29583,20 @@ def _launch_update_ui(clear_install=False):
     tk.Frame(left, bg=_BRD2, height=1).pack(fill="x", pady=(10,8))
     tk.Label(left, text="OPTIONS", font=("Consolas",8,"bold"), bg=_PNL, fg=_DIM).pack(anchor="w")
     tk.Frame(left, bg=_BRD2, height=1).pack(fill="x", pady=(4,8))
-    _upd_opt_bk    = tk.BooleanVar(value=True)
-    _upd_opt_rules = tk.BooleanVar(value=True)
-    _upd_opt_cfg   = tk.BooleanVar(value=not clear_install)
+    _au_restored = {}
+    _au_tmp2 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "_upd_tmp_opts.json")
+    if os.path.isfile(_au_tmp2):
+        try:
+            with open(_au_tmp2, encoding="utf-8") as _auf2:
+                _au_restored = json.load(_auf2)
+            os.remove(_au_tmp2)
+        except Exception:
+            pass
+    if _au_restored.get("fresh_install", False):
+        clear_install = True
+    _upd_opt_bk    = tk.BooleanVar(value=_au_restored.get("backup_before",   True))
+    _upd_opt_rules = tk.BooleanVar(value=_au_restored.get("update_rules",    True))
+    _upd_opt_cfg   = tk.BooleanVar(value=_au_restored.get("preserve_config", not clear_install))
     _upd_opt_restore = tk.BooleanVar(value=False)
     _upd_restore_path = tk.StringVar(value="")
     for _vv, _tt in [(_upd_opt_bk,"Backup before update"),
@@ -26152,7 +29611,7 @@ def _launch_update_ui(clear_install=False):
     tk.Label(left, text="INSTALL TYPE", font=("Consolas",8,"bold"),
              bg=_PNL, fg=_DIM).pack(anchor="w")
     tk.Frame(left, bg=_BRD2, height=1).pack(fill="x", pady=(2,4))
-    tk.Radiobutton(left, text="Normal update (keep data)",
+    tk.Radiobutton(left, text="Normal update (preserve existing data)",
                    variable=_upd_opt_fresh, value=False,
                    font=("Consolas",9), bg=_PNL, fg=_GRN,
                    selectcolor=_BRD2, activebackground=_PNL).pack(anchor="w", pady=1)
@@ -26239,52 +29698,281 @@ def _launch_update_ui(clear_install=False):
         rr.after(0, lambda: (_upd_pbar_pct.set(pct), _upd_pbar_sv.set(f"▶ {step}"), _upd_step_sv.set(f"{pct}%")))
 
     def _do_update():
-        _upd_start_btn.config(state="disabled")
-        import zipfile as _zf, shutil as _shu, json as _j
-        base_url = _upd_repo_v.get().strip().rstrip("/")
-        script_path = os.path.abspath(__file__)
-        script_dir  = os.path.dirname(script_path)
-        ts = time.strftime("%Y%m%d_%H%M%S")
+        rr.after(0, lambda: _upd_start_btn.config(state="disabled"))
+        import zipfile as _zf, shutil as _shu, json as _j, tempfile as _upd_tmp
 
-        _upd_in_progress_sentinel = os.path.join(script_dir, "_update_in_progress.json")
-        try:
-            with open(_upd_in_progress_sentinel, "w", encoding="utf-8") as _pf:
-                _j.dump({
-                    "started": ts,
-                    "old_version": _VORTEX_VERSION,
-                    "remote_version": _UPDATE_STATE.get("remote_version","?"),
-                    "clear_install": clear_install,
-                }, _pf)
-        except Exception:
-            pass
-
-        try:
-            _do_update_inner()
-        except Exception as _upd_fatal:
-            import traceback as _upd_tb
-            _tb_str = _upd_tb.format_exc()
-            _ulog("\n✗ FATAL ERROR DURING UPDATE: {_upd_fatal}", "ERR")
-            _ulog(_tb_str[:600], "ERR")
+        def _is_admin_now():
             try:
-                _crash_sentinel = os.path.join(script_dir, "_update_crash.json")
-                with open(_crash_sentinel, "w", encoding="utf-8") as _cf:
-                    _j.dump({
-                        "error": str(_upd_fatal),
-                        "traceback": _tb_str,
-                        "old_version": _VORTEX_VERSION,
-                        "remote_version": _UPDATE_STATE.get("remote_version","?"),
-                        "backup_path": str(bk_path) if "bk_path" in dir() else "",
-                        "ts": ts,
-                    }, _cf)
+                if sys.platform == "win32":
+                    import ctypes
+                    return bool(ctypes.windll.shell32.IsUserAnAdmin())
+                return os.getuid() == 0
+            except Exception:
+                return False
+
+        if not _is_admin_now():
+            if sys.platform == "win32":
+                import ctypes as _ct_adm, subprocess as _sp_uac
+                _ulog("⚡  Requesting administrator privileges...", "WARN")
+                try:
+                    _base_args = [a for a in sys.argv if a != "--auto-update"]
+                    _elev_args = _base_args + ["--auto-update"]
+                    params = _sp_uac.list2cmdline(_elev_args)
+                    ret = _ct_adm.windll.shell32.ShellExecuteW(
+                        None, "runas", sys.executable, params, None, 1)
+                    if ret > 32:
+                        _ulog("✓  Admin granted — relaunching updater as administrator...", "OK")
+                        _ulog("   This window will close now.", "DIM")
+                        try:
+                            _tmp_opts = {
+                                "backup_before":   _upd_opt_bk.get(),
+                                "preserve_config": _upd_opt_cfg.get(),
+                                "update_rules":    _upd_opt_rules.get(),
+                                "fresh_install":   _upd_opt_fresh.get(),
+                            }
+                            _tmp_opts_path = os.path.join(
+                                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                "_upd_tmp_opts.json")
+                            with open(_tmp_opts_path, "w", encoding="utf-8") as _tf:
+                                json.dump(_tmp_opts, _tf)
+                        except Exception:
+                            pass
+                        root.after(800, rr.destroy)
+                        root.after(1000, root.destroy)
+                        return
+                    else:
+                        _ulog("✗  Administrator privileges denied (UAC declined).", "ERR")
+                        _ulog("   Restart V0RTEX as Administrator to update.", "WARN")
+                        import tkinter.messagebox as _tmb_adm
+                        _tmb_adm.showwarning(
+                            "Admin Required",
+                            "V0RTEX Updater requires administrator privileges.\n"
+                            "Please right-click V0RTEX and run as Administrator.",
+                            parent=rr)
+                        rr.after(0, lambda: _upd_start_btn.config(state="normal"))
+                        return
+                except Exception as _ue:
+                    _ulog(f"✗  UAC request error: {_ue}", "ERR")
+                    rr.after(0, lambda: _upd_start_btn.config(state="normal"))
+                    return
+            else:
+                _ulog("✗  Not running as root — update requires sudo.", "ERR")
+                import tkinter.messagebox as _tmb_adm2
+                _tmb_adm2.showwarning("Admin Required",
+                    "Please run V0RTEX with sudo to update.", parent=rr)
+                rr.after(0, lambda: _upd_start_btn.config(state="normal"))
+                return
+
+        script_path    = os.path.abspath(__file__)
+        script_dir     = os.path.dirname(script_path)
+        _vx_system_dir = os.path.dirname(script_dir)
+        _settings_dir  = os.path.dirname(_vx_system_dir)
+        _settings_path = os.path.join(_settings_dir, "update_settings.json")
+        ts             = time.strftime("%Y%m%d_%H%M%S")
+
+        _do_fresh = getattr(_upd_opt_fresh, "get", lambda: clear_install)()
+
+        _ulog("\n[ 1/4 ]  Collecting process info...", "HEAD"); _uprog(5, "pids")
+        _update_pids = [os.getpid()]
+        try:
+            import psutil as _psu_upd
+            for _ch in _psu_upd.Process(os.getpid()).children(recursive=True):
+                _update_pids.append(_ch.pid)
+            _ulog(f"  ✓ PIDs collected: {_update_pids}", "OK")
+        except Exception as _pse:
+            _ulog(f"  ~ psutil unavailable ({_pse}) — only main PID", "WARN")
+
+        _ulog("\n[ 2/4 ]  Choosing update options...", "HEAD"); _uprog(10, "options")
+
+        _data_reset_choice = [False]
+        if _do_fresh:
+            try:
+                _UFW, _UFH = 560, 320
+                _uf = tk.Toplevel(rr)
+                _uf.title("Fresh Install — Data Options")
+                _uf.configure(bg="#0d0d14")
+                _uf.geometry(f"{_UFW}x{_UFH}+{(rr.winfo_screenwidth()-_UFW)//2}+{(rr.winfo_screenheight()-_UFH)//2}")
+                _uf.resizable(False, False)
+                _uf.attributes("-topmost", True)
+                _uf.grab_set()
+                _uf.protocol("WM_DELETE_WINDOW", lambda: None)
+                _uf.after(30000, lambda: (_data_reset_choice.__setitem__(0, False), _uf.destroy()) if _uf.winfo_exists() else None)
+                tk.Frame(_uf, bg="#fab387", height=3).pack(fill="x")
+                _hfd = tk.Frame(_uf, bg="#11111b", pady=8, padx=14); _hfd.pack(fill="x")
+                tk.Label(_hfd, text="  ● ● ●   FRESH INSTALL — DATA OPTIONS",
+                         font=("Consolas", 9, "bold"), bg="#11111b", fg="#585b70").pack(side="left")
+                tk.Label(_uf, text="⚠  What happens to your data?",
+                         font=("Consolas", 12, "bold"), bg="#0d0d14", fg="#fab387").pack(pady=(14, 4))
+                tk.Label(_uf,
+                         text="Program files will be removed and reinstalled from scratch.\n"
+                              "An EMERGENCY_RESTORE.zip backup will be created before any changes.",
+                         font=("Consolas", 9), bg="#0d0d14", fg="#cdd6f4",
+                         wraplength=500, justify="center").pack(pady=(0, 8))
+                tk.Frame(_uf, bg="#313244", height=1).pack(fill="x", padx=20)
+                _opf = tk.Frame(_uf, bg="#11111b", padx=24, pady=12); _opf.pack(fill="x")
+                tk.Label(_opf, text="☁  KEEP DATA  (safer)",
+                         font=("Consolas", 10, "bold"), bg="#11111b", fg="#a6e3a1").pack(anchor="w")
+                tk.Label(_opf,
+                         text="  Reinstalls program files. Keeps config, DB, rules, notes, API keys.",
+                         font=("Consolas", 8), bg="#11111b", fg="#7f849c", justify="left").pack(anchor="w", pady=(0, 8))
+                tk.Label(_opf, text="⚠  RESET EVERYTHING  (clean slate)",
+                         font=("Consolas", 10, "bold"), bg="#11111b", fg="#f38ba8").pack(anchor="w")
+                tk.Label(_opf,
+                         text="  Wipes ALL data. EMERGENCY_RESTORE.zip lets you roll back if needed.",
+                         font=("Consolas", 8), bg="#11111b", fg="#7f849c", justify="left").pack(anchor="w")
+                tk.Frame(_uf, bg="#313244", height=1).pack(fill="x", padx=20)
+                _bfd = tk.Frame(_uf, bg="#0d0d14", pady=10); _bfd.pack()
+                def _choose_keep(_dc=_data_reset_choice, _w=_uf):
+                    _dc[0] = False
+                    try: _w.grab_release(); _w.destroy()
+                    except Exception: pass
+                def _choose_reset(_dc=_data_reset_choice, _w=_uf):
+                    _dc[0] = True
+                    try: _w.grab_release(); _w.destroy()
+                    except Exception: pass
+                tk.Button(_bfd, text="☁  Keep My Data",
+                          font=("Consolas", 10, "bold"), bg="#a6e3a1", fg="#0d0d14",
+                          relief="flat", padx=20, pady=8, cursor="hand2", bd=0,
+                          command=_choose_keep).pack(side="left", padx=(0, 10))
+                tk.Button(_bfd, text="⚠  Reset Everything",
+                          font=("Consolas", 10, "bold"), bg="#f38ba8", fg="#0d0d14",
+                          relief="flat", padx=20, pady=8, cursor="hand2", bd=0,
+                          command=_choose_reset).pack(side="left")
+                rr.wait_window(_uf)
+            except Exception as _ufe:
+                _ulog(f"  ~ Data choice dialog error: {_ufe} — defaulting to KEEP DATA", "WARN")
+                _data_reset_choice[0] = False
+            _ulog(f"  ✔ User chose: {'RESET ALL' if _data_reset_choice[0] else 'KEEP DATA'}", "INFO")
+
+        _ulog("\n[ 3/4 ]  Creating EMERGENCY_RESTORE backup...", "HEAD"); _uprog(18, "backup")
+        _emergency_path = None
+        _userdata_path  = None
+        try:
+            _em_dir = _upd_tmp.gettempdir()
+            _emergency_path = os.path.join(_em_dir, f"EMERGENCY_RESTORE_{ts}.zip")
+            with _zf.ZipFile(_emergency_path, "w", _zf.ZIP_DEFLATED) as _ezw:
+                for _root_w, _dirs_w, _files_w in os.walk(_vx_system_dir):
+                    for _fw in _files_w:
+                        _fp_w = os.path.join(_root_w, _fw)
+                        try:
+                            _arc_w = os.path.relpath(_fp_w, _vx_system_dir)
+                            _ezw.write(_fp_w, _arc_w)
+                        except Exception:
+                            pass
+            _em_size = os.path.getsize(_emergency_path) // 1024
+            _ulog(f"  ✓ EMERGENCY_RESTORE.zip → {_emergency_path}  ({_em_size} KB)", "OK")
+        except Exception as _eme:
+            _ulog(f"  ~ Emergency backup failed: {_eme} — continuing anyway", "WARN")
+            _emergency_path = None
+
+        if _do_fresh and not _data_reset_choice[0]:
+            try:
+                _ud_path = os.path.join(_upd_tmp.gettempdir(), f"userdata_{ts}.zip")
+                _USER_FILES = ["config.json", "whitelist.txt", "notes.txt",
+                               "scan_history.db", "todo_list.json", "snippets.json",
+                               "rules_state.json"]
+                _USER_DIRS  = ["rules", "reports", "reports_pdf", "quarantine", "backups"]
+                with _zf.ZipFile(_ud_path, "w", _zf.ZIP_DEFLATED) as _uzw:
+                    for _uf2 in _USER_FILES:
+                        _ufp = os.path.join(script_dir, _uf2)
+                        if os.path.isfile(_ufp):
+                            _uzw.write(_ufp, _uf2)
+                    for _ud in _USER_DIRS:
+                        _udp = os.path.join(script_dir, _ud)
+                        if os.path.isdir(_udp):
+                            for _ur, _, _ufs in os.walk(_udp):
+                                for _uf3 in _ufs:
+                                    _ufp2 = os.path.join(_ur, _uf3)
+                                    try:
+                                        _uzw.write(_ufp2, os.path.relpath(_ufp2, script_dir))
+                                    except Exception:
+                                        pass
+                _userdata_path = _ud_path
+                _ud_size = os.path.getsize(_ud_path) // 1024
+                _ulog(f"  ✓ userdata.zip → {_ud_path}  ({_ud_size} KB)", "OK")
+            except Exception as _ude:
+                _ulog(f"  ~ User data backup failed: {_ude}", "WARN")
+                _userdata_path = None
+
+        _ulog("\n[ 4/4 ]  Fetching update adapter...", "HEAD"); _uprog(40, "adapter")
+        _adapter_path = None
+        try:
+            adapter_code = _upd_fetch_text(_GITHUB_ADAPTER_URL, timeout=20)
+            import ast as _ast_ua
+            _ast_ua.parse(adapter_code)
+            _afd, _adapter_path = _upd_tmp.mkstemp(suffix="_v0rtex_adapter.py",
+                                                    dir=_upd_tmp.gettempdir())
+            with open(_afd, "w", encoding="utf-8") as _af:
+                _af.write(adapter_code)
+            _ulog(f"  ✓ adapter fetched ({len(adapter_code):,} bytes)", "OK")
+        except Exception as _afe:
+            _ulog(f"  ✗ adapter fetch failed: {_afe}", "ERR")
+
+        _update_settings = {
+            "install_dir":                  script_dir,
+            "vx_system_dir":                _vx_system_dir,
+            "python_exe":                   sys.executable,
+            "old_version":                  _VORTEX_VERSION,
+            "new_version":                  _UPDATE_STATE.get("remote_version", "?"),
+            "target_version":               "latest",
+            "branch":                       _PLATFORM_BRANCH,
+            "backup_before":                _upd_opt_bk.get(),
+            "preserve_config":              _upd_opt_cfg.get(),
+            "update_rules":                 _upd_opt_rules.get(),
+            "fresh_install":                _do_fresh,
+            "data_reset":                   _data_reset_choice[0],
+            "restart_level":                "admin" if CONFIG.get("require_admin_start", False) else "user",
+            "v0rtex_pids":                  _update_pids,
+            "adapter_pid":                  0,
+            "backup_path":                  "",
+            "emergency_backup_path":        _emergency_path or "",
+            "userdata_backup_path":         _userdata_path or "",
+            "log_dir":                      os.path.join(_vx_system_dir, "v0rtex_utils",
+                                                         "debug_log", "update_log"),
+            "started_ts":                   ts,
+            "status":                       "pending",
+            "trampoline_current_version":   _VORTEX_VERSION,
+        }
+
+        try:
+            with open(_settings_path, "w", encoding="utf-8") as _sf:
+                _j.dump(_update_settings, _sf, indent=2)
+            _ulog(f"  ✓ update_settings.json → {_settings_path}", "OK")
+        except Exception as _swe:
+            _ulog(f"  ~ settings write failed: {_swe} — continuing anyway", "WARN")
+
+        if not _adapter_path:
+            _ulog("  → falling back to legacy update method...", "WARN")
+            threading.Thread(target=_do_update_legacy, daemon=True).start()
+            return
+
+        _uprog(55, "launching adapter")
+        try:
+            kw = {}
+            if sys.platform == "win32":
+                kw["creationflags"] = 0x08000000
+            _adapter_proc = subprocess.Popen(
+                [sys.executable, _adapter_path, _settings_path], **kw)
+            _update_settings["adapter_pid"] = _adapter_proc.pid
+            try:
+                with open(_settings_path, "w", encoding="utf-8") as _sf3:
+                    _j.dump(_update_settings, _sf3, indent=2)
             except Exception:
                 pass
-            rr.after(0, lambda: _upd_start_btn.config(state="normal"))
-            return
-        finally:
-            try: os.remove(_upd_in_progress_sentinel)
-            except Exception: pass
+            _ulog(f"  ✓ Adapter running  PID={_adapter_proc.pid}", "OK")
+            _ulog("  V0RTEX will now close — the adapter handles the rest.", "WARN")
+            _ulog("  Watch the splash screen for progress.", "DIM")
+            _uprog(60, "adapter running")
+            _UPDATE_STATE["available"] = False
+            rr.after(3000, rr.destroy)
+            rr.after(3500, root.destroy)
+        except Exception as _ale:
+            _ulog(f"  ✗ adapter launch failed: {_ale}", "ERR")
+            _ulog("  → falling back to legacy update method...", "WARN")
+            threading.Thread(target=_do_update_legacy, daemon=True).start()
 
-    def _do_update_inner():
+    def _do_update_legacy():
+        _sl("Update install started", "UPDATE")
         import zipfile as _zf, shutil as _shu, json as _j
         base_url = _upd_repo_v.get().strip().rstrip("/")
         script_path = os.path.abspath(__file__)
@@ -26343,9 +30031,25 @@ def _launch_update_ui(clear_install=False):
             _saved_json = {}; bk_path = None
             _ulog("  ~ Backup skipped","DIM"); _uprog(10,"")
 
-        _ulog("\n[ 2/7 ]  Downloading v0rtex.py…","HEAD"); _uprog(20,"download")
+        _ulog("\n[ 2/7 ]  Fetching update adapter…","HEAD"); _uprog(18,"adapter")
+        import tempfile as _upd_tmp
+        _adapter_path = None
         try:
-            new_script = _upd_fetch_text(f"{base_url}/v0rtex.py", timeout=60)
+            adapter_url = _GITHUB_ADAPTER_URL
+            _ulog(f"  → {adapter_url}", "DIM")
+            adapter_code = _upd_fetch_text(adapter_url, timeout=20)
+            _adapter_fd, _adapter_path = _upd_tmp.mkstemp(suffix="_v0rtex_adapter.py")
+            with open(_adapter_fd, "w", encoding="utf-8") as _af:
+                _af.write(adapter_code)
+            _ulog(f"  ✓ Adapter fetched ({len(adapter_code):,} bytes) → {_adapter_path}", "OK")
+        except Exception as e:
+            _ulog(f"  ✗ Adapter fetch failed: {e}", "ERR")
+            _ulog("  → Falling back to direct download…", "WARN")
+            _adapter_path = None
+
+        _ulog("\n[ 2b/7 ]  Downloading v0rtex.py…","HEAD"); _uprog(20,"download")
+        try:
+            new_script = _upd_fetch_text(f"{base_url}/{_REMOTE_SCRIPT_NAME}", timeout=60)
             _ulog(f"  ✓ Downloaded {len(new_script):,} bytes","OK")
         except Exception as e:
             _ulog(f"  ✗ Download failed: {e}","ERR")
@@ -26381,6 +30085,7 @@ def _launch_update_ui(clear_install=False):
                 _uf.attributes("-topmost", True)
                 _uf.grab_set()
                 _uf.protocol("WM_DELETE_WINDOW", lambda: None)
+                _uf.after(30000, lambda: (_data_reset.__setitem__(0, False), _uf.destroy()) if _uf.winfo_exists() else None)
 
                 _uftk.Frame(_uf, bg="#fab387", height=3).pack(fill="x")
                 _hf2 = _uftk.Frame(_uf, bg="#11111b", pady=8, padx=14)
@@ -26416,7 +30121,7 @@ def _launch_update_ui(clear_install=False):
                             font=("Consolas", 10, "bold"), bg="#11111b",
                             fg="#f38ba8").pack(anchor="w")
                 _uftk.Label(_opt_frame,
-                            text="  Reinstalls the program AND wipes config, DB, notes, rules.\n"
+                            text="Fresh install (WIPE ALL DATA — cannot be undone)"
                                  "  A backup ZIP will be created first.",
                             font=("Consolas", 8), bg="#11111b",
                             fg="#7f849c", justify="left").pack(anchor="w")
@@ -26755,7 +30460,7 @@ def _launch_update_ui(clear_install=False):
                   "--no-cache-dir", "-q", "--progress-bar", "off"] + _TH_UPD, "plain"),
             ]:
                 try:
-                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=180, creationflags=0x08000000 if sys.platform=="win32" else 0)
+                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
                     if r.returncode == 0:
                         _ulog(f"  ✓ {pname}  [{lbl}]", "OK"); return True
                 except Exception: pass
@@ -26826,6 +30531,37 @@ def _launch_update_ui(clear_install=False):
                 _ulog("  ✓ All packages up to date.", "OK")
         
 
+
+        if _adapter_path and os.path.isfile(_adapter_path):
+            try:
+                _ulog("\n[ 7/7 ]  Launching update adapter…", "HEAD")
+                _uprog(92, "adapter")
+                import json as _aj, tempfile as _upd_tmp2
+                _adapter_meta = {
+                    "install_dir": script_dir,
+                    "python_exe":  sys.executable,
+                    "old_version": _VORTEX_VERSION,
+                    "new_version": _UPDATE_STATE.get("remote_version", "?"),
+                    "branch":      _PLATFORM_BRANCH,
+                    "keep_data":   True,
+                    "backup_path": str(bk_path) if bk_path else "",
+                    "manifest":    manifest,
+                }
+                _meta_fd, _meta_path = _upd_tmp2.mkstemp(suffix="_adapter_meta.json")
+                with open(_meta_fd, "w", encoding="utf-8") as _mf:
+                    _aj.dump(_adapter_meta, _mf, indent=2)
+                subprocess.Popen(
+                    [sys.executable, _adapter_path, _meta_path],
+                    creationflags=0x08000000 if sys.platform=="win32" else 0
+                )
+                _ulog("  ✓ Adapter running — it will clean deps and relaunch V0RTEX", "OK")
+                _ulog("  This window closes in 6 seconds.", "DIM")
+                _UPDATE_STATE["available"] = False
+                rr.after(6000, rr.destroy)
+                return
+            except Exception as _ae:
+                _ulog(f"  ~ Adapter unavailable ({_ae}) — manual restart needed", "WARN")
+
         _uprog(100, "done")
         _ulog("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "HEAD")
         _ulog("  ✓  Update complete!", "OK")
@@ -26877,6 +30613,7 @@ _mkbtn(_upd_btnrow,"🔍 Check for Update",lambda: _upd_check(silent=False),C["b
 _mkbtn(_upd_btnrow,"⚡ Normal Update",lambda: _launch_update_ui(clear_install=False),C["green"])
 _mkbtn(_upd_btnrow,"🔥 Clear Install",lambda: _launch_update_ui(clear_install=True),C["red"])
 _mkbtn(_upd_btnrow,"🔗 Open on GitHub",lambda: __import__("webbrowser").open(_GITHUB_PAGE_URL),C["surface2"],C["blue"])
+_mkbtn(_upd_btnrow,"💾 Emergency Rollback",lambda: (_nb.select(_tab_approt), _ap_nb.select(_ap_bk_tab)),C["surface2"],C["red"])
 
 def _check_update_corrupted():
     """On startup: check if previous update crashed and show recovery UI."""
@@ -27209,16 +30946,16 @@ def _show_update_ui_if_needed():
         notif = tk.Toplevel(root)
         notif.title("V0RTEX — Update Available")
         notif.configure(bg=_BG)
-        notif.resizable(False, False)
-        W, H = 480, 270
+        notif.resizable(True, True)
+        W, H = 520, 360
         sw, sh = notif.winfo_screenwidth(), notif.winfo_screenheight()
         notif.geometry(f"{W}x{H}+{(sw-W)//2}+{max((sh-H)//3, 30)}")
+        notif.minsize(460, 320)
         notif.attributes("-topmost", True)
-        notif.grab_set()
 
         tk.Frame(notif, bg=_BLU, height=3).pack(fill="x")
 
-        hdr = tk.Frame(notif, bg=_BG, padx=22, pady=16); hdr.pack(fill="x")
+        hdr = tk.Frame(notif, bg=_BG, padx=22, pady=12); hdr.pack(fill="x")
         tk.Label(hdr, text="⚡  Update Available!",
                  font=("Consolas", 14, "bold"), bg=_BG, fg=_BLU).pack(anchor="w")
 
@@ -27261,21 +30998,21 @@ def _show_update_ui_if_needed():
             import webbrowser
             webbrowser.open(_GITHUB_PAGE_URL)
 
-        tk.Button(bot, text="⚡ Update Now",
+        tk.Button(bot, text="⚡  Update Now",
                   font=("Consolas", 10, "bold"), bg=_GRN, fg="#000",
-                  relief="flat", bd=0, padx=14, pady=7,
+                  relief="flat", bd=0, padx=18, pady=8,
                   cursor="hand2", activebackground="#7ecf9b",
-                  command=_do_update).pack(side="left", padx=(0, 6))
+                  command=_do_update).pack(side="left", padx=(0, 8))
 
-        tk.Button(bot, text="🔗 Read more on GitHub",
+        tk.Button(bot, text="🔗  GitHub",
                   font=("Consolas", 9), bg=_BRD, fg=_BLU,
-                  relief="flat", bd=0, padx=12, pady=7,
+                  relief="flat", bd=0, padx=14, pady=8,
                   cursor="hand2", activebackground="#252545",
-                  command=_open_github).pack(side="left", padx=(0, 6))
+                  command=_open_github).pack(side="left", padx=(0, 8))
 
         tk.Button(bot, text="Later",
                   font=("Consolas", 9), bg=_BG, fg=_DIM,
-                  relief="flat", bd=0, padx=10, pady=7,
+                  relief="flat", bd=0, padx=14, pady=8,
                   cursor="hand2", activebackground=_BRD,
                   command=notif.destroy).pack(side="right")
 
@@ -27284,6 +31021,8 @@ def _show_update_ui_if_needed():
 
 
 def _startup_update_check():
+    if "--auto-update" in sys.argv:
+        return
     if CONFIG.get("auto_update_check", True) or _upd_auto_v.get():
         _upd_check(silent=True)
 
@@ -27297,9 +31036,11 @@ def _upd_auto_changed(*_):
         with open(CONFIG_PATH,"w",encoding="utf-8") as f: json.dump(CONFIG,f,indent=2)
     except: pass
 _upd_auto_v.trace_add("write", _upd_auto_changed)
+_sl("[DBG] CP6 updater trace added", "BOOT")
 
 
-def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
+def _unified_recovery_ui(
+exc_type=None, exc_val=None, exc_tb=None,
                           tb_str="", missing_files=None, _toplevel_root=None):
     import tkinter as _rtk
     import tkinter.ttk as _rttk
@@ -27556,7 +31297,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
         _rec_hb_sv.set("● DONE")
         try: _rec_hb_lbl.config(fg=_GRN)
         except Exception: pass
-        # After 2.5s flash checkmark, return to idle pulsing dot
+
         def _idle_pulse(n=0):
             try:
                 _IDLE = ["·", "•", "●", "•"]
@@ -27685,7 +31426,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             rec_log_txt.config(state="disabled")
             _rec_record_activity(msg)
         except Exception: pass
-        # Also persist to debug_log/recovery_ops/
+
         try:
             import datetime as _dtrec_op
             _rec_ops_dir = _ros.path.join(
@@ -27713,6 +31454,18 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             rec_raw_txt.see(_rtk.END)
             rec_raw_txt.config(state="disabled")
         except Exception: pass
+
+
+    def _make_mirrored_log(orig_fn, tag_prefix=""):
+        """Wrap a tab-local log function to also write to rec_oplog."""
+        def _mirrored(msg, tag="DIM"):
+            orig_fn(msg, tag)
+            try: _rec_oplog(f"{tag_prefix}{msg}", tag)
+            except Exception: pass
+        return _mirrored
+
+
+    _rec_log_mirror_pending = []
 
 
     _term_split = _rtk.Frame(t_term, bg=_BG); _term_split.pack(fill=_rtk.BOTH, expand=True)
@@ -27784,7 +31537,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
         import threading as _tth
         def _exec():
             try:
-                r = _rsp.run(raw, shell=True, cwd=_tcwd[0], capture_output=True, text=True, timeout=30)
+                r = _rsp.run(raw, shell=True, cwd=_tcwd[0], capture_output=True, text=True, timeout=30, creationflags=0x08000000 if _rsys.platform=="win32" else 0)
                 if r.stdout:
                     try: rr.after(0, lambda t=r.stdout: _term_write(t, "DIM"))
                     except Exception: pass
@@ -27988,6 +31741,8 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             rep_txt.see(_rtk.END)
             rep_txt.config(state="disabled")
         except Exception: pass
+        try: _rec_oplog(f"[REPAIR] {msg}", tag)
+        except Exception: pass
 
     _rpbtn_f = _rtk.Frame(t_rep, bg=_PNL2, pady=6, padx=8)
     _rpbtn_f.pack(fill=_rtk.X, side=_rtk.BOTTOM)
@@ -28012,6 +31767,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
         except Exception as e: _replog(f">_ Error: {e}", "ERR")
 
     def _vacuum_db():
+        _sl("DB vacuum started", "DB")
         try:
             import sqlite3 as _sq
             db = _ros.path.join(_tcwd[0], "scan_history.db")
@@ -28704,7 +32460,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
         except Exception: pass
 
 
-    # ── PRIMARY ACTIONS ─────────────────────────────────────────────────────
+
     _rtk.Label(_rpbtn_f, text="  PRIMARY ACTIONS", font=("Consolas",7,"bold"),
                bg=_PNL2, fg=_GRN2).pack(anchor="w", padx=6, pady=(2,0))
     _row0 = _rtk.Frame(_rpbtn_f, bg=_PNL2)
@@ -28720,7 +32476,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                     highlightthickness=1, highlightbackground=_r0hl
                     ).pack(side=_rtk.LEFT, padx=(0,4))
 
-    # ── CONFIG & SETTINGS ───────────────────────────────────────────────────
+
     _rtk.Label(_rpbtn_f, text="  CONFIG & SETTINGS", font=("Consolas",7,"bold"),
                bg=_PNL2, fg=_DIM2).pack(anchor="w", padx=6, pady=(4,0))
     _row1 = _rtk.Frame(_rpbtn_f, bg=_PNL2)
@@ -29194,7 +32950,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
     _replog("║  Then ↺ RESTART APP to relaunch normally.                  ║", "DIM")
     _replog("╚─────────────────────────────────────────────────────────────╝", "PROMPT")
 
-    # ── VERSION tab ──────────────────────────────────────────────────────────
+
     t_ver = _rtk.Frame(nb, bg=_BG)
     nb.add(t_ver, text="🏷 VERSION")
 
@@ -29208,12 +32964,14 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             _ver_txt.see(_rtk.END)
             _ver_txt.config(state="disabled")
         except Exception: pass
+        try: _rec_oplog(f"[VERSION] {msg}", tag)
+        except Exception: pass
 
     _ver_btn_f = _rtk.Frame(t_ver, bg=_PNL2, padx=8, pady=6)
     _ver_btn_f.pack(fill=_rtk.X, side=_rtk.BOTTOM)
     _rtk.Frame(t_ver, bg=_BRD, height=1).pack(fill=_rtk.X, side=_rtk.BOTTOM)
 
-    # Version metadata path — always derived from tcwd, never hardcoded
+
     _vx_meta_path_rec = _ros.path.normpath(
         _ros.path.join(_ros.path.dirname(_tcwd[0]),
                        "v0rtex_utils", ".vx_meta", "vx_version"))
@@ -29244,6 +33002,10 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
         return None
 
     def _rec_version_check():
+        try:
+            _ver_txt.config(state="normal"); _ver_txt.delete("1.0", _rtk.END)
+            _ver_txt.config(state="disabled")
+        except Exception: pass
         _vlog("╔─ VERSION INFO ─────────────────────────────────────────────╗", "PROMPT")
         _ver, _name, _auth = _rec_read_local_ver()
         _main_script = _ros.path.join(_tcwd[0], "v0rtex.py")
@@ -29264,8 +33026,17 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
 
         _vlog("╠─ BACKUP HISTORY ───────────────────────────────────────────╣", "PROMPT")
         _found_bk = False
-        for _bk_name in ("v0rtex.py.update_bak", "v0rtex.py.bak", "v0rtex.py.pre_rollback"):
+        _bk_candidates = ["v0rtex.py.update_bak", "v0rtex.py.bak", "v0rtex.py.pre_rollback"]
+
+        _bk_parent = _ros.path.dirname(_tcwd[0])
+        _bk_extra = [_ros.path.join(_bk_parent, n) for n in _bk_candidates]
+        for _bk_name in _bk_candidates:
             _bk_path = _ros.path.join(_tcwd[0], _bk_name)
+            if not _ros.path.exists(_bk_path):
+
+                _bk_path2 = _ros.path.join(_bk_parent, _bk_name)
+                if _ros.path.exists(_bk_path2): _bk_path = _bk_path2
+                else: continue
             if _ros.path.exists(_bk_path):
                 try:
                     import datetime as _dbk
@@ -29296,6 +33067,10 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
         _vlog("╚─────────────────────────────────────────────────────────────╝", "PROMPT")
 
     def _rec_write_version_file():
+        try:
+            _ver_txt.config(state="normal"); _ver_txt.delete("1.0", _rtk.END)
+            _ver_txt.config(state="disabled")
+        except Exception: pass
         try:
             import json as _rwj
             _ms = _ros.path.join(_tcwd[0], "v0rtex.py")
@@ -29351,7 +33126,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
         except Exception as _ue:
             _vlog(f"  ✗  {_ue}", "ERR")
 
-    # Rollback frame — populated dynamically
+
     _rtk.Label(_ver_btn_f, text="  ROLLBACK", font=("Consolas",7,"bold"),
                bg=_PNL2, fg=_YEL).pack(anchor="w", padx=4, pady=(0,2))
     _ver_rb_f = _rtk.Frame(_ver_btn_f, bg=_PNL2)
@@ -29380,7 +33155,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                         highlightthickness=1, highlightbackground=_col
                         ).pack(side=_rtk.LEFT, padx=(0,4))
 
-    # Action buttons
+
     _rtk.Label(_ver_btn_f, text="  ACTIONS", font=("Consolas",7,"bold"),
                bg=_PNL2, fg=_DIM2).pack(anchor="w", padx=4)
     _ver_act_f = _rtk.Frame(_ver_btn_f, bg=_PNL2)
@@ -29402,9 +33177,9 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                     highlightthickness=1, highlightbackground=_vfg
                     ).pack(side=_rtk.LEFT, padx=(0,4))
 
-    # Auto-populate on open
+
     rr.after(400, lambda: (_rec_version_check(), _rec_show_rollback_picker()))
-    # ── end VERSION tab ──────────────────────────────────────────────────────
+
 
 
     if missing_files:
@@ -29422,6 +33197,13 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             bk_txt.config(state="normal")
             bk_txt.insert(_rtk.END, msg+"\n", tag)
             bk_txt.see(_rtk.END)
+            bk_txt.config(state="disabled")
+        except Exception: pass
+        try: _rec_oplog(f"[BACKUP] {msg}", tag)
+        except Exception: pass
+    def _bklog_clear():
+        try:
+            bk_txt.config(state="normal"); bk_txt.delete("1.0", _rtk.END)
             bk_txt.config(state="disabled")
         except Exception: pass
 
@@ -29462,6 +33244,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
         _tthr2.Thread(target=_w, daemon=True).start()
 
     def _list_backups():
+        _bklog_clear()
         try:
             try: bd = BACKUPS_DIR
             except: bd = _ros.path.join(_tcwd[0], "backups")
@@ -29876,6 +33659,8 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             cln_txt.see(_rtk.END)
             cln_txt.config(state="disabled")
         except Exception: pass
+        try: _rec_oplog(f"[CLEAN] {msg}", tag)
+        except Exception: pass
 
     _clnbtn_f = _rtk.Frame(t_cln, bg=_PNL2, pady=6, padx=8)
     _clnbtn_f.pack(fill=_rtk.X, side=_rtk.BOTTOM)
@@ -29977,8 +33762,9 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                     conn.execute(f"DELETE FROM [{t}]")
                     deleted += cnt
                 except Exception: pass
+            conn.commit()
             conn.execute("VACUUM")
-            conn.commit(); conn.close()
+            conn.close()
             _clnlog(f">_ Scan history wiped: {deleted} record(s) removed.", "OK")
             _sts("scan history wiped")
         except Exception as _se: _clnlog(f">_ Error: {_se}", "ERR")
@@ -30031,7 +33817,8 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             import sqlite3 as _sq3
             db = _ros.path.join(_tcwd[0], "scan_history.db")
             if _ros.path.exists(db): _ros.remove(db)
-            conn = _sq3.connect(db)
+            conn = _sq3.connect(db, timeout=10)
+            conn.execute("PRAGMA journal_mode=WAL")
             conn.executescript("""
                 CREATE TABLE scan_history (
                     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30687,7 +34474,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                 _slog_w(">_ Listing non-Microsoft services...", "INFO")
                 r = _rspsvc.run(["sc", "query", "type=", "all", "state=", "all"],
                                  capture_output=True, text=True, timeout=30)
-                lines = [l for l in r.stdout.splitlines() if "SERVICE_NAME" in l]
+                lines = [l for l in r.stdout.splitlines() if "SERVICE_NAME" in l.upper()]
                 _slog_w(f"  Total services: {len(lines)}", "DIM")
                 for l in lines[:30]: _slog_w(f"  {l.strip()}", "DIM")
                 if len(lines) > 30: _slog_w(f"  ... and {len(lines)-30} more", "DIM")
@@ -30936,7 +34723,8 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                 r = _rsphf.run(["netsh","advfirewall","firewall","add","rule",
                                   f"name={name}_{port}","dir=out","action=block",
                                   f"protocol=tcp","remoteport="+port],
-                                 capture_output=True, text=True, timeout=20)
+                                 capture_output=True, text=True, timeout=20,
+                                 creationflags=0x08000000 if _rsys.platform=="win32" else 0)
                 if r.returncode == 0:
                     _hlog_w(f"  ✓ Outbound TCP {port} blocked (rule: {name}_{port})", "OK")
                     _rec_log_admin(f"Firewall block added: outbound TCP {port}")
@@ -30948,7 +34736,8 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             def _w():
                 _hlog_w(">_ Listing firewall rules containing 'V0RTEX'...", "INFO")
                 r = _rsphf.run(["netsh","advfirewall","firewall","show","rule","name=all"],
-                                 capture_output=True, text=True, timeout=30)
+                                 capture_output=True, text=True, timeout=30,
+                                 creationflags=0x08000000 if _rsys.platform=="win32" else 0)
                 lines = r.stdout.splitlines()
                 found = []
                 for i, l in enumerate(lines):
@@ -30966,7 +34755,8 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             if not name: _hlog_w("  ✗ Provide a rule name", "ERR"); return
             def _w():
                 r = _rsphf.run(["netsh","advfirewall","firewall","delete","rule",f"name={name}"],
-                                 capture_output=True, text=True, timeout=15)
+                                 capture_output=True, text=True, timeout=15,
+                                 creationflags=0x08000000 if _rsys.platform=="win32" else 0)
                 tag = "OK" if r.returncode == 0 else "ERR"
                 _hlog_w(f"  {'✓' if r.returncode==0 else '✗'} Delete rule '{name}': {r.stdout.strip() or r.stderr.strip()}", tag)
                 _rec_log_admin(f"Firewall rule deleted: {name} rc={r.returncode}")
@@ -31029,16 +34819,14 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                 _pklog_w(">_ Listing running processes...", "INFO")
                 if _rsys.platform == "win32":
                     r = _rsppk.run(["tasklist","/FO","CSV","/NH"],
-                                    capture_output=True, text=True, timeout=20)
+                                    capture_output=True, text=True, timeout=20, creationflags=0x08000000 if _rsys.platform=="win32" else 0)
                     lines = [l.strip().strip('"') for l in r.stdout.splitlines() if l.strip()]
                     _pklog_w(f"  Total: {len(lines)} processes", "DIM")
-                    for l in lines[:60]:
+                    for l in lines:
                         parts = l.replace('","', '|').strip('"').split("|")
                         name = parts[0] if parts else l
                         pid  = parts[1] if len(parts) > 1 else ""
                         _pklog_w(f"  PID {pid:<8}  {name}", "DIM")
-                    if len(lines) > 60:
-                        _pklog_w(f"  ... and {len(lines)-60} more", "DIM")
                 else:
                     r = _rsppk.run(["ps","aux","--no-header"], capture_output=True, text=True, timeout=20)
                     for l in r.stdout.splitlines()[:60]: _pklog_w(f"  {l}", "DIM")
@@ -31053,7 +34841,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
                         "netcat","nc","ncat","psexec","procdump","meterpreter",
                         "cobaltstrike","beacon","inject","dump","keylog"]
                 r = _rsppk.run(["tasklist","/FO","CSV","/NH"],
-                                capture_output=True, text=True, timeout=20)
+                                capture_output=True, text=True, timeout=20, creationflags=0x08000000 if _rsys.platform=="win32" else 0)
                 found = []
                 for l in r.stdout.splitlines():
                     low = l.lower()
@@ -31074,7 +34862,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             if not _mb.askyesno("Confirm", f"Terminate process PID {pid}?\n\nThis cannot be undone.", parent=rr): return
             def _w():
                 if _rsys.platform == "win32":
-                    r = _rsppk.run(["taskkill","/F","/PID",pid], capture_output=True, text=True)
+                    r = _rsppk.run(["taskkill","/F","/PID",pid], capture_output=True, text=True, creationflags=0x08000000 if _rsys.platform=="win32" else 0)
                 else:
                     r = _rsppk.run(["kill","-9",pid], capture_output=True, text=True)
                 tag = "OK" if r.returncode == 0 else "ERR"
@@ -31089,7 +34877,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             if not _mb.askyesno("Confirm", f"Terminate ALL processes named '{name}'?\n\nThis cannot be undone.", parent=rr): return
             def _w():
                 if _rsys.platform == "win32":
-                    r = _rsppk.run(["taskkill","/F","/IM",name], capture_output=True, text=True)
+                    r = _rsppk.run(["taskkill","/F","/IM",name], capture_output=True, text=True, creationflags=0x08000000 if _rsys.platform=="win32" else 0)
                 else:
                     r = _rsppk.run(["killall","-9",name], capture_output=True, text=True)
                 tag = "OK" if r.returncode == 0 else "ERR"
@@ -31103,7 +34891,7 @@ def _unified_recovery_ui(exc_type=None, exc_val=None, exc_tb=None,
             def _w():
                 _pklog_w(f">_ Querying modules for PID {pid} (tasklist)...", "INFO")
                 r = _rsppk.run(["tasklist","/FI",f"PID eq {pid}","/M","/FO","LIST"],
-                                 capture_output=True, text=True, timeout=15)
+                                 capture_output=True, text=True, timeout=15, creationflags=0x08000000 if _rsys.platform=="win32" else 0)
                 for l in r.stdout.splitlines(): _pklog_w(f"  {l}", "DIM")
                 _rec_log_admin(f"Module list for PID {pid} viewed")
             _tpk.Thread(target=_w, daemon=True).start()
@@ -31187,12 +34975,14 @@ def _start_recovery_ui(exc_type=None, exc_val=None, exc_tb=None, tb_str=""):
 
 
 _wd_thread = threading.Thread(target=_watchdog_thread, daemon=True)
+_sl("[DBG] CP7 watchdog thread starting", "BOOT")
 _wd_thread.start()
 root.after(3000, _schedule_ping)
 
 _log_debug(f"{_VX_TITLE} ready", "INFO")
 _log_ops(f"{_VX_NAME}  v{_VX_VER}  by {_VX_AUTH}", "HEAD")
 _start_tray()
+_sl("[DBG] CP8 _start_tray done", "BOOT")
 root.after(500,   _refresh_stats)
 root.after(5000,  _perf_hist_tick)
 root.after(60000, _perf_tick)
@@ -31201,6 +34991,7 @@ _log_ops(f"API keys: {len(API_KEYS)}" if API_KEYS else "No API keys loaded — e
 _log_ops(f"YARA: {'active (' + str(len(os.listdir(RULES_DIR)) + len(os.listdir(RULES_EXTERN_DIR))) + ' files)' if _yara_rules else 'unavailable'}", "NORM")
 _log_ops("Ready — drop files to scan or use YARA Manager to update rules.", "DIM")
 _update_charts()
+_sl("[DBG] CP9 _update_charts done", "BOOT")
 
 
 _MATPLOTLIB_CANVAS_IDS = set()
@@ -31427,6 +35218,7 @@ try:
         _nb.insert(i, tab)
 except Exception as _tro:
     print(f"[TAB ORDER] Tab reorder failed: {_tro}")
+_sl("[DBG] CP10 tab reorder done", "BOOT")
 
 
 _sbar = tk.Frame(root, bg=C["crust"], pady=3, padx=10)
@@ -31454,6 +35246,7 @@ tk.Label(_sbar, textvariable=_sb_time_sv, font=("Consolas",8),
 tk.Label(_sbar, text=f"{_VX_NAME} v{_VX_VER}  by {_VX_AUTH}",
          font=("Consolas",7), bg=C["crust"], fg=C["surface2"]).pack(side=tk.RIGHT, padx=12)
 
+_sl("[DBG] CP11 statusbar packed", "BOOT")
 def _sbar_tick():
     try:
         import datetime as _dtsb
@@ -31494,7 +35287,9 @@ root.after(1200, _sbar_tick)
 
 
 def _write_startup_scripts():
+    _sl("Writing startup scripts", "SYS")
     """Generate (or regenerate) utility scripts on startup.
+    Also copies v0rtex_log_censor.py to v0rtex_utils if found near the install dir.
     Files are always rewritten to stay in sync with the current version.
     They are deleted ONLY by the uninstall/reinstall/update/recovery process."""
     try:
@@ -31506,30 +35301,37 @@ def _write_startup_scripts():
             ("v0rtex_reinstall.py",   _build_reinstall_script,   (BASE_DIR, sys.executable, _tram)),
             ("v0rtex_updater.py",     _build_updater_script,     (BASE_DIR, sys.executable)),
             ("v0rtex_recovery_ui.py", _build_recovery_ui_script, (BASE_DIR, sys.executable)),
+            ("v0rtex_log_censor.py",  _build_censor_script,      ()),
         ]:
             _p = os.path.join(_media, _name)
             try:
                 with open(_p, "w", encoding="utf-8") as _f:
                     _f.write(_builder(*_ba))
+                _sl(f"write_startup_scripts: wrote {_name}", "SYS")
             except Exception as _we:
-                print(f"[STARTUP] Could not write {_name}: {_we}")
+                _sl(f"write_startup_scripts: could not write {_name}: {_we}", "ERR")
     except Exception as _e:
-        print(f"[STARTUP] _write_startup_scripts failed: {_e}")
+        _sl(f"write_startup_scripts failed: {_e}", "ERR")
 
-root.after(1200, _write_startup_scripts)
+_sl("Scheduled: write startup scripts at +1200ms", "BOOT"); root.after(1200, _write_startup_scripts)
 root.after(400, _take_startup_snapshot)
+_sl("[DBG] CP12 startup scripts scheduled", "BOOT")
 
 
 if _missing:
-    print(f"[RECOVERY] Launching Recovery UI for missing: {_missing}")
-    try:
-        root.withdraw()
-    except Exception:
-        pass
-    _unified_recovery_ui(missing_files=_missing)
-    sys.exit(0)
+
+    _checkpoint("WARN", f"Missing files after auto-create attempt: {_missing} — continuing anyway")
+    for _rel in _missing:
+        _fp = os.path.join(BASE_DIR, _rel.replace("/", os.sep))
+        try:
+            os.makedirs(os.path.dirname(_fp), exist_ok=True)
+            with open(_fp, "w", encoding="utf-8") as _cff:
+                _cff.write("{}")
+        except Exception:
+            pass
 
 
+_sl(f"[DBG] CP13 RECOVERY_MODE={_RECOVERY_MODE}", "BOOT")
 if _RECOVERY_MODE:
     _sentinel_data = {}
     try:
@@ -31540,6 +35342,8 @@ if _RECOVERY_MODE:
         pass
     try:
         os.remove(_RECOVERY_ADMIN_SENTINEL)
+    except FileNotFoundError:
+        pass
     except Exception as _se:
         print(f"[RECOVERY] Could not delete sentinel: {_se}")
     try:
@@ -31572,7 +35376,137 @@ if _RECOVERY_MODE:
     sys.exit(0)
 
 
+
+def _tk_callback_exception_handler(exc_type, exc_val, exc_tb):
+    import traceback as _tbe
+    tb = "".join(_tbe.format_exception(exc_type, exc_val, exc_tb))
+    _sl(f"[TK_CALLBACK_CRASH] {exc_type.__name__}: {exc_val}", "CRASH")
+    _sl(f"[TK_CALLBACK_CRASH] TRACEBACK:\n{tb}", "CRASH")
+    try: _write_crash_log(99, f"{exc_type.__name__}: {exc_val}", tb)
+    except Exception: pass
+root.report_callback_exception = _tk_callback_exception_handler
+
+_sl("[DBG] PRE-MAINLOOP: entering mainloop now", "BOOT")
+
+def _tk_callback_exception_handler(exc_type, exc_val, exc_tb):
+    import traceback as _tbe
+    tb = "".join(_tbe.format_exception(exc_type, exc_val, exc_tb))
+    _sl(f"[TK_CALLBACK_CRASH] {exc_type.__name__}: {exc_val}", "CRASH")
+    _sl(f"[TK_CALLBACK_CRASH] TRACEBACK:\n{tb}", "CRASH")
+    try: _write_crash_log(99, f"{exc_type.__name__}: {exc_val}", tb)
+    except Exception: pass
+root.report_callback_exception = _tk_callback_exception_handler
+
+_sl("[DBG] PRE-MAINLOOP: all module-level code done, entering mainloop", "BOOT")
+
+
+
+
+if "--auto-update" in sys.argv:
+    _sl("[AUTO-UPDATE] flag detected — auto-opening updater UI", "BOOT")
+    try:
+        _au_fresh = False
+        _au_tmp = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "_upd_tmp_opts.json")
+        if os.path.isfile(_au_tmp):
+            try:
+                with open(_au_tmp, encoding="utf-8") as _auf:
+                    _au_saved = json.load(_auf)
+                os.remove(_au_tmp)
+                _au_fresh = _au_saved.get("fresh_install", False)
+                _sl(f"[AUTO-UPDATE] restored opts: {_au_saved}", "BOOT")
+            except Exception:
+                pass
+        root.after(600, lambda _f=_au_fresh: _launch_update_ui(clear_install=_f))
+    except Exception as _au_e:
+        _sl(f"[AUTO-UPDATE] failed to schedule _launch_update_ui: {_au_e}", "WARN")
+
+if "--just-updated" in sys.argv:
+    try:
+        _ju_idx = sys.argv.index("--just-updated")
+        _ju_old = sys.argv[_ju_idx + 1] if _ju_idx + 1 < len(sys.argv) else "?"
+    except Exception:
+        _ju_old = "?"
+    _sl(f"[JUST-UPDATED] flag detected — old={_ju_old}  new={_VX_VER}", "BOOT")
+
+    def _show_updated_popup():
+        try:
+            import tkinter as tk
+            _BG2  = "#0d0d14"
+            _PNL2 = "#12121e"
+            _ACC2 = "#cba6f7"
+            _GRN2 = "#a6e3a1"
+            _DIM2 = "#45475a"
+            _TXT2 = "#cdd6f4"
+            _SUB2 = "#6c7086"
+
+            pu = tk.Toplevel(root)
+            pu.title("V0RTEX Updated")
+            pu.configure(bg=_BG2)
+            pu.overrideredirect(True)
+            pu.attributes("-topmost", True)
+
+            W, H = 420, 190
+            sw = pu.winfo_screenwidth()
+            sh = pu.winfo_screenheight()
+            pu.geometry(f"{W}x{H}+{(sw - W) // 2}+{(sh - H) // 2}")
+
+            tk.Frame(pu, bg=_GRN2, height=3).pack(fill="x")
+
+            hdr = tk.Frame(pu, bg=_PNL2, padx=18, pady=12)
+            hdr.pack(fill="x")
+            tk.Label(hdr, text="\u2713  V0RTEX UPDATED",
+                     font=("Consolas", 14, "bold"), bg=_PNL2, fg=_GRN2).pack(anchor="w")
+            tk.Label(hdr, text="Update applied successfully",
+                     font=("Consolas", 8), bg=_PNL2, fg=_SUB2).pack(anchor="w")
+
+            tk.Frame(pu, bg=_DIM2, height=1).pack(fill="x")
+
+            body = tk.Frame(pu, bg=_BG2, padx=18, pady=14)
+            body.pack(fill="x")
+
+            ver_row = tk.Frame(body, bg=_BG2)
+            ver_row.pack(fill="x", pady=(0, 8))
+            tk.Label(ver_row, text=f"v{_ju_old}", font=("Consolas", 13),
+                     bg=_BG2, fg=_SUB2).pack(side="left")
+            tk.Label(ver_row, text="  \u2192  ", font=("Consolas", 13),
+                     bg=_BG2, fg=_DIM2).pack(side="left")
+            tk.Label(ver_row, text=f"v{_VX_VER}", font=("Consolas", 13, "bold"),
+                     bg=_BG2, fg=_GRN2).pack(side="left")
+
+            _countdown = [6]
+            _btn_sv = tk.StringVar(value="OK  (6)")
+
+            def _close_popup():
+                try:
+                    pu.destroy()
+                except Exception:
+                    pass
+
+            def _tick_countdown():
+                _countdown[0] -= 1
+                if _countdown[0] <= 0:
+                    _close_popup()
+                    return
+                _btn_sv.set(f"OK  ({_countdown[0]})")
+                pu.after(1000, _tick_countdown)
+
+            btn_row = tk.Frame(body, bg=_BG2)
+            btn_row.pack(fill="x")
+            tk.Button(btn_row, textvariable=_btn_sv, font=("Consolas", 9, "bold"),
+                      bg=_GRN2, fg="#000", relief="flat", bd=0,
+                      padx=20, pady=6, cursor="hand2",
+                      command=_close_popup).pack(side="right")
+
+            pu.after(1000, _tick_countdown)
+
+        except Exception as _pu_e:
+            _sl(f"[JUST-UPDATED] popup error: {_pu_e}", "WARN")
+
+    root.after(1200, _show_updated_popup)
+
 root.mainloop()
+_sl("Mainloop returned — clean exit or window closed", "EXIT")
+_sl_copy_to_final()
 
 if _RECOVERY_REQUESTED[0] and not _APP_DYING[0]:
     try: root.destroy()
