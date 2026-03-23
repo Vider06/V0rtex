@@ -19,8 +19,12 @@ NEW_VER:     str = meta.get("new_version", "?")
 BRANCH:      str = meta.get("branch", "TESTING-GENERAL")
 MANIFEST:    dict = meta.get("manifest", {})
 
-VX_SYSTEM_DIR: str = meta.get("vx_system_dir") or os.path.dirname(INSTALL_DIR)
-FRESH_INSTALL: bool = bool(meta.get("fresh_install", False))
+VX_SYSTEM_DIR:     str  = meta.get("vx_system_dir") or os.path.dirname(INSTALL_DIR)
+FRESH_INSTALL:     bool = bool(meta.get("fresh_install", False))
+DATA_RESET:        bool = bool(meta.get("data_reset", False))
+PRESERVE_CFG:      bool = bool(meta.get("preserve_config", True))
+EMERGENCY_BK_PATH: str  = meta.get("emergency_backup_path", "")
+USERDATA_BK_PATH:  str  = meta.get("userdata_backup_path", "")
 UTILS_DIR   = os.path.join(VX_SYSTEM_DIR, "v0rtex_utils")
 META_DIR    = os.path.join(UTILS_DIR, ".vx_meta")
 MAIN_SCRIPT = os.path.join(INSTALL_DIR, "v0rtex.py")
@@ -84,6 +88,34 @@ def _splash_pkg(name: str, done: bool = False) -> None:
 
 def _splash_finalizing() -> None:
     _sq(("finalizing",))
+
+
+def _emergency_restore() -> bool:
+    if not EMERGENCY_BK_PATH or not os.path.isfile(EMERGENCY_BK_PATH):
+        log("  ~ No EMERGENCY_RESTORE.zip found — cannot restore")
+        return False
+    import zipfile as _zf_em, shutil as _shu_em
+    log(f"  ⚠ RESTORING from EMERGENCY_RESTORE.zip: {EMERGENCY_BK_PATH}")
+    try:
+        if os.path.isdir(VX_SYSTEM_DIR):
+            _shu_em.rmtree(VX_SYSTEM_DIR, ignore_errors=True)
+        with _zf_em.ZipFile(EMERGENCY_BK_PATH, "r") as _ez:
+            _ez.extractall(VX_SYSTEM_DIR)
+        log("  ✓ Emergency restore complete")
+        return True
+    except Exception as _ere:
+        log(f"  ✗ Emergency restore failed: {_ere}")
+        return False
+
+
+def _cleanup_emergency_backups() -> None:
+    for _bp in [EMERGENCY_BK_PATH, USERDATA_BK_PATH]:
+        if _bp and os.path.isfile(_bp):
+            try:
+                os.remove(_bp)
+                log(f"  ✓ Removed temp backup: {os.path.basename(_bp)}")
+            except Exception as _ce:
+                log(f"  ~ Could not remove backup: {_ce}")
 
 
 def log(msg: str) -> None:
@@ -454,44 +486,79 @@ time.sleep(0.8)
 _splash_progress(18, "kill — processes cleared")
 
 if FRESH_INSTALL:
-    log("  [ FRESH INSTALL ]  Removing V0rtex_System directory...")
-    _splash_progress(20, "fresh install — wiping V0rtex_System...")
-    import shutil as _shu_fresh, urllib.request as _ur_fresh
-    try:
-        if os.path.isdir(VX_SYSTEM_DIR):
-            _shu_fresh.rmtree(VX_SYSTEM_DIR, ignore_errors=True)
-            log(f"  ✓ Removed: {VX_SYSTEM_DIR}")
-        else:
-            log("  ~ VX_SYSTEM_DIR not found, skipping wipe")
-    except Exception as _fe:
-        log(f"  ~ Fresh install wipe error: {_fe}")
-    time.sleep(0.3)
-    log("  [ FRESH INSTALL ]  Re-downloading v0rtex.py...")
-    _splash_progress(22, "fresh install — downloading v0rtex.py...")
+    import shutil as _shu_fresh, urllib.request as _ur_fresh, tempfile as _tmp_fresh
+    _fresh_ok = False
+    _fresh_tmp = None
+
+    _splash_progress(18, "fresh install — downloading v0rtex.py first...")
+    log("  [ FRESH INSTALL ]  Downloading v0rtex.py before wipe...")
     try:
         _fr_url = f"https://raw.githubusercontent.com/Vider06/V0rtex/{BRANCH}/v0rtex.py"
+        log(f"  ► {_fr_url}")
         _fr_req = _ur_fresh.Request(_fr_url, headers={"User-Agent": "V0RTEX-Adapter/2.0"})
         with _ur_fresh.urlopen(_fr_req, timeout=60) as _fr_resp:
             _fr_code = _fr_resp.read().decode("utf-8")
-        os.makedirs(INSTALL_DIR, exist_ok=True)
-        with open(MAIN_SCRIPT, "w", encoding="utf-8") as _fr_f:
-            _fr_f.write(_fr_code)
-        log(f"  ✓ v0rtex.py downloaded ({len(_fr_code):,} bytes)")
-        _req_out = os.path.join(INSTALL_DIR, "requirements.txt")
-        if not os.path.isfile(_req_out):
-            try:
-                _req_url = f"https://raw.githubusercontent.com/Vider06/V0rtex/{BRANCH}/requirements.txt"
-                _req_req2 = _ur_fresh.Request(_req_url, headers={"User-Agent": "V0RTEX-Adapter/2.0"})
-                with _ur_fresh.urlopen(_req_req2, timeout=30) as _rr:
-                    with open(_req_out, "w", encoding="utf-8") as _rf:
-                        _rf.write(_rr.read().decode("utf-8"))
-                log("  ✓ requirements.txt downloaded")
-            except Exception as _rqe:
-                log(f"  ~ requirements.txt fetch failed: {_rqe}")
-    except Exception as _fre:
-        log(f"  ✗ Fresh install download failed: {_fre}")
-    time.sleep(0.3)
+        _fresh_fd, _fresh_tmp = _tmp_fresh.mkstemp(suffix="_v0rtex_fresh.py")
+        with os.fdopen(_fresh_fd, "w", encoding="utf-8") as _ff:
+            _ff.write(_fr_code)
+        log(f"  ✓ Downloaded ({len(_fr_code):,} bytes) — proceeding with wipe")
+        _fresh_ok = True
+    except Exception as _fde:
+        log(f"  ✗ Download failed: {_fde} — ABORTING fresh install, install dir preserved")
 
+    if _fresh_ok:
+        _splash_progress(20, "fresh install — wiping...")
+        if DATA_RESET:
+            log("  [ FRESH INSTALL / RESET ALL ]  Removing entire V0rtex_System...")
+            try:
+                if os.path.isdir(VX_SYSTEM_DIR):
+                    _shu_fresh.rmtree(VX_SYSTEM_DIR, ignore_errors=True)
+                    log(f"  ✓ Removed: {VX_SYSTEM_DIR}")
+            except Exception as _fe:
+                log(f"  ~ Wipe error: {_fe}")
+        else:
+            log("  [ FRESH INSTALL / KEEP DATA ]  Removing program files, preserving user data...")
+            _KEEP_FILES = {"config.json", "whitelist.txt", "notes.txt",
+                           "scan_history.db", "todo_list.json", "snippets.json",
+                           "rules_state.json"}
+            _KEEP_DIRS  = {"rules", "quarantine", "reports", "reports_pdf",
+                           "backups", "_recovery"}
+            try:
+                for _item in list(os.listdir(INSTALL_DIR)):
+                    if _item in _KEEP_FILES or _item in _KEEP_DIRS:
+                        log(f"  ~ kept: {_item}")
+                        continue
+                    _fp = os.path.join(INSTALL_DIR, _item)
+                    try:
+                        if os.path.isdir(_fp):
+                            _shu_fresh.rmtree(_fp, ignore_errors=True)
+                        else:
+                            os.remove(_fp)
+                    except Exception:
+                        pass
+                log("  ✓ Program files removed, user data preserved")
+            except Exception as _kfe:
+                log(f"  ~ Keep data wipe error: {_kfe}")
+        time.sleep(0.3)
+
+        _splash_progress(22, "fresh install — installing v0rtex.py...")
+        try:
+            os.makedirs(INSTALL_DIR, exist_ok=True)
+            _shu_fresh.copy2(_fresh_tmp, MAIN_SCRIPT)
+            log(f"  ✓ v0rtex.py installed → {MAIN_SCRIPT}")
+        except Exception as _fie:
+            log(f"  ✗ Install failed: {_fie}")
+
+        try:
+            _req_out = os.path.join(INSTALL_DIR, "requirements.txt")
+            _req_url = f"https://raw.githubusercontent.com/Vider06/V0rtex/{BRANCH}/requirements.txt"
+            _req_req2 = _ur_fresh.Request(_req_url, headers={"User-Agent": "V0RTEX-Adapter/2.0"})
+            with _ur_fresh.urlopen(_req_req2, timeout=30) as _rr:
+                with open(_req_out, "w", encoding="utf-8") as _rf:
+                    _rf.write(_rr.read().decode("utf-8"))
+            log("  ✓ requirements.txt downloaded")
+        except Exception as _rqe:
+            log(f"  ~ requirements.txt fetch failed: {_rqe}")
 
 log("[ 2/6 ]  Checking obsolete dependencies...")
 _splash_progress(22, "deps — checking obsolete packages...")
@@ -634,17 +701,33 @@ time.sleep(1.0)
 _splash_closed.set()
 time.sleep(0.3)
 
+_launch_ok = False
 try:
     if os.path.isfile(MAIN_SCRIPT):
         _popen([PYTHON_EXE, MAIN_SCRIPT, "--just-updated", OLD_VER])
-        log(f"  \u2713 V0RTEX v{NEW_VER} launched  (--just-updated {OLD_VER})")
+        log(f"  ✓ V0RTEX v{NEW_VER} launched  (--just-updated {OLD_VER})")
+        _launch_ok = True
     else:
-        log(f"  \u2717 v0rtex.py not found: {MAIN_SCRIPT}")
+        log(f"  ✗ v0rtex.py not found: {MAIN_SCRIPT}")
 except Exception as _e:
-    log(f"  \u2717 Launch failed: {_e}")
+    log(f"  ✗ Launch failed: {_e}")
 
+if _launch_ok:
+    log("  ✓ Update successful — removing emergency backup...")
+    _cleanup_emergency_backups()
+else:
+    log("  ⚠ Launch failed — attempting emergency restore...")
+    if _emergency_restore():
+        try:
+            _popen([PYTHON_EXE, os.path.join(VX_SYSTEM_DIR,
+                    os.path.basename(INSTALL_DIR), "v0rtex.py")])
+            log("  ✓ V0RTEX restored and relaunched from emergency backup")
+        except Exception as _rle:
+            log(f"  ✗ Relaunch after restore failed: {_rle}")
+    _cleanup_emergency_backups()
 
 time.sleep(2.0)
+log("  → Cleaning up...")
 log("  \u2192 Cleaning up...")
 try:
     if META_PATH and os.path.isfile(META_PATH):
