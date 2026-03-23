@@ -7824,6 +7824,33 @@ if os.path.exists(_setup_sentinel):
 import json, threading, queue, sqlite3, hashlib, time
 import math, re, struct, webbrowser, base64
 
+import subprocess as _subprocess_orig
+_NW_FLAGS = {"creationflags": 0x08000000} if sys.platform == "win32" else {}
+class _SubprocessSilencer:
+    def __getattr__(self, name):
+        orig = getattr(_subprocess_orig, name)
+        if name in ("run", "check_output", "check_call"):
+            def _wrap(*a, **kw):
+                if "creationflags" not in kw: kw.update(_NW_FLAGS)
+                return orig(*a, **kw)
+            return _wrap
+        if name == "Popen":
+            def _popen_wrap(*a, **kw):
+                if "creationflags" not in kw: kw.update(_NW_FLAGS)
+                return orig(*a, **kw)
+            return _popen_wrap
+        return orig
+    def __dir__(self): return dir(_subprocess_orig)
+    PIPE            = _subprocess_orig.PIPE
+    DEVNULL         = _subprocess_orig.DEVNULL
+    STDOUT          = _subprocess_orig.STDOUT
+    STARTUPINFO     = _subprocess_orig.STARTUPINFO
+    STARTF_USESHOWWINDOW = _subprocess_orig.STARTF_USESHOWWINDOW
+    TimeoutExpired  = _subprocess_orig.TimeoutExpired
+    CalledProcessError = _subprocess_orig.CalledProcessError
+subprocess = _SubprocessSilencer()
+
+
 try:
     import requests
 except ImportError:
@@ -28650,12 +28677,11 @@ def _lt_worker():
         _app_log_write(_lt_log_path[0], f"Session started — iface={iface or 'auto'} filter={filt!r} count={count}")
         _app_log_write(_lt_log_path[0], f"tshark cmd: {' '.join(cmd)}")
     try:
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         _lt_proc[0] = proc
         with _lt_slk: _lt_stats["start"] = _lt4.monotonic()
         for line in proc.stdout:
             if not _lt_running[0]: break
-            if line.startswith("tshark:"): continue
             parts = line.strip().split("|")
             if len(parts) < 10: continue
             fnum,flen,si,di,tsp,tdp,usp,udp2,proto,info = (parts[i] if i<len(parts) else "" for i in range(10))
@@ -28675,12 +28701,7 @@ def _lt_worker():
             if _lt_log_path[0]:
                 _app_log_write(_lt_log_path[0], log_line)
             root.after(0, _lt_upd_stats)
-        stderr_out = proc.stderr.read() if proc.stderr else ""
         proc.wait()
-        if stderr_out and _lt_log_path[0]:
-            _app_log_write(_lt_log_path[0], f"tshark stderr: {stderr_out[:300]}")
-        if stderr_out and "error" in stderr_out.lower():
-            _lt_append(f"tshark: {stderr_out.strip()[:120]}", "WARN")
     except FileNotFoundError:
         _lt_append("tshark not found — check Settings > Config > tshark path", "WARN")
     except Exception as e:
@@ -28841,7 +28862,7 @@ for _mk, _mc in [
 ]:
     _mv2 = tk.StringVar(value="—"); _nst_mvars[_mk] = _mv2
     _mc2 = tk.Frame(_nst_metrics_row, bg=C["surface0"], padx=8)
-    _mc2.pack(side=tk.LEFT)
+    _mc2.pack(side=tk.LEFT, expand=True, fill=tk.X)
     tk.Label(_mc2, text=f"{_mk}:", font=("Consolas",7), bg=C["surface0"],
              fg=C["overlay0"]).pack(anchor="w")
     tk.Label(_mc2, textvariable=_mv2, font=("Consolas",8,"bold"),
