@@ -28937,14 +28937,7 @@ _VORTEX_VERSION      = _VX_VER
 
 
 def _detect_platform_branch():
-    _override = CONFIG.get("update_branch", "").strip()
-    if _override:
-        return _override
-    if sys.platform == "win32":
-        return "Windows_Release"
-    if sys.platform == "darwin":
-        return "MacOS_Release"
-    return "Linux_Release"
+    return "TESTING-GENERAL"
 _PLATFORM_BRANCH     = _detect_platform_branch()
 _GITHUB_BASE         = "https://raw.githubusercontent.com/Vider06/V0rtex"
 _GITHUB_REPO_RAW     = f"{_GITHUB_BASE}/{_PLATFORM_BRANCH}"
