@@ -394,6 +394,12 @@ def _run_splash() -> None:
                     pass
                 return
 
+            try:
+                r.lift()
+                r.attributes("-topmost", True)
+            except Exception:
+                pass
+
             r.after(150, _pump)
 
         r.after(0, _splash_ready.set)
