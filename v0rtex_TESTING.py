@@ -455,7 +455,7 @@ def _vx_load_ver():
                 str(_d.get("author","Vider_06")).strip())
     except Exception:
         _vx_load_ver._from_file = False
-        return (".".join(["0","9","9","X0"]), "V"+"0RTEX", "Vider"+"_06")
+        return (".".join(["1","0","0","X0"]), "V"+"0RTEX", "Vider"+"_06")
 
 _VX_VER, _VX_NAME, _VX_AUTH = _vx_load_ver()
 _pre_sl(f"version loaded: {_VX_VER}  from_file={_vx_load_ver._from_file}", "BOOT")
@@ -482,8 +482,8 @@ _T = "".join
 
 
 _ADM_BADGE   = _T(["⚠ ELEV", "ATED ·", " ADMIN"])
-_ADM_BADGE_W = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX v","0.9.9",".X0  by Vider_06"])
-_ADM_BADGE_R = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX RECOVERY TERMINAL  v","0.9.9",".X0"])
+_ADM_BADGE_W = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX v","1.0.0",".X0  by Vider_06"])
+_ADM_BADGE_R = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX RECOVERY TERMINAL  v","1.0.0",".X0"])
 _ADM_BADGE_S = _T(["⚡ ELEV", "ATED — ", "ADMIN"])   
 
 
@@ -948,205 +948,165 @@ _EMBED = {
     ),
     "INSTRUCTIONS.txt":        (
         "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT0KICBWMFJURVggdjEuMCAgLSAgTWFsd2FyZSBBbmFseXNpcyBQbGF0Zm9ybQog"
-        "IGJ5IFZpZGVyXzA2Cj09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09CgogIFYwUlRFWCBpcyBhIGxvY2FsIG1hbHdhcmUgYW5h"
-        "bHlzaXMgYW5kIHRocmVhdCBpbnRlbGxpZ2VuY2UgcGxhdGZvcm0uCiAgSXQgaW50ZWdyYXRlcyBz"
-        "dGF0aWMgYW5hbHlzaXMsIFlBUkEgc2Nhbm5pbmcsIFBFIGluc3BlY3Rpb24sIGVudHJvcHkKICBh"
-        "bmFseXNpcywgbmV0d29yayBjYXB0dXJlLCBzYW5kYm94IG1vbml0b3JpbmcsIElPQyBleHRyYWN0"
-        "aW9uLCBhbmQgbGl2ZQogIHRocmVhdCBpbnRlbCBsb29rdXBzIGZyb20gVmlydXNUb3RhbCwgTWFs"
-        "d2FyZUJhemFhciwgQWJ1c2VJUERCLCBTaG9kYW4sCiAgQWxpZW5WYXVsdCBPVFgsIEdyZXlOb2lz"
-        "ZSwgVVJMU2Nhbi5pbywgYW5kIEh5YnJpZCBBbmFseXNpcy4KCj09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgUVVJQ0sg"
-        "U1RBUlQKPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT0KCiAgMS4gUnVuIHNldHVwX3dpbi5iYXQgYXMgQWRtaW5pc3RyYXRv"
-        "ciAocmlnaHQtY2xpY2sgPiBSdW4gYXMgYWRtaW5pc3RyYXRvcikKICAyLiBXYWl0IGZvciBhbGwg"
-        "cGFja2FnZXMgdG8gaW5zdGFsbAogIDMuIEFkZCB5b3VyIFZpcnVzVG90YWwgQVBJIGtleSB0byBj"
-        "b25maWcuanNvbiAgKHNlZSBzZWN0aW9uIFszXSBiZWxvdykKICA0LiBSdW46ICBweXRob24gdjBy"
-        "dGV4LnB5Cgo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PQogIFsxXSAgU1lTVEVNIFJFUVVJUkVNRU5UUwo9PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT0KICBWMFJURVggdjEuMC4wICAtICBNYWx3YXJlIEFuYWx5"
+        "c2lzIFBsYXRmb3JtCiAgYnkgVmlkZXJfMDYgIHwgIGh0dHBzOi8vZ2l0aHViLmNvbS9WaWRlcjA2"
+        "L1YwcnRleAo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKICBWMFJURVggaXMgYSBsb2NhbCBtYWx3"
+        "YXJlIGFuYWx5c2lzIGFuZCB0aHJlYXQgaW50ZWxsaWdlbmNlIHBsYXRmb3JtLgogIEl0IGludGVn"
+        "cmF0ZXMgc3RhdGljIGFuYWx5c2lzLCBZQVJBIHNjYW5uaW5nLCBQRSBpbnNwZWN0aW9uLCBlbnRy"
+        "b3B5CiAgYW5hbHlzaXMsIG5ldHdvcmsgY2FwdHVyZSwgc2FuZGJveCBtb25pdG9yaW5nLCBJT0Mg"
+        "ZXh0cmFjdGlvbiwgYW5kIGxpdmUKICB0aHJlYXQgaW50ZWwgbG9va3VwcyBmcm9tIFZpcnVzVG90"
+        "YWwsIE1hbHdhcmVCYXphYXIsIEFidXNlSVBEQiwgU2hvZGFuLAogIEFsaWVuVmF1bHQgT1RYLCBH"
+        "cmV5Tm9pc2UsIFVSTFNjYW4uaW8sIGFuZCBIeWJyaWQgQW5hbHlzaXMuCgo9PT09PT09PT09PT09"
         "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PQoKICAtIFdpbmRvd3MgMTAvMTEgICg2NC1iaXQgcmVjb21tZW5kZWQpIG9yIExpbnV4L21hY09T"
-        "CiAgLSBQeXRob24gMy4xMCBvciBoaWdoZXIgIC0tPiAgaHR0cHM6Ly93d3cucHl0aG9uLm9yZy9k"
-        "b3dubG9hZHMvCiAgICAqIER1cmluZyBpbnN0YWxsOiBjaGVjayAiQWRkIFB5dGhvbiB0byBQQVRI"
-        "IgogIC0gSW50ZXJuZXQgY29ubmVjdGlvbiAoZm9yIHRocmVhdCBpbnRlbCBsb29rdXBzKQogIC0g"
-        "T3B0aW9uYWw6IFdpcmVzaGFyay90c2hhcmsgZm9yIG5ldHdvcmsgY2FwdHVyZSBmZWF0dXJlcwog"
-        "ICAgLS0+ICBodHRwczovL3d3dy53aXJlc2hhcmsub3JnL2Rvd25sb2FkLmh0bWwKICAgICAgICAg"
-        "RHVyaW5nIFdpcmVzaGFyayBpbnN0YWxsOiBjaGVjayAiQWRkIHRzaGFyayB0byBQQVRIIgoKPT09"
+        "PT09PT09PT09PQogIFFVSUNLIFNUQVJUCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CgogIDEuIFJ1"
+        "biB2MHJ0ZXgucHkgLS0gdGhlIHNldHVwIHdpemFyZCBvcGVucyBhdXRvbWF0aWNhbGx5IG9uIGZp"
+        "cnN0IGxhdW5jaC4KICAyLiBGb2xsb3cgdGhlIHdpemFyZDogaXQgaW5zdGFsbHMgYWxsIHBhY2th"
+        "Z2VzLCBjcmVhdGVzIGZvbGRlcnMsIGNvbmZpZy5qc29uLgogIDMuIEFkZCB5b3VyIEFQSSBrZXlz"
+        "IGluIENGRyA+IEFQSSBLRVlTIChhdCBtaW5pbXVtOiBWaXJ1c1RvdGFsKS4KICA0LiBEb3dubG9h"
+        "ZCBZQVJBIHJ1bGVzIHZpYSBZQVJBID4gTElCUkFSWS4KCiAgVG8gbGF1bmNoIG1hbnVhbGx5Ogog"
+        "ICAgIHB5dGhvbiB2MHJ0ZXgucHkKCiAgT3IgZG91YmxlLWNsaWNrIGxhdW5jaC5iYXQgKFdpbmRv"
+        "d3MpIC8gcnVuIGxhdW5jaC5zaCAoTGludXgvbWFjT1MpLgoKPT09PT09PT09PT09PT09PT09PT09"
         "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT0KICBbMl0gIElOU1RBTExBVElPTgo9PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKICBPUFRJT04gQSDigJQg"
-        "QXV0b21hdGljIChyZWNvbW1lbmRlZCk6CiAgICBSaWdodC1jbGljayBzZXR1cF93aW4uYmF0ID4g"
-        "UnVuIGFzIGFkbWluaXN0cmF0b3IKICAgIFRoZSBzY3JpcHQgd2lsbDoKICAgICAgLSBDaGVjay9p"
-        "bnN0YWxsIFB5dGhvbiAzLjEyIGlmIG1pc3NpbmcgKHZpYSB3aW5nZXQgb3IgcHl0aG9uLm9yZykK"
-        "ICAgICAgLSBVcGdyYWRlIHBpcAogICAgICAtIEluc3RhbGwgYWxsIHJlcXVpcmVkIHBhY2thZ2Vz"
-        "IGZyb20gcmVxdWlyZW1lbnRzLnR4dAogICAgICAtIENoZWNrIGZvciB0c2hhcmsgYW5kIG9mZmVy"
-        "IHRvIGluc3RhbGwgV2lyZXNoYXJrCiAgICAgIC0gQ3JlYXRlIGFsbCBuZWVkZWQgZm9sZGVycwog"
-        "ICAgICAtIENyZWF0ZSBhIGRlZmF1bHQgY29uZmlnLmpzb24KICAgICAgLSBDcmVhdGUgYSBkZWZh"
-        "dWx0IFlBUkEgcnVsZSBmaWxlCiAgICAgIC0gT2ZmZXIgdG8gbGF1bmNoIFYwUlRFWCBpbW1lZGlh"
-        "dGVseQoKICBPUFRJT04gQiDigJQgTWFudWFsOgogICAgT3BlbiBhIHRlcm1pbmFsIGluIHRoZSBW"
-        "MFJURVggZm9sZGVyIGFuZCBydW46CiAgICAgIHB5dGhvbiAtbSBwaXAgaW5zdGFsbCAtciByZXF1"
-        "aXJlbWVudHMudHh0CgogIElmIHlvdSBnZXQgImV4dGVybmFsbHkgbWFuYWdlZCBlbnZpcm9ubWVu"
-        "dCIgb24gc29tZSBzeXN0ZW1zOgogICAgICBweXRob24gLW0gcGlwIGluc3RhbGwgLXIgcmVxdWly"
-        "ZW1lbnRzLnR4dCAtLWJyZWFrLXN5c3RlbS1wYWNrYWdlcwoKPT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KICBbM10gIEFQ"
-        "SSBLRVkgQ09ORklHVVJBVElPTiAgKGNvbmZpZy5qc29uKQo9PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKICBPcGVuIGNv"
-        "bmZpZy5qc29uIGluIGEgdGV4dCBlZGl0b3IuIEl0IGxvb2tzIGxpa2UgdGhpczoKCiAgewogICAg"
-        "ImFwaV9rZXlzIjogW10sCiAgICAibWFsd2FyZWJhemFhcl9rZXkiOiAiIiwKICAgICJhYnVzZWlw"
-        "ZGJfa2V5IjogIiIsCiAgICAidXJsc2Nhbl9rZXkiOiAiIiwKICAgICJvdHhfa2V5IjogIiIsCiAg"
-        "ICAic2hvZGFuX2tleSI6ICIiLAogICAgImdyZXlub2lzZV9rZXkiOiAiIiwKICAgICJoeWJyaWRf"
-        "YW5hbHlzaXNfa2V5IjogIiIsCiAgICAicmVxdWVzdF9kZWxheSI6IDE1LAogICAgInRzaGFya19w"
-        "YXRoIjogInRzaGFyayIsCiAgICAiY3Vja29vX3VybCI6ICJodHRwOi8vMTI3LjAuMC4xOjgwOTAi"
-        "LAogICAgImN1Y2tvb19lbmFibGVkIjogZmFsc2UKICB9CgogIC0tIFZpcnVzVG90YWwgKHN1cHBv"
-        "cnRzIG11bHRpcGxlIGtleXMgZm9yIHJvdGF0aW9uKToKICAgICBHZXQgYSBmcmVlIGtleSBhdDog"
-        "aHR0cHM6Ly93d3cudmlydXN0b3RhbC5jb20vZ3VpL2pvaW4tdXMKICAgICBGcmVlIHRpZXI6IDUw"
-        "MCByZXF1ZXN0cy9kYXksIDQgcmVxL21pbgogIC0tIE1hbHdhcmVCYXphYXI6IGh0dHBzOi8vYmF6"
-        "YWFyLmFidXNlLmNoLwogIC0tIEFidXNlSVBEQjogaHR0cHM6Ly93d3cuYWJ1c2VpcGRiLmNvbS9h"
-        "Y2NvdW50L2FwaSAgKEZyZWU6IDEwMDAvZGF5KQogIC0tIFVSTFNjYW4uaW86IGh0dHBzOi8vdXJs"
-        "c2Nhbi5pby91c2VyL3Byb2ZpbGUvI2FwaUtleQogIC0tIEFsaWVuVmF1bHQgT1RYOiBodHRwczov"
-        "L290eC5hbGllbnZhdWx0LmNvbS9hcGkKICAtLSBTaG9kYW46IGh0dHBzOi8vYWNjb3VudC5zaG9k"
-        "YW4uaW8KICAtLSBHcmV5Tm9pc2U6IGh0dHBzOi8vdml6LmdyZXlub2lzZS5pby9zaWdudXAKICAt"
-        "LSBIeWJyaWQgQW5hbHlzaXM6IGh0dHBzOi8vd3d3Lmh5YnJpZC1hbmFseXNpcy5jb20vbXktYWNj"
-        "b3VudD90YWI9YXBpLWtleQoKICBBZnRlciBlZGl0aW5nIGNvbmZpZy5qc29uLCB1c2UgdGhlIEFQ"
-        "SSBBbmFseXplciAoU2V0dGluZ3MgPiBBUEkgS2V5cyA+IFRlc3QgQWxsKQogIHRvIHZlcmlmeSBh"
-        "bGwgeW91ciBrZXlzIGFyZSB3b3JraW5nIGNvcnJlY3RseS4KCj09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgWzRdICBG"
-        "RUFUVVJFUyBPVkVSVklFVwo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKICBTQ0FOIFRBQgogICAgLSBEcmFnICYgZHJv"
-        "cCBvciBicm93c2UgdG8gc2VsZWN0IGEgZmlsZQogICAgLSBIYXNoIGNvbXB1dGF0aW9uOiBNRDUs"
-        "IFNIQTEsIFNIQTI1NiwgU1NERUVQCiAgICAtIFZpcnVzVG90YWwgbG9va3VwIHdpdGggZGV0ZWN0"
-        "aW9uIHJhdGlvIGFuZCBlbmdpbmUgYnJlYWtkb3duCiAgICAtIFlBUkEgc2NhbiBhZ2FpbnN0IGFs"
-        "bCBsb2FkZWQgcnVsZXMKICAgIC0gRW50cm9weSBhbmFseXNpcyB3aXRoIHNlY3Rpb24tbGV2ZWwg"
-        "Y2hhcnQKICAgIC0gUEUgaGVhZGVyIGFuYWx5c2lzIChpbXBvcnRzLCBleHBvcnRzLCBzZWN0aW9u"
-        "cywgcGFja2VyIGRldGVjdGlvbikKICAgIC0gSU9DIGV4dHJhY3Rpb24gKElQcywgZG9tYWlucywg"
-        "VVJMcywgcmVnaXN0cnkga2V5cywgZmlsZSBwYXRocykKICAgIC0gRmlsZSB0eXBlIGRldGVjdGlv"
-        "biBhbmQgbWFnaWMgYnl0ZXMKCiAgRk9MREVSIFNDQU4gVEFCCiAgICAtIFJlY3Vyc2l2ZSBmb2xk"
-        "ZXIgc2Nhbm5pbmcgd2l0aCBwcm9ncmVzcyBiYXIKICAgIC0gQnVsayBWaXJ1c1RvdGFsIGxvb2t1"
-        "cHMgd2l0aCByYXRlLWxpbWl0IGhhbmRsaW5nCiAgICAtIEV4cG9ydGFibGUgcmVzdWx0cyB0byBI"
-        "VE1MIGFuZCBQREYKCiAgTkVUV09SSyBUQUIKICAgIC0gTGl2ZSB0cmFmZmljIGNhcHR1cmUgdmlh"
-        "IHRzaGFyawogICAgLSBETlMgcXVlcnkgZXh0cmFjdGlvbgogICAgLSBDb25uZWN0aW9uIGxvZyB3"
-        "aXRoIElQL3BvcnQvcHJvdG9jb2wKICAgIC0gU3VzcGljaW91cyBjb25uZWN0aW9uIGZsYWdnaW5n"
-        "CgogIFNBTkRCT1ggVEFCCiAgICAtIE1vbml0b3IgZmlsZSBkcm9wcyBpbiBzYW5kYm94X2Vudi9k"
-        "cm9wLwogICAgLSBQcm9jZXNzIGFuZCBmaWxlIHN5c3RlbSBhY3Rpdml0eSBsb2dnaW5nCiAgICAt"
-        "IEF1dG8tc2NhbiBkcm9wcGVkIGZpbGVzCgogIFRIUkVBVCBJTlRFTCBUQUIKICAgIC0gSVAvZG9t"
-        "YWluL1VSTCByZXB1dGF0aW9uIGxvb2t1cAogICAgLSBBYnVzZUlQREIgY29uZmlkZW5jZSBzY29y"
-        "ZQogICAgLSBTaG9kYW4gaG9zdCBpbmZvIChwb3J0cywgYmFubmVycywgQ1ZFcykKICAgIC0gT1RY"
-        "IHB1bHNlIGxvb2t1cAogICAgLSBHcmV5Tm9pc2UgY2xhc3NpZmljYXRpb24gKHNjYW5uZXIvbm9p"
-        "c2UvbWFsaWNpb3VzKQogICAgLSBVUkxTY2FuLmlvIHNjcmVlbnNob3QgYW5kIERPTSBhbmFseXNp"
-        "cwoKICBZQVJBIE1BTkFHRVIgVEFCCiAgICAtIExvYWQgbG9jYWwgLnlhci8ueWFyYSBydWxlIGZp"
-        "bGVzCiAgICAtIERvd25sb2FkIGNvbW11bml0eSBydWxlc2V0cyBmcm9tIEdpdEh1YgogICAgLSBS"
-        "dWxlIGVkaXRvciB3aXRoIHN5bnRheCBoaWdobGlnaHRpbmcKICAgIC0gUnVsZSB2YWxpZGF0aW9u"
-        "IGFuZCB0ZXN0LXNjYW4KCiAg4pSA4pSAIE5FVyBJTiB2MS4wIOKUgOKUgOKUgOKUgOKUgOKUgOKU"
-        "gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU"
-        "gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU"
-        "gOKUgOKUgOKUgOKUgOKUgAoKICDwn5CmIENVQ0tPTyBUQUIKICAgIC0gT25lLWNsaWNrIGNvbm5l"
-        "Y3Rpb24gdG8gQ3Vja29vIG9yIENBUEUgc2FuZGJveAogICAgLSBTdWJtaXQgc2FtcGxlcyBkaXJl"
-        "Y3RseSBmcm9tIFYwUlRFWCBVSQogICAgLSBMaXZlIHBvbGxpbmcgb2YgdGFzayBzdGF0dXMgYW5k"
-        "IHJlcG9ydCBwYXJzaW5nCiAgICAtIEJ1aWx0LWluIHNldHVwIGd1aWRlIGZvciBDQVBFLCBEb2Nr"
-        "ZXIsIGFuZCBDdWNrb28gMi54CgogIPCfp6wgREVPQkZVU0NBVE9SIFRBQgogICAgLSBEZWNvZGUg"
-        "QmFzZTY0LCBIZXgsIFJPVDEzLCBVUkwtZW5jb2RlZCwgcmV2ZXJzZWQgc3RyaW5ncwogICAgLSBY"
-        "T1IgYnJ1dGUgZm9yY2UgKHNpbmdsZSBieXRlLCBzaG93cyBwcmludGFibGUgcmVzdWx0cykKICAg"
-        "IC0gRmluZCBhbmQgZGVjb2RlIGFsbCBlbWJlZGRlZCBCYXNlNjQgYmxvYnMgaW4gYSBmaWxlCiAg"
-        "ICAtIExvYWQgZmlsZXMgZGlyZWN0bHkgb3IgcGFzdGUgdGV4dAoKICDwn46vIE1JVFJFIEFUVCZD"
-        "SyBUQUIKICAgIC0gQXV0b21hdGljYWxseSBtYXAgc2NhbiBvdXRwdXQgdG8gQVRUJkNLIHRlY2hu"
-        "aXF1ZXMKICAgIC0gMjQgYnVpbHQtaW4gdGVjaG5pcXVlIG1hdGNoZXJzIGFjcm9zcyBhbGwgdGFj"
-        "dGljcwogICAgLSBFeHBvcnQgbWF0Y2hlZCB0ZWNobmlxdWVzIHRvIENTVgogICAgLSBDb3ZlcnMg"
-        "RXhlY3V0aW9uLCBQZXJzaXN0ZW5jZSwgRGVmZW5zZSBFdmFzaW9uLCBDJkMsIEltcGFjdCwgZXRj"
-        "LgoKICDwn5OmIEJBVENIIEhBU0ggTE9PS1VQIFRBQgogICAgLSBJbXBvcnQgQ1NWL1RYVCBsaXN0"
-        "IG9mIE1ENS9TSEExL1NIQTI1NiBoYXNoZXMKICAgIC0gQnVsayBWaXJ1c1RvdGFsIGxvb2t1cCB3"
-        "aXRoIHJhdGUtbGltaXQgaGFuZGxpbmcKICAgIC0gTXVsdGkta2V5IHJvdGF0aW9uIHN1cHBvcnQK"
-        "ICAgIC0gRXhwb3J0IHJlc3VsdHMgdG8gQ1NWCgogIPCflIAgRklMRSBESUZGIFRBQgogICAgLSBT"
-        "aWRlLWJ5LXNpZGUgY29tcGFyaXNvbiBvZiB0d28gZmlsZXMKICAgIC0gQ29sb3ItY29kZWQgdW5p"
-        "ZmllZCBkaWZmIChhZGRlZC9yZW1vdmVkIGxpbmVzKQogICAgLSBFeHBvcnQgSFRNTCBkaWZmIHJl"
-        "cG9ydAogICAgLSBEZXRlY3QgbWFsaWNpb3VzIG1vZGlmaWNhdGlvbnMgYmV0d2VlbiBjbGVhbiBh"
-        "bmQgaW5mZWN0ZWQgdmVyc2lvbnMKCiAg8J+UjCBQT1JUIFNDQU5ORVIgVEFCCiAgICAtIFRDUCBw"
-        "b3J0IHNjYW4gb24gYW55IGhvc3QgKGxvY2FsIG9yIHJlbW90ZSkKICAgIC0gUmFuZ2Ugb3IgbGlz"
-        "dCBzeW50YXggKGUuZy4gMS0xMDI0IG9yIDIyLDgwLDQ0MykKICAgIC0gUmlzayBjbGFzc2lmaWNh"
-        "dGlvbiBwZXIgcG9ydAogICAgLSBObyBleHRlcm5hbCBkZXBlbmRlbmNpZXMgbmVlZGVkCgogIPCf"
-        "lJEgU0VDUkVUIFNDQU5ORVIgVEFCCiAgICAtIFNjYW4gZmlsZXMgb3IgZW50aXJlIGRpcmVjdG9y"
-        "aWVzCiAgICAtIERldGVjdHM6IEFXUyBrZXlzLCBHaXRIdWIgdG9rZW5zLCBKV1QsIEFQSSBrZXlz"
-        "LCBwYXNzd29yZHMsCiAgICAgIGNvbm5lY3Rpb24gc3RyaW5ncywgcHJpdmF0ZSBrZXlzLCBiZWFy"
-        "ZXIgdG9rZW5zLCBhbmQgbW9yZQogICAgLSBTdXBwb3J0czogLnB5LCAuanMsIC50cywgLnBocCwg"
-        "LmphdmEsIC5nbywgLmVudiwgLmpzb24sIC55YW1sLAogICAgICAuc2gsIC5iYXQsIC5wczEsIC5j"
-        "b25maWcsIC5pbmksIC54bWwsIC5sb2csIC50eHQKICAgIC0gRXhwb3J0IGZpbmRpbmdzIHRvIENT"
-        "VgoKICDwn5OmIEFSQ0hJVkUgVU5QQUNLRVIgVEFCCiAgICAtIFRyeSB0byB1bnBhY2sgcGFzc3dv"
-        "cmQtcHJvdGVjdGVkIFpJUCBhcmNoaXZlcwogICAgLSBCdWlsdC1pbiB3b3JkbGlzdCBvZiAzMCsg"
-        "bWFsd2FyZS1jb21tb24gcGFzc3dvcmRzCiAgICAtIExvYWQgY3VzdG9tIHdvcmRsaXN0IGZpbGUg"
-        "KFRYVCwgb25lIHBhc3N3b3JkIHBlciBsaW5lKQogICAgLSBFeHRyYWN0cyB0byBkaWZmX3dvcmtz"
-        "cGFjZS9leHRyYWN0ZWQvIGluIHRoZSBWMFJURVggZm9sZGVyCgogIPCfk6EgVEhSRUFUIEZFRUQg"
-        "TU9OSVRPUiBUQUIKICAgIC0gRG93bmxvYWQgYW5kIGNhY2hlIDYgZnJlZSB0aHJlYXQgaW50ZWxs"
-        "aWdlbmNlIGZlZWRzOgogICAgICAgIOKAoiBGZW9kbyBUcmFja2VyIChDMiBJUHMgZnJvbSBhYnVz"
-        "ZS5jaCkKICAgICAgICDigKIgVVJMaGF1cyAobWFsd2FyZSBVUkxzKQogICAgICAgIOKAoiBDSU5T"
-        "c2NvcmUgKGJhZCBJUHMpCiAgICAgICAg4oCiIEVtZXJnaW5nIFRocmVhdHMgY29tcHJvbWlzZWQg"
-        "SVBzCiAgICAgICAg4oCiIFNwYW1oYXVzIERST1AgbGlzdAogICAgICAgIOKAoiBBYnVzZS5jaCBT"
-        "U0wgQmxhY2tsaXN0CiAgICAtIENoZWNrIGFueSBJUC9kb21haW4vVVJMIGFnYWluc3QgYWxsIGNh"
-        "Y2hlZCBmZWVkcyBpbnN0YW50bHkKICAgIC0gTm8gQVBJIGtleSByZXF1aXJlZAoKICDwn5OEIE1B"
-        "Q1JPIEFOQUxZWkVSIFRBQgogICAgLSBBbmFseXplIE9mZmljZSBkb2N1bWVudHMgKC5kb2MvLmRv"
-        "Y3gvLnhscy8ueGxzeC8ueGxzbSBldGMuKQogICAgLSBEZXRlY3QgVkJBIG1hY3JvcywgT0xFIHN0"
-        "cmVhbXMsIGVtYmVkZGVkIG9iamVjdHMKICAgIC0gU2NhbiBmb3IgMjArIHN1c3BpY2lvdXMga2V5"
-        "d29yZHMgKEF1dG9PcGVuLCBTaGVsbCwgV1NjcmlwdCwgZXRjLikKICAgIC0gRXh0cmFjdCBlbWJl"
-        "ZGRlZCBVUkxzCiAgICAtIFNhdmUgYW5hbHlzaXMgcmVwb3J0IHRvIHRleHQgZmlsZQoKICDwn5Oh"
-        "IFBDQVAgQU5BTFlaRVIgVEFCCiAgICAtIFBhcnNlIC5wY2FwIGFuZCAucGNhcG5nIGZpbGVzIHdp"
-        "dGhvdXQgdHNoYXJrCiAgICAtIEV4dHJhY3Q6IHVuaXF1ZSBjb25uZWN0aW9ucywgRE5TIHF1ZXJp"
-        "ZXMsIEhUVFAgcmVxdWVzdHMKICAgIC0gSWRlbnRpZnkgZXh0ZXJuYWwgKG5vbi1SRkMxOTE4KSBJ"
-        "UHMgYXV0b21hdGljYWxseQogICAgLSBFeHBvcnQgSU9DcyAoSVBzLCBETlMsIFVSTHMpIHRvIENT"
-        "VgoKPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT0KICBbNV0gIFlBUkEgUlVMRVMKPT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KCiAgVjBSVEVYIGxv"
-        "YWRzIGFsbCAueWFyIC8gLnlhcmEgZmlsZXMgZnJvbSB0aGUgcnVsZXMvIGRpcmVjdG9yeS4KICBU"
-        "byBhZGQgcnVsZXM6CiAgICAtIERyb3AgLnlhciBmaWxlcyBpbnRvIHJ1bGVzLyBhbmQgdXNlIFlB"
-        "UkEgTWFuYWdlciA+IFJlbG9hZAogICAgLSBVc2UgWUFSQSBNYW5hZ2VyID4gRG93bmxvYWQgdG8g"
-        "Z2V0IGNvbW11bml0eSBydWxlc2V0cyBmcm9tIEdpdEh1YgogIFlBUkEgZG9jdW1lbnRhdGlvbjog"
-        "aHR0cHM6Ly95YXJhLnJlYWR0aGVkb2NzLmlvL2VuL3N0YWJsZS8KCj09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgWzZd"
-        "ICBDVUNLT08gU0FOREJPWCAoRUFTWSBTRVRVUCkKPT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KCiAgVXNlIHRoZSDwn5Cm"
-        "IENVQ0tPTyB0YWIgZm9yIGd1aWRlZCBzZXR1cC4gUXVpY2sgcmVmZXJlbmNlOgoKICBDQVBFIFNh"
-        "bmRib3ggKHJlY29tbWVuZGVkIOKAlCBhY3RpdmVseSBtYWludGFpbmVkIGZvcmspOgogICAgZ2l0"
-        "IGNsb25lIGh0dHBzOi8vZ2l0aHViLmNvbS9rZXZvcmVpbGx5L0NBUEV2MgogICAgY2QgQ0FQRXYy"
-        "ICYmIHN1ZG8gYmFzaCBjYXBlMi5zaCBiYXNlCiAgICBzdWRvIHN5c3RlbWN0bCBzdGFydCBjYXBl"
-        "LXdlYgogICAgU2V0IFVSTDogaHR0cDovLzxWTV9JUD46ODAwMAoKICBEb2NrZXIgKGZhc3Rlc3Qg"
-        "c3RhcnQpOgogICAgZG9ja2VyIHB1bGwgYmxhY2t0b3AvY3Vja29vCiAgICBkb2NrZXIgcnVuIC1k"
-        "IC1wIDgwOTA6ODA5MCBibGFja3RvcC9jdWNrb28KICAgIFNldCBVUkw6IGh0dHA6Ly8xMjcuMC4w"
-        "LjE6ODA5MAoKICDimqAgIElNUE9SVEFOVDogQWx3YXlzIHJ1biBtYWx3YXJlIGluIGFuIGlzb2xh"
-        "dGVkIFZNLCBuZXZlciBvbiB5b3VyCiAgICAgaG9zdCBtYWNoaW5lLiBVc2Ugc25hcHNob3RzIHRv"
-        "IHJlc3RvcmUgYWZ0ZXIgZWFjaCBhbmFseXNpcy4KICAgICBDQVBFOiBodHRwczovL2dpdGh1Yi5j"
-        "b20va2V2b3JlaWxseS9DQVBFdjIKCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgWzddICBUUk9VQkxFU0hPT1RJTkcK"
+        "PT0KICBbMV0gIFNZU1RFTSBSRVFVSVJFTUVOVFMKPT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KCiAg"
+        "LSBXaW5kb3dzIDEwLzExICg2NC1iaXQpCiAgLSBQeXRob24gMy4xMCBvciBoaWdoZXIgIC0tPiAg"
+        "aHR0cHM6Ly93d3cucHl0aG9uLm9yZy9kb3dubG9hZHMvCiAgICAqIER1cmluZyBpbnN0YWxsOiBj"
+        "aGVjayAiQWRkIFB5dGhvbiB0byBQQVRIIgogIC0gSW50ZXJuZXQgY29ubmVjdGlvbiAoZm9yIHRo"
+        "cmVhdCBpbnRlbCBsb29rdXBzIGFuZCB1cGRhdGVzKQogIC0gT3B0aW9uYWw6IFdpcmVzaGFyay90"
+        "c2hhcmsgZm9yIG5ldHdvcmsgY2FwdHVyZQogICAgLS0+ICBodHRwczovL3d3dy53aXJlc2hhcmsu"
+        "b3JnL2Rvd25sb2FkLmh0bWwKICAgICAgICAgRHVyaW5nIFdpcmVzaGFyayBpbnN0YWxsOiBjaGVj"
+        "ayAiQWRkIHRzaGFyayB0byBQQVRIIgoKPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KICBbMl0gIElO"
+        "U1RBTExBVElPTgo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKICBPUFRJT04gQSAtLSBBdXRvbWF0"
+        "aWMgKHJlY29tbWVuZGVkKToKICAgIFJ1biB2MHJ0ZXgucHkgLS0gdGhlIHNldHVwIHdpemFyZCBo"
+        "YW5kbGVzIGV2ZXJ5dGhpbmc6CiAgICAgIC0gSW5zdGFsbHMgYWxsIFB5dGhvbiBkZXBlbmRlbmNp"
+        "ZXMgKFlBUkEgbXVsdGktc3RyYXRlZ3k6IHdoZWVsL3lhcmEteC9zcmMpCiAgICAgIC0gQXV0by1k"
+        "ZXRlY3RzIGFuZCBvcHRpb25hbGx5IGluc3RhbGxzIFdpcmVzaGFyay90c2hhcmsKICAgICAgLSBD"
+        "cmVhdGVzIGZvbGRlciBzdHJ1Y3R1cmUsIGNvbmZpZy5qc29uLCBzY2FuX2hpc3RvcnkuZGIKICAg"
+        "ICAgLSBBZGRzIFdpbmRvd3MgRGVmZW5kZXIgZXhjbHVzaW9ucwogICAgICAtIFdyaXRlcyBsYXVu"
+        "Y2guYmF0IC8gbGF1bmNoLnNoCgogIE9QVElPTiBCIC0tIE1hbnVhbDoKICAgIE9wZW4gYSB0ZXJt"
+        "aW5hbCBpbiB0aGUgVjBSVEVYIGZvbGRlciBhbmQgcnVuOgogICAgICBweXRob24gLW0gcGlwIGlu"
+        "c3RhbGwgLXIgcmVxdWlyZW1lbnRzLnR4dAoKICBJZiB5b3UgZ2V0ICJleHRlcm5hbGx5IG1hbmFn"
+        "ZWQgZW52aXJvbm1lbnQiOgogICAgICBweXRob24gLW0gcGlwIGluc3RhbGwgLXIgcmVxdWlyZW1l"
+        "bnRzLnR4dCAtLWJyZWFrLXN5c3RlbS1wYWNrYWdlcwoKPT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0K"
+        "ICBbM10gIEFQSSBLRVkgQ09ORklHVVJBVElPTiAgKENGRyA+IEFQSSBLRVlTIG9yIGNvbmZpZy5q"
+        "c29uKQo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKICB7CiAgICAiYXBpX2tleXMiOiBbXSwKICAg"
+        "ICJtYWx3YXJlYmF6YWFyX2tleSI6ICIiLAogICAgImFidXNlaXBkYl9rZXkiOiAiIiwKICAgICJ1"
+        "cmxzY2FuX2tleSI6ICIiLAogICAgIm90eF9rZXkiOiAiIiwKICAgICJzaG9kYW5fa2V5IjogIiIs"
+        "CiAgICAiZ3JleW5vaXNlX2tleSI6ICIiLAogICAgImh5YnJpZF9hbmFseXNpc19rZXkiOiAiIiwK"
+        "ICAgICJyZXF1ZXN0X2RlbGF5IjogMTUsCiAgICAidHNoYXJrX3BhdGgiOiAidHNoYXJrIiwKICAg"
+        "ICJjdWNrb29fdXJsIjogImh0dHA6Ly8xMjcuMC4wLjE6ODA5MCIsCiAgICAiY3Vja29vX2VuYWJs"
+        "ZWQiOiBmYWxzZQogIH0KCiAgLS0gVmlydXNUb3RhbDogICAgaHR0cHM6Ly93d3cudmlydXN0b3Rh"
+        "bC5jb20vZ3VpL2pvaW4tdXMgICg1MDAgcmVxL2RheSBmcmVlKQogIC0tIE1hbHdhcmVCYXphYXI6"
+        "IGh0dHBzOi8vYmF6YWFyLmFidXNlLmNoLwogIC0tIEFidXNlSVBEQjogICAgIGh0dHBzOi8vd3d3"
+        "LmFidXNlaXBkYi5jb20vYWNjb3VudC9hcGkgICgxMDAwL2RheSBmcmVlKQogIC0tIFVSTFNjYW4u"
+        "aW86ICAgIGh0dHBzOi8vdXJsc2Nhbi5pby91c2VyL3Byb2ZpbGUvI2FwaUtleQogIC0tIEFsaWVu"
+        "VmF1bHQgT1RYOmh0dHBzOi8vb3R4LmFsaWVudmF1bHQuY29tL2FwaQogIC0tIFNob2RhbjogICAg"
+        "ICAgIGh0dHBzOi8vYWNjb3VudC5zaG9kYW4uaW8KICAtLSBHcmV5Tm9pc2U6ICAgICBodHRwczov"
+        "L3Zpei5ncmV5bm9pc2UuaW8vc2lnbnVwCiAgLS0gSHlicmlkQW5hbHlzaXM6aHR0cHM6Ly93d3cu"
+        "aHlicmlkLWFuYWx5c2lzLmNvbS9teS1hY2NvdW50P3RhYj1hcGkta2V5CgogIEFmdGVyIGVkaXRp"
+        "bmcsIHVzZSBDRkcgPiBBUEkgS0VZUyA+IFRlc3QgQWxsIHRvIHZlcmlmeS4KCj09PT09PT09PT09"
         "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT0KCiAgIk1vZHVsZU5vdEZvdW5kRXJyb3I6IE5vIG1vZHVsZSBuYW1lZCAneWFy"
-        "YSciCiAgICAtLT4gUnVuOiBweXRob24gLW0gcGlwIGluc3RhbGwgeWFyYS1weXRob24KCiAgIk1v"
-        "ZHVsZU5vdEZvdW5kRXJyb3I6IE5vIG1vZHVsZSBuYW1lZCAndGtpbnRlcmRuZDInIgogICAgLS0+"
-        "IFJ1bjogcHl0aG9uIC1tIHBpcCBpbnN0YWxsIHRraW50ZXJkbmQyCgogICJ0c2hhcmsgbm90IGZv"
-        "dW5kIiAvIE5ldHdvcmsgdGFiIGRpc2FibGVkCiAgICAtLT4gSW5zdGFsbCBXaXJlc2hhcmsgZnJv"
-        "bSBodHRwczovL3d3dy53aXJlc2hhcmsub3JnCiAgICAgICAgRHVyaW5nIGluc3RhbGwsIGNoZWNr"
-        "ICJBZGQgdHNoYXJrIHRvIFBBVEgiCiAgICAgICAgT3Igc2V0IGZ1bGwgcGF0aCBpbiBjb25maWcu"
-        "anNvbjogInRzaGFya19wYXRoIjogIkM6XC4uLlx0c2hhcmsuZXhlIgoKICBWaXJ1c1RvdGFsIHJl"
-        "dHVybnMgIldyb25nQ3JlZGVudGlhbHNFcnJvciIgb3IgNDAzCiAgICAtLT4gWW91ciBBUEkga2V5"
-        "IGlzIGludmFsaWQgb3IgZXhwaXJlZC4gQ2hlY2sgY29uZmlnLmpzb24gPiBhcGlfa2V5cwogICAg"
-        "ICAgIFVzZSB0aGUgQVBJIEFuYWx5emVyIChTZXR0aW5ncyA+IEFQSSBLZXlzID4gVGVzdCBBbGwp"
-        "IHRvIGRlYnVnCgogIEFwcCBjcmFzaGVzIG9uIHN0YXJ0dXAgLyBibGFuayB3aW5kb3cKICAgIC0t"
-        "PiBDaGVjayB0aGUgZGVidWdfbG9nLyBmb2xkZXIgZm9yIHRoZSBsYXRlc3Qgc2Vzc2lvbiBsb2cK"
-        "ICAgICAgICBVc2UgUmVjb3ZlcnkgVGVybWluYWwgKERaIHRhYikgaWYgdGhlIGFwcCBwYXJ0aWFs"
-        "bHkgbG9hZHMKCiAgInNjYW5faGlzdG9yeS5kYiBpcyBsb2NrZWQiCiAgICAtLT4gT25seSBvbmUg"
-        "aW5zdGFuY2Ugb2YgVjBSVEVYIGNhbiBydW4gYXQgYSB0aW1lCiAgICAgICAgVXNlIFJlY292ZXJ5"
-        "IFRlcm1pbmFsID4gUmVzZXQgREIgdG8gZml4IGEgY29ycnVwdGVkIGRhdGFiYXNlCgo9PT09PT09"
+        "PT09PT09PT09PT09CiAgWzRdICBVUERBVEVSCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CgogIFYw"
+        "UlRFWCBoYXMgYSBidWlsdC1pbiBhdXRvLXVwZGF0ZXIgKENGRyA+IFVQREFURVIpLgoKICAtIENo"
+        "ZWNrcyBHaXRIdWIgZm9yIG5ldyB2ZXJzaW9ucyBvbiBzdGFydHVwIChjb25maWd1cmFibGUpCiAg"
+        "LSBDcmVhdGVzIEVNRVJHRU5DWV9SRVNUT1JFLnppcCBiYWNrdXAgYmVmb3JlIGFueSBjaGFuZ2Vz"
+        "CiAgLSBJZiB1cGRhdGUgZmFpbHM6IFBST1QgPiBCQUNLVVAgPiBFbWVyZ2VuY3kgUm9sbGJhY2sK"
+        "CiAgVG8gZm9yY2UgYSBzcGVjaWZpYyBicmFuY2gsIGFkZCB0byBjb25maWcuanNvbjoKICAgICJ1"
+        "cGRhdGVfYnJhbmNoIjogIlRFU1RJTkctR0VORVJBTCIKCiAgVXBkYXRlIGhpc3RvcnkgaXMgdmll"
+        "d2FibGUgaW4gQ0ZHID4gVVBEQVRFIExPRy4KCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgWzVd"
+        "ICBGRUFUVVJFUyAgKHYxLjAuMCAgLS0gIDIxIG1haW4gdGFicywgODArIHN1Yi10YWJzKQo9PT09"
         "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PQogIFs4XSAgTk9URVMKPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KCiAgLSBWMFJURVggaXMgYSBsb2NhbCB0b29s"
-        "LiBObyBkYXRhIGlzIHNlbnQgdG8gYW55IHNlcnZlciBleGNlcHQgdGhlCiAgICBvZmZpY2lhbCBB"
-        "UElzIHlvdSBjb25maWd1cmUgKFZpcnVzVG90YWwsIEFidXNlSVBEQiwgZXRjLikKICAtIE5ldmVy"
-        "IHJ1biB1bnRydXN0ZWQgbWFsd2FyZSBzYW1wbGVzIG91dHNpZGUgYSBWTSBmb3IgZnVsbCBpc29s"
-        "YXRpb24uCiAgICBUaGUgc2FuZGJveF9lbnYvZHJvcC8gZm9sZGVyIGlzIGZvciBtb25pdG9yaW5n"
-        "IG9ubHkg4oCUIGl0IGRvZXMgTk9UCiAgICBwcm92aWRlIGEgcmVhbCBpc29sYXRlZCBleGVjdXRp"
-        "b24gZW52aXJvbm1lbnQuCiAgLSBGcmVlIEFQSSB0aWVyIGxpbWl0czogVmlydXNUb3RhbCA1MDAg"
-        "cmVxL2RheSwgQWJ1c2VJUERCIDEwMDAgcmVxL2RheS4KICAgIFJlc3BlY3QgcmF0ZSBsaW1pdHMg"
-        "dG8gYXZvaWQgZ2V0dGluZyB5b3VyIGtleXMgcmV2b2tlZC4KICAtIFRoaXMgdG9vbCBpcyBmb3Ig"
-        "ZWR1Y2F0aW9uYWwgYW5kIGRlZmVuc2l2ZSBzZWN1cml0eSByZXNlYXJjaCBvbmx5LgoKPT09PT09"
+        "PT09PT09PT09PT09PT09PT09PQoKICBIT01FICAgIERhc2hib2FyZDogbGl2ZSBjb3VudGVycywg"
+        "dGhyZWF0IGxldmVsLCByZWNlbnQgc2NhbnMKICBMT0dTICAgIEZpbGUgb3BlcmF0aW9uIGxvZyAr"
+        "IGRlYnVnIGxvZyB2aWV3ZXIKICBDSFJUICAgIENoYXJ0cywgZW50cm9weSBoaXN0b2dyYW0sIHRo"
+        "cmVhdCBoZWF0bWFwCiAgUkVQICAgICBCcm93c2UgYW5kIG9wZW4gc2NhbiByZXBvcnRzIChIVE1M"
+        "L0pTT04vUERGKQogIElPQyAgICAgRXh0cmFjdCBJUHMvZG9tYWlucy9VUkxzL2hhc2hlcy9lbWFp"
+        "bHMvQ1ZFcy9yZWdpc3RyeSBrZXlzL1dpbiBBUElzCiAgICAgICAgICArIE1JVFJFIEFUVCZDSyBt"
+        "YXBwaW5nICsgSW1waGFzaCBhbmFseXplcgogIFlBUkEgICAgUnVsZSBzY2FubmVyLCBjb21tdW5p"
+        "dHkgbGlicmFyeSBkb3dubG9hZGVyLCBydWxlIGVkaXRvciwKICAgICAgICAgIGRlb2JmdXNjYXRv"
+        "ciAoWE9SL0I2NC9ST1QvSGV4KSwgU2lnbWEgdmlld2VyCiAgUEVSRiAgICBMaXZlIHN5c3RlbSBw"
+        "ZXJmb3JtYW5jZSBtb25pdG9yCiAgVEwgICAgICBTY2FuIGhpc3RvcnkgdGltZWxpbmUKICBTQiAg"
+        "ICAgIFNhbmRib3ggYXV0by1zY2FuLCBwcm9jZXNzIG1vbml0b3IsIGZpbGUgYW5hbHl6ZXIsIEN1"
+        "Y2tvby9DQVBFCiAgU0VUVVAgICBTZXR1cCB3aXphcmQgKGFjY2Vzc2libGUgd2l0aG91dCByZXN0"
+        "YXJ0aW5nKQogIENGRyAgICAgQVBJIGtleXMsIGNvbmZpZywgd2hpdGVsaXN0LCBleHBvcnQsIGNo"
+        "ZWNrcG9pbnQsIHNjYW4gaGlzdG9yeSwKICAgICAgICAgIGRlYnVnIGxvZ3MsIHVwZGF0ZSBsb2cs"
+        "IHVwZGF0ZXIKICBMT09LICAgIEhhc2gsIEhFWCB2aWV3ZXIsIFJFR0VYLCBET0MsIFNJRywgYmF0"
+        "Y2ggc2Nhbm5lciwgZGlmZiwgYXJjaGl2ZQogICAgICAgICAgdW5wYWNrZXIsIEI2NC9YT1IvQkNP"
+        "TlYvSldUL1JPVC9QRS1IRFIvVU5JQ09ERS9CSU5QQVQsCiAgICAgICAgICBGVVpaWSBoYXNoIHNp"
+        "bWlsYXJpdHkKICBQUk9DICAgIExpdmUgcHJvY2Vzc2VzLCBzZXJ2aWNlcywgc3RhcnR1cCBpdGVt"
+        "cywgZW52IHZhcnMsCiAgICAgICAgICBvcGVuIGhhbmRsZXMsIHByb2Nlc3MgdHJlZSwgcmVnaXN0"
+        "cnkgYnJvd3NlcgogIE5FVCAgICAgQ29ubmVjdGlvbnMgKHByb2Nlc3MvcG9ydCBmaWx0ZXIpLCBV"
+        "UkwgdG9vbHMsIElQL2RvbWFpbiByZXAsCiAgICAgICAgICBETlMsIFdIT0lTLCBIVFRQIGhlYWRl"
+        "cnMsIFNTTC9UTFMsIHBvcnQgc2Nhbm5lciwgUENBUCwKICAgICAgICAgIHBpbmcsIHByb3h5LCBU"
+        "b3IsIG5vaXNlIGdlbiwgbGl2ZSB0cmFmZmljLCBjb25uIHF1YWxpdHkgc3RhdHMKICBOT1RFUyAg"
+        "IE5vdGVwYWQsIE1JVFJFIEFUVCZDSyByZWZlcmVuY2UsIFRPRE8sIHNuaXBwZXRzCiAgQ1JZUFQg"
+        "ICBBRVMvUlNBIGVuY3J5cHQvZGVjcnlwdCwgaGFzaCBpbnNwZWN0b3IsIFZpZ2VuZXJlCiAgU0VU"
+        "ICAgICBHbG9iYWwgc2V0dGluZ3MKICBQUk9UICAgIEFwcCBwcm90ZWN0aW9uLCBpbnRlZ3JpdHks"
+        "IGRlZmVuc2UsIHNlbGYtZGVmZW5zZSwKICAgICAgICAgIGJhY2t1cCAmIHJlc3RvcmUgKHdpdGgg"
+        "ZW1lcmdlbmN5IHJvbGxiYWNrKSwgc3lzdGVtIGNoZWNrLCB3YXRjaGRvZwogIERaICAgICAgRGVi"
+        "dWcgem9uZSwgY3Jhc2ggc2ltdWxhdG9yLCBTT0MgZXJyb3IgY29kZXMKCj09PT09PT09PT09PT09"
         "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT0KICBWMFJURVggdjEuMCAgLSAgYnkgVmlkZXJfMDYKPT09PT09PT09PT09PT09PT09PT09"
-        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0K"
+        "PT09PT09PT09CiAgWzZdICBZQVJBIFJVTEVTCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CgogIFYw"
+        "UlRFWCBsb2FkcyBhbGwgLnlhciAvIC55YXJhIGZpbGVzIGZyb20gdGhlIHJ1bGVzLyBkaXJlY3Rv"
+        "cnkuCiAgVG8gYWRkIHJ1bGVzOgogICAgLSBEcm9wIC55YXIgZmlsZXMgaW50byBydWxlcy8gYW5k"
+        "IHVzZSBZQVJBIE1hbmFnZXIgPiBSZWxvYWQKICAgIC0gVXNlIFlBUkEgTWFuYWdlciA+IExpYnJh"
+        "cnkgdG8gZG93bmxvYWQgY29tbXVuaXR5IHJ1bGVzZXRzIGZyb20gR2l0SHViCiAgWUFSQSBkb2Nz"
+        "OiBodHRwczovL3lhcmEucmVhZHRoZWRvY3MuaW8vZW4vc3RhYmxlLwoKPT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT0KICBbN10gIENVQ0tPTyAvIENBUEUgU0FOREJPWAo9PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PQoKICBDQVBFIFNhbmRib3ggKHJlY29tbWVuZGVkKToKICAgIGdpdCBjbG9uZSBodHRwczov"
+        "L2dpdGh1Yi5jb20va2V2b3JlaWxseS9DQVBFdjIKICAgIGNkIENBUEV2MiAmJiBzdWRvIGJhc2gg"
+        "Y2FwZTIuc2ggYmFzZQogICAgc3VkbyBzeXN0ZW1jdGwgc3RhcnQgY2FwZS13ZWIKICAgIFNldCBV"
+        "Ukw6IGh0dHA6Ly88Vk1fSVA+OjgwMDAKCiAgRG9ja2VyIChmYXN0ZXN0KToKICAgIGRvY2tlciBw"
+        "dWxsIGJsYWNrdG9wL2N1Y2tvbwogICAgZG9ja2VyIHJ1biAtZCAtcCA4MDkwOjgwOTAgYmxhY2t0"
+        "b3AvY3Vja29vCiAgICBTZXQgVVJMOiBodHRwOi8vMTI3LjAuMC4xOjgwOTAKCiAgSU1QT1JUQU5U"
+        "OiBBbHdheXMgcnVuIG1hbHdhcmUgaW4gYW4gaXNvbGF0ZWQgVk0sIG5ldmVyIG9uIHlvdXIgaG9z"
+        "dC4KCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgWzhdICBUUk9VQkxFU0hPT1RJTkcKPT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT0KCiAgIk1vZHVsZU5vdEZvdW5kRXJyb3I6IE5vIG1vZHVsZSBuYW1l"
+        "ZCAneWFyYSciCiAgICAtLT4gUnVuIHNldHVwIHdpemFyZCBhZ2Fpbiwgb3I6CiAgICAgICAgcHl0"
+        "aG9uIC1tIHBpcCBpbnN0YWxsIHlhcmEtcHl0aG9uLXdoZWVsCgogICJNb2R1bGVOb3RGb3VuZEVy"
+        "cm9yOiBObyBtb2R1bGUgbmFtZWQgJ3RraW50ZXJkbmQyJyIKICAgIC0tPiBweXRob24gLW0gcGlw"
+        "IGluc3RhbGwgdGtpbnRlcmRuZDIKCiAgInRzaGFyayBub3QgZm91bmQiIC8gTmV0d29yayB0YWIg"
+        "ZGlzYWJsZWQKICAgIC0tPiBJbnN0YWxsIFdpcmVzaGFyayBmcm9tIGh0dHBzOi8vd3d3LndpcmVz"
+        "aGFyay5vcmcKICAgICAgICBEdXJpbmcgaW5zdGFsbCBjaGVjayAiQWRkIHRzaGFyayB0byBQQVRI"
+        "IgogICAgICAgIE9yIHNldDogInRzaGFya19wYXRoIjogIkM6XFwuLi5cXHRzaGFyay5leGUiIGlu"
+        "IGNvbmZpZy5qc29uCgogIFZpcnVzVG90YWwgcmV0dXJucyA0MDMgLyBXcm9uZ0NyZWRlbnRpYWxz"
+        "RXJyb3IKICAgIC0tPiBDaGVjayBjb25maWcuanNvbiA+IGFwaV9rZXlzCiAgICAgICAgVXNlIENG"
+        "RyA+IEFQSSBLRVlTID4gVGVzdCBBbGwgdG8gZGVidWcKCiAgQXBwIGNyYXNoZXMgLyBibGFuayB3"
+        "aW5kb3cKICAgIC0tPiBDaGVjayBkZWJ1Z19sb2cvIGZvciB0aGUgbGF0ZXN0IHNlc3Npb24gbG9n"
+        "CiAgICAgICAgVXNlIERaIHRhYiA+IFJlY292ZXJ5IFRlcm1pbmFsIGlmIHRoZSBhcHAgcGFydGlh"
+        "bGx5IGxvYWRzCgogICJzY2FuX2hpc3RvcnkuZGIgaXMgbG9ja2VkIgogICAgLS0+IE9ubHkgb25l"
+        "IGluc3RhbmNlIGF0IGEgdGltZS4gVXNlIERaID4gUmVzZXQgREIgdG8gcmVwYWlyLgoKICBXaW5k"
+        "b3dzIERlZmVuZGVyIGZsYWdzIFYwUlRFWAogICAgLS0+IFNldHVwIHdpemFyZCBhZGRzIGV4Y2x1"
+        "c2lvbnMgYXV0b21hdGljYWxseS4KICAgICAgICBNYW51YWw6IGFkZCB0aGUgaW5zdGFsbCBmb2xk"
+        "ZXIgdG8gRGVmZW5kZXIgZXhjbHVzaW9ucy4KCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgWzld"
+        "ICBOT1RFUwo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQoKICAtIFYwUlRFWCBpcyBhIGxvY2FsIHRv"
+        "b2wuIE5vIGRhdGEgaXMgc2VudCBhbnl3aGVyZSBleGNlcHQgdGhlIEFQSXMKICAgIHlvdSBjb25m"
+        "aWd1cmUgKFZpcnVzVG90YWwsIEFidXNlSVBEQiwgZXRjLikKICAtIE5ldmVyIHJ1biBtYWx3YXJl"
+        "IG91dHNpZGUgYSBWTS4gc2FuZGJveF9lbnYvZHJvcC8gaXMgZm9yIG1vbml0b3JpbmcKICAgIG9u"
+        "bHkgLS0gaXQgZG9lcyBOT1QgcHJvdmlkZSBhIHJlYWwgaXNvbGF0ZWQgZXhlY3V0aW9uIGVudmly"
+        "b25tZW50LgogIC0gRnJlZSBBUEkgbGltaXRzOiBWaXJ1c1RvdGFsIDUwMCByZXEvZGF5LCBBYnVz"
+        "ZUlQREIgMTAwMCByZXEvZGF5LgogIC0gRm9yIGVkdWNhdGlvbmFsIGFuZCBkZWZlbnNpdmUgc2Vj"
+        "dXJpdHkgcmVzZWFyY2ggb25seS4KCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiAgVjBSVEVYIHYx"
+        "LjAuMCAgLSAgYnkgVmlkZXJfMDYgIHwgIGh0dHBzOi8vZ2l0aHViLmNvbS9WaWRlcjA2L1YwcnRl"
+        "eAo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09"
+        "PT09PT09PT09PT09PT09PT09PT09PT09PQo="
+    
     ),
 }
 _pre_sl("BOOT L354", "BOOT")
@@ -4353,7 +4313,25 @@ def _run_setup_ui():
                 if os.path.exists(lpath):
                     _log("  ~ launch.bat  (already present, kept)", "DIM")
                 else:
-                    _bat = '@echo off\r\ncd /d "%~dp0"\r\npython v0rtex.py\r\nif errorlevel 1 pause\r\n'
+                    _bat = (
+                        '@echo off\r\n'
+                        'setlocal EnableDelayedExpansion\r\n'
+                        'title V0RTEX v1.0.0 - Launcher\r\n'
+                        'color 0A\r\n'
+                        'python --version >nul 2>&1\r\n'
+                        'if %errorLevel% neq 0 (\r\n'
+                        '    echo  [ERR] Python not found. Install from https://www.python.org\r\n'
+                        '    pause & exit /b 1\r\n'
+                        ')\r\n'
+                        'cd /d "%~dp0"\r\n'
+                        'if not exist "v0rtex.py" (\r\n'
+                        '    echo  [ERR] v0rtex.py not found\r\n'
+                        '    pause & exit /b 1\r\n'
+                        ')\r\n'
+                        'echo  [OK] Launching V0RTEX...\r\n'
+                        'start "" pythonw v0rtex.py %*\r\n'
+                        'endlocal\r\n'
+                    )
                     _wf_track(lpath, _bat)
                     _log("  ✓ launch.bat  (written)", "OK")
             else:
@@ -18070,6 +18048,17 @@ tk.Checkbutton(_nc_ctrl, text="Auto 30s", variable=_nc_auto_var, font=FS,
                selectcolor=C["mantle"], relief="flat").pack(side=tk.LEFT, padx=8)
 _nc_status_sv = tk.StringVar(value="")
 tk.Label(_nc_ctrl, textvariable=_nc_status_sv, font=FS, bg=C["surface0"], fg=C["teal"]).pack(side=tk.LEFT, padx=12)
+_nc_filter_v = tk.StringVar()
+_nc_filter_row = tk.Frame(_net_conn_tab, bg=C["base"], padx=16, pady=3); _nc_filter_row.pack(fill=tk.X)
+tk.Label(_nc_filter_row, text="Filter process:", font=FS, bg=C["base"], fg=C["text"]).pack(side=tk.LEFT)
+tk.Entry(_nc_filter_row, textvariable=_nc_filter_v, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+         insertbackground=C["text"], relief="flat", bd=3, width=22).pack(side=tk.LEFT, padx=(4,8))
+tk.Label(_nc_filter_row, text="Filter port:", font=FS, bg=C["base"], fg=C["text"]).pack(side=tk.LEFT)
+_nc_port_filter_v = tk.StringVar()
+tk.Entry(_nc_filter_row, textvariable=_nc_port_filter_v, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+         insertbackground=C["text"], relief="flat", bd=3, width=8).pack(side=tk.LEFT, padx=(4,8))
+_mkbtn(_nc_filter_row, "Apply", lambda: _nc_scan(), C["sapphire"])
+_mkbtn(_nc_filter_row, "Clear", lambda: (_nc_filter_v.set(""), _nc_port_filter_v.set(""), _nc_scan()), C["surface2"])
 _nc_sc = tk.Scrollbar(_net_conn_tab, orient="vertical", bg=C["surface1"],
                        troughcolor=C["mantle"], relief="flat", bd=0, width=7)
 _nc_hsc = tk.Scrollbar(_net_conn_tab, orient="horizontal", bg=C["surface1"],
@@ -18113,10 +18102,14 @@ def _nc_refresh():
             _nc_out.insert(tk.END,"─"*110+"\n","DIM"),
             _nc_out.config(state="disabled"),
         ])
+        _nc_proc_flt = _nc_filter_v.get().strip().lower()
+        _nc_port_flt = _nc_port_filter_v.get().strip()
         for c in sorted(conns, key=lambda x: x.pid or 0):
             if not c.raddr: continue
             rip = c.raddr.ip; rport = c.raddr.port
             if ext_only and any(rip.startswith(p) for p in _PRIVATE_PREFIXES): continue
+            if _nc_proc_flt and _nc_proc_flt not in (pid_map.get(c.pid,"") or "").lower(): continue
+            if _nc_port_flt and _nc_port_flt.isdigit() and int(_nc_port_flt) not in (c.laddr.port if c.laddr else 0, rport): continue
             shown += 1
             proto = "TCP" if c.type==1 else "UDP"
             local = f"{c.laddr.ip}:{c.laddr.port}" if c.laddr else "-"
@@ -18144,6 +18137,8 @@ def _nc_refresh():
             try: root.after(30000, _nc_refresh)
             except Exception: pass
     threading.Thread(target=_do, daemon=True).start()
+
+_nc_scan = _nc_refresh
 
 def _nc_copy_sel():
     try:
@@ -21007,9 +21002,35 @@ def _ap_bk_open_dir():
     elif sys.platform == "darwin": subprocess.Popen(["open", d])
     else: subprocess.Popen(["xdg-open", d])
 
+def _ap_bk_emergency_rollback():
+    import glob as _glb, zipfile as _zfe, shutil as _shue
+    tmp = tempfile.gettempdir()
+    candidates = sorted(_glb.glob(os.path.join(tmp, "EMERGENCY_RESTORE_*.zip")), reverse=True)
+    if not candidates:
+        messagebox.showwarning("Emergency Rollback",
+            "No EMERGENCY_RESTORE_*.zip found in temp.\nRun an update first to create one.")
+        return
+    chosen = candidates[0]
+    if not messagebox.askyesno("Emergency Rollback",
+        f"Restore from:\n{os.path.basename(chosen)}\n\nThis will overwrite V0rtex_System. Continue?"):
+        return
+    _ap_bk_write(f"Rolling back from {os.path.basename(chosen)}...", "WARN")
+    def _do():
+        try:
+            vx_sys = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            _shue.rmtree(vx_sys, ignore_errors=True)
+            with _zfe.ZipFile(chosen, "r") as _z:
+                _z.extractall(vx_sys)
+            _ap_bk_write("\u2713 Rollback complete \u2014 restart V0RTEX.", "OK")
+            root.after(0, lambda: messagebox.showinfo("Rollback", "Rollback complete.\nPlease restart V0RTEX."))
+        except Exception as _re:
+            _ap_bk_write(f"\u2717 Rollback failed: {_re}", "FAIL")
+    threading.Thread(target=_do, daemon=True).start()
+
 _mkbtn(_ap_bk_ctrl, "💾 Create Full Backup",       _ap_bk_create,         C["teal"])
 _mkbtn(_ap_bk_ctrl, "🔄 Restore Latest Backup",   _ap_bk_restore_latest, C["blue"])
 _mkbtn(_ap_bk_ctrl, "📂 Choose ZIP to Restore", _ap_bk_restore_choose, C["sapphire"])
+_mkbtn(_ap_bk_ctrl, "\u26a0 Emergency Rollback",   _ap_bk_emergency_rollback, C["red"])
 _mkbtn(_ap_bk_ctrl, "📋 List Backups",                _ap_bk_list,           C["surface2"])
 _mkbtn(_ap_bk_ctrl, "📁 Open Folder",               _ap_bk_open_dir,       C["surface2"])
 _mkbtn(_ap_bk_ctrl, "🗑 Clear Log",
@@ -24740,6 +24761,128 @@ def _sig_verify():
             root.after(0,lambda err=str(e): _sig_set_verdict("✗","Error",C["red"]))
             root.after(0,lambda err=str(e): _sig_log(f"  Error: {err}","WARN"))
     threading.Thread(target=_do,daemon=True).start()
+
+
+_tab_imphash = tk.Frame(_ioc_nb, bg=C["base"])
+_ioc_nb.add(_tab_imphash, text="📦 IMPHASH")
+
+_ih_head = tk.Frame(_tab_imphash, bg=C["surface0"], padx=16, pady=10); _ih_head.pack(fill=tk.X)
+tk.Label(_ih_head, text="IMPHASH — IMPORT HASH ANALYZER", font=FB, bg=C["surface0"], fg=C["sapphire"]).pack(anchor="w")
+tk.Label(_ih_head, text="Compute PE import hash (imphash) for malware family clustering — requires pefile",
+         font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_tab_imphash, bg=C["sapphire"], height=2).pack(fill=tk.X)
+
+_ih_ctrl = tk.Frame(_tab_imphash, bg=C["surface0"], padx=12, pady=8); _ih_ctrl.pack(fill=tk.X)
+_ih_file_v = tk.StringVar()
+tk.Label(_ih_ctrl, text="PE File:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
+tk.Entry(_ih_ctrl, textvariable=_ih_file_v, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+         insertbackground=C["text"], relief="flat", bd=4, width=48).pack(side=tk.LEFT, padx=4)
+_mkbtn(_ih_ctrl, "Browse", lambda: _ih_file_v.set(filedialog.askopenfilename(
+    filetypes=[("PE files","*.exe *.dll *.sys *.ocx *.drv"),("All","*.*")]) or _ih_file_v.get()), C["surface2"])
+_mkbtn(_ih_ctrl, "📦 Analyze", lambda: _ih_run(), C["sapphire"])
+
+_ih_bulk_row = tk.Frame(_tab_imphash, bg=C["base"], padx=12, pady=4); _ih_bulk_row.pack(fill=tk.X)
+_ih_dir_v = tk.StringVar()
+tk.Label(_ih_bulk_row, text="Bulk folder:", font=FS, bg=C["base"], fg=C["text"]).pack(side=tk.LEFT)
+tk.Entry(_ih_bulk_row, textvariable=_ih_dir_v, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+         insertbackground=C["text"], relief="flat", bd=4, width=40).pack(side=tk.LEFT, padx=4)
+_mkbtn(_ih_bulk_row, "Browse", lambda: _ih_dir_v.set(filedialog.askdirectory() or _ih_dir_v.get()), C["surface2"])
+_mkbtn(_ih_bulk_row, "📂 Bulk Scan", lambda: _ih_bulk(), C["teal"])
+_mkbtn(_ih_bulk_row, "Clear", lambda: (_ih_out.config(state="normal"),_ih_out.delete("1.0",tk.END),_ih_out.config(state="disabled")), C["surface1"])
+
+tk.Frame(_tab_imphash, bg=C["surface2"], height=1).pack(fill=tk.X)
+
+_ih_out = tk.Text(_tab_imphash, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+                  relief="flat", bd=0, padx=12, pady=8, wrap="none", state="disabled")
+_ih_sc_y = tk.Scrollbar(_tab_imphash, orient="vertical", command=_ih_out.yview,
+                          bg=C["surface1"], troughcolor=C["base"], relief="flat", width=7)
+_ih_sc_x = tk.Scrollbar(_tab_imphash, orient="horizontal", command=_ih_out.xview,
+                          bg=C["surface1"], troughcolor=C["base"], relief="flat", width=7)
+_ih_sc_y.pack(side=tk.RIGHT, fill=tk.Y)
+_ih_sc_x.pack(side=tk.BOTTOM, fill=tk.X)
+_ih_out.pack(fill=tk.BOTH, expand=True)
+_ih_out.configure(yscrollcommand=_ih_sc_y.set, xscrollcommand=_ih_sc_x.set)
+_ih_out.tag_configure("HEAD", foreground=C["sapphire"], font=("Consolas",9,"bold"))
+_ih_out.tag_configure("HASH", foreground=C["mauve"])
+_ih_out.tag_configure("IMP",  foreground=C["teal"])
+_ih_out.tag_configure("WARN", foreground=C["yellow"])
+_ih_out.tag_configure("DIM",  foreground=C["overlay0"])
+_ih_out.tag_configure("MATCH",foreground=C["red"], font=("Consolas",9,"bold"))
+
+def _ih_log(msg, tag="DIM"):
+    _ih_out.config(state="normal")
+    _ih_out.insert(tk.END, msg + "\n", tag)
+    _ih_out.see(tk.END)
+    _ih_out.config(state="disabled")
+
+def _ih_compute(path: str):
+    try:
+        import pefile as _pef
+    except ImportError:
+        _ih_log("pefile not available — install via pip", "WARN")
+        return None, []
+    try:
+        pe = _pef.PE(path, fast_load=False)
+    except Exception as e:
+        _ih_log(f"  pefile error: {e}", "WARN")
+        return None, []
+    imports = []
+    if hasattr(pe, "DIRECTORY_ENTRY_IMPORT"):
+        for entry in pe.DIRECTORY_ENTRY_IMPORT:
+            dll = entry.dll.decode("utf-8","replace").lower().split(".")[0] if entry.dll else "?"
+            for imp in entry.imports:
+                name = imp.name.decode("utf-8","replace").lower() if imp.name else f"ord_{imp.ordinal}"
+                imports.append(f"{dll}.{name}")
+    import hashlib as _hih
+    imphash = _hih.md5(",".join(imports).encode()).hexdigest() if imports else "N/A"
+    return imphash, imports
+
+def _ih_run():
+    p = _ih_file_v.get().strip()
+    if not p or not os.path.isfile(p):
+        messagebox.showerror("Imphash", "Select a valid PE file.")
+        return
+    _ih_out.config(state="normal"); _ih_out.delete("1.0", tk.END); _ih_out.config(state="disabled")
+    def _do():
+        _ih_log(f"File: {os.path.basename(p)}  ({os.path.getsize(p):,} bytes)", "HEAD")
+        imphash, imports = _ih_compute(p)
+        if imphash is None:
+            return
+        _ih_log(f"  Imphash  : {imphash}", "HASH")
+        _ih_log(f"  Imports  : {len(imports)} functions", "DIM")
+        _ih_log("", "DIM")
+        _ih_log("IMPORTED FUNCTIONS:", "HEAD")
+        for imp2 in imports[:150]:
+            _ih_log(f"  {imp2}", "IMP")
+        if len(imports) > 150:
+            _ih_log(f"  ... and {len(imports)-150} more", "DIM")
+        _ih_log("", "DIM")
+        _ih_log(f"VT search: https://www.virustotal.com/gui/search/{imphash}", "DIM")
+    threading.Thread(target=_do, daemon=True).start()
+
+def _ih_bulk():
+    d = _ih_dir_v.get().strip()
+    if not d or not os.path.isdir(d):
+        messagebox.showerror("Imphash", "Select a valid folder.")
+        return
+    _ih_out.config(state="normal"); _ih_out.delete("1.0", tk.END); _ih_out.config(state="disabled")
+    def _do_bulk():
+        _ih_log(f"Scanning: {d}", "HEAD")
+        seen = {}
+        exts = {".exe",".dll",".sys",".ocx",".drv"}
+        for fn in os.listdir(d):
+            fp = os.path.join(d, fn)
+            if not os.path.isfile(fp): continue
+            if os.path.splitext(fn)[1].lower() not in exts: continue
+            imphash, imports = _ih_compute(fp)
+            if imphash is None or imphash == "N/A": continue
+            _ih_log(f"  {fn:<40} {imphash}  ({len(imports)} imports)", "IMP")
+            if imphash in seen:
+                _ih_log(f"    ⚠ SAME IMPHASH as: {seen[imphash]} — possible variant!", "MATCH")
+            else:
+                seen[imphash] = fn
+        _ih_log(f"\nDone. {len(seen)} unique imphashes.", "HEAD")
+    threading.Thread(target=_do_bulk, daemon=True).start()
 
 
 _tab_reg = tk.Frame(_proc_nb, bg=C["base"]); _proc_nb.add(_tab_reg, text="🗝Registry")
@@ -28955,6 +29098,136 @@ _bpan_pat_e.bind("<Return>", lambda e: _bpan_run())
 
 
 
+_tab_fuzzy = tk.Frame(_look_nb, bg=C["base"])
+_look_nb.add(_tab_fuzzy, text="🧬 FUZZY")
+
+_fz_head = tk.Frame(_tab_fuzzy, bg=C["surface0"], padx=16, pady=10); _fz_head.pack(fill=tk.X)
+tk.Label(_fz_head, text="FUZZY HASH / SIMILARITY", font=FB, bg=C["surface0"], fg=C["pink"]).pack(anchor="w")
+tk.Label(_fz_head, text="Compute rolling fuzzy hashes and similarity score between two files (ssdeep-style, no extra deps)",
+         font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_tab_fuzzy, bg=C["pink"], height=2).pack(fill=tk.X)
+
+_fz_ctrl = tk.Frame(_tab_fuzzy, bg=C["surface0"], padx=12, pady=8); _fz_ctrl.pack(fill=tk.X)
+_fz_f1 = tk.StringVar(); _fz_f2 = tk.StringVar()
+tk.Label(_fz_ctrl, text="File A:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
+tk.Entry(_fz_ctrl, textvariable=_fz_f1, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+         insertbackground=C["text"], relief="flat", bd=4, width=30).pack(side=tk.LEFT, padx=4)
+_mkbtn(_fz_ctrl, "Browse A", lambda: _fz_f1.set(filedialog.askopenfilename() or _fz_f1.get()), C["surface2"])
+tk.Label(_fz_ctrl, text="  File B:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT, padx=(10,0))
+tk.Entry(_fz_ctrl, textvariable=_fz_f2, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+         insertbackground=C["text"], relief="flat", bd=4, width=30).pack(side=tk.LEFT, padx=4)
+_mkbtn(_fz_ctrl, "Browse B", lambda: _fz_f2.set(filedialog.askopenfilename() or _fz_f2.get()), C["surface2"])
+_mkbtn(_fz_ctrl, "🧬 Compute", lambda: _fz_run(), C["pink"])
+
+_fz_single_row = tk.Frame(_tab_fuzzy, bg=C["base"], padx=12, pady=4); _fz_single_row.pack(fill=tk.X)
+_fz_single_v = tk.StringVar()
+tk.Label(_fz_single_row, text="Single file hash:", font=FS, bg=C["base"], fg=C["text"]).pack(side=tk.LEFT)
+tk.Entry(_fz_single_row, textvariable=_fz_single_v, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+         insertbackground=C["text"], relief="flat", bd=4, width=40).pack(side=tk.LEFT, padx=4)
+_mkbtn(_fz_single_row, "Browse", lambda: _fz_single_v.set(filedialog.askopenfilename() or _fz_single_v.get()), C["surface2"])
+_mkbtn(_fz_single_row, "Hash Only", lambda: _fz_single(), C["mauve"])
+
+tk.Frame(_tab_fuzzy, bg=C["surface2"], height=1).pack(fill=tk.X)
+
+_fz_out = tk.Text(_tab_fuzzy, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
+                  relief="flat", bd=0, padx=12, pady=8, wrap="word", state="disabled")
+_fz_sc = tk.Scrollbar(_tab_fuzzy, orient="vertical", command=_fz_out.yview,
+                       bg=C["surface1"], troughcolor=C["base"], relief="flat", width=7)
+_fz_sc.pack(side=tk.RIGHT, fill=tk.Y)
+_fz_out.pack(fill=tk.BOTH, expand=True)
+_fz_out.configure(yscrollcommand=_fz_sc.set)
+_fz_out.tag_configure("HEAD", foreground=C["pink"],  font=("Consolas",9,"bold"))
+_fz_out.tag_configure("OK",   foreground=C["green"])
+_fz_out.tag_configure("WARN", foreground=C["yellow"])
+_fz_out.tag_configure("VAL",  foreground=C["mauve"])
+_fz_out.tag_configure("DIM",  foreground=C["overlay0"])
+
+def _fz_rolling_hash(data: bytes, block_size: int = 64) -> str:
+    import hashlib as _hlib
+    if not data:
+        return ""
+    out = []
+    for i in range(0, len(data), block_size):
+        chunk = data[i:i + block_size]
+        h = _hlib.md5(chunk).hexdigest()[:6]
+        out.append(h)
+    return ":".join(out)
+
+def _fz_similarity(h1: str, h2: str) -> float:
+    if not h1 or not h2:
+        return 0.0
+    parts1 = set(h1.split(":"))
+    parts2 = set(h2.split(":"))
+    if not parts1 or not parts2:
+        return 0.0
+    intersection = len(parts1 & parts2)
+    union = len(parts1 | parts2)
+    return (intersection / union) * 100 if union > 0 else 0.0
+
+def _fz_log(msg, tag="DIM"):
+    _fz_out.config(state="normal")
+    _fz_out.insert(tk.END, msg + "\n", tag)
+    _fz_out.see(tk.END)
+    _fz_out.config(state="disabled")
+
+def _fz_single():
+    p = _fz_single_v.get().strip()
+    if not p or not os.path.isfile(p):
+        messagebox.showerror("Fuzzy Hash", "Select a valid file.")
+        return
+    _fz_out.config(state="normal"); _fz_out.delete("1.0", tk.END); _fz_out.config(state="disabled")
+    try:
+        data = open(p, "rb").read()
+    except Exception as e:
+        _fz_log(f"Read error: {e}", "WARN"); return
+    import hashlib as _hlib2
+    fhash = _fz_rolling_hash(data)
+    md5   = _hlib2.md5(data).hexdigest()
+    sha1  = _hlib2.sha1(data).hexdigest()
+    sha256= _hlib2.sha256(data).hexdigest()
+    _fz_log(f"File: {os.path.basename(p)}  ({len(data):,} bytes)", "HEAD")
+    _fz_log(f"  MD5    : {md5}", "DIM")
+    _fz_log(f"  SHA1   : {sha1}", "DIM")
+    _fz_log(f"  SHA256 : {sha256}", "DIM")
+    _fz_log(f"  Fuzzy  : {fhash[:120]}{'...' if len(fhash)>120 else ''}", "VAL")
+    _fz_log(f"  Blocks : {len(fhash.split(':'))}", "DIM")
+
+def _fz_run():
+    p1, p2 = _fz_f1.get().strip(), _fz_f2.get().strip()
+    if not p1 or not p2 or not os.path.isfile(p1) or not os.path.isfile(p2):
+        messagebox.showerror("Fuzzy Hash", "Select two valid files.")
+        return
+    _fz_out.config(state="normal"); _fz_out.delete("1.0", tk.END); _fz_out.config(state="disabled")
+    try:
+        d1 = open(p1, "rb").read()
+        d2 = open(p2, "rb").read()
+    except Exception as e:
+        _fz_log(f"Read error: {e}", "WARN"); return
+    h1 = _fz_rolling_hash(d1)
+    h2 = _fz_rolling_hash(d2)
+    sim = _fz_similarity(h1, h2)
+    import hashlib as _hlib3
+    _fz_log("FILE A", "HEAD")
+    _fz_log(f"  {os.path.basename(p1)}  ({len(d1):,} bytes)", "DIM")
+    _fz_log(f"  SHA256 : {_hlib3.sha256(d1).hexdigest()}", "DIM")
+    _fz_log(f"  Fuzzy  : {h1[:100]}{'...' if len(h1)>100 else ''}", "VAL")
+    _fz_log("", "DIM")
+    _fz_log("FILE B", "HEAD")
+    _fz_log(f"  {os.path.basename(p2)}  ({len(d2):,} bytes)", "DIM")
+    _fz_log(f"  SHA256 : {_hlib3.sha256(d2).hexdigest()}", "DIM")
+    _fz_log(f"  Fuzzy  : {h2[:100]}{'...' if len(h2)>100 else ''}", "VAL")
+    _fz_log("", "DIM")
+    _fz_log(f"SIMILARITY SCORE:  {sim:.1f}%", "HEAD")
+    if sim >= 80:
+        _fz_log("  ⚠ HIGH similarity — likely variants of the same sample", "WARN")
+    elif sim >= 40:
+        _fz_log("  ~ MODERATE similarity — possible code reuse or shared packer", "WARN")
+    else:
+        _fz_log("  ✓ LOW similarity — files appear unrelated", "OK")
+    size_diff = abs(len(d1) - len(d2))
+    _fz_log(f"  Size delta: {size_diff:,} bytes", "DIM")
+
+
 _VORTEX_VERSION      = _VX_VER
 
 
@@ -28974,6 +29247,75 @@ _GITHUB_ADAPTER_URL  = f"{_GITHUB_BASE}/{_PLATFORM_BRANCH}/Adapters/v0rtex_adapt
 _ADAPTER_LOCAL_NAME  = "v0rtex_adapter.py"
 _UPDATE_STATE        = {"available": False, "remote_version": None, "changelog": ""}
 _UPDATE_CHECK_LOCK   = threading.Lock()
+
+_tab_upd_log = tk.Frame(_stg_nb, bg=C["base"])
+_stg_nb.add(_tab_upd_log, text=" 📜 UPDATE LOG ")
+
+_ul_head = tk.Frame(_tab_upd_log, bg=C["surface0"], padx=16, pady=8); _ul_head.pack(fill=tk.X)
+tk.Label(_ul_head, text="UPDATE LOG", font=FB, bg=C["surface0"], fg=C["sapphire"]).pack(anchor="w")
+tk.Label(_ul_head, text="History of all updates applied to V0RTEX", font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
+tk.Frame(_tab_upd_log, bg=C["sapphire"], height=2).pack(fill=tk.X)
+
+_ul_ctrl = tk.Frame(_tab_upd_log, bg=C["surface0"], padx=12, pady=6); _ul_ctrl.pack(fill=tk.X)
+
+_ul_out_f = tk.Frame(_tab_upd_log, bg=C["base"]); _ul_out_f.pack(fill=tk.BOTH, expand=True, padx=6, pady=4)
+_ul_sc = tk.Scrollbar(_ul_out_f, orient="vertical", bg=C["surface1"], troughcolor=C["base"], relief="flat", width=7)
+_ul_out = tk.Text(_ul_out_f, bg=C["mantle"], fg=C["text"], font=("Consolas",9),
+                  relief="flat", bd=0, padx=10, pady=8, wrap="none", state="disabled",
+                  yscrollcommand=_ul_sc.set)
+_ul_sc.config(command=_ul_out.yview)
+_ul_sc.pack(side=tk.RIGHT, fill=tk.Y); _ul_out.pack(fill=tk.BOTH, expand=True)
+_ul_out.tag_configure("HEAD", foreground=C["sapphire"], font=("Consolas",9,"bold"))
+_ul_out.tag_configure("OK",   foreground=C["green"])
+_ul_out.tag_configure("ERR",  foreground=C["red"])
+_ul_out.tag_configure("DIM",  foreground=C["overlay0"])
+_ul_out.tag_configure("VER",  foreground=C["mauve"], font=("Consolas",9,"bold"))
+
+_UL_LOG_PATH = os.path.join(UTILS_DIR, "debug_log", "update_log")
+
+def _ul_load():
+    _ul_out.config(state="normal"); _ul_out.delete("1.0", tk.END)
+    entries = []
+    if os.path.isdir(_UL_LOG_PATH):
+        import glob as _ulg
+        for _lf in sorted(_ulg.glob(os.path.join(_UL_LOG_PATH, "adapter_*.log")), reverse=True):
+            try:
+                with open(_lf, encoding="utf-8", errors="replace") as _f:
+                    content = _f.read()
+                date = os.path.basename(_lf).replace("adapter_","").replace(".log","")
+                entries.append((date, content))
+            except Exception:
+                pass
+    if not entries:
+        _ul_out.insert(tk.END, "No update logs found.\n", "DIM")
+        _ul_out.config(state="disabled")
+        return
+    for date, content in entries:
+        _ul_out.insert(tk.END, f"\u2500\u2500 {date} \u2500\u2500\n", "HEAD")
+        old_ver = "?"; new_ver = "?"
+        for line in content.splitlines():
+            if "old=" in line:
+                import re as _ulre
+                m = _ulre.search(r"old=([\w.]+)", line)
+                if m: old_ver = m.group(1)
+                m2 = _ulre.search(r"new=([\w.]+)", line)
+                if m2: new_ver = m2.group(1)
+        _ul_out.insert(tk.END, f"  v{old_ver}  \u2192  v{new_ver}\n", "VER")
+        for line in content.splitlines():
+            l = line.strip()
+            if not l: continue
+            tag = "OK" if "\u2713" in l else ("ERR" if "\u2717" in l else "DIM")
+            _ul_out.insert(tk.END, f"  {l}\n", tag)
+        _ul_out.insert(tk.END, "\n", "DIM")
+    _ul_out.config(state="disabled")
+
+_mkbtn(_ul_ctrl, "\U0001f504 Refresh", _ul_load, C["sapphire"])
+_mkbtn(_ul_ctrl, "\U0001f5d1 Clear Log Files",
+    lambda: [os.remove(f) for f in __import__("glob").glob(os.path.join(_UL_LOG_PATH,"adapter_*.log"))
+             if os.path.isfile(f)] or _ul_load(),
+    C["surface2"])
+
+root.after(1500, _ul_load)
 
 _tab_updater = tk.Frame(_stg_nb, bg=C["base"])
 _stg_nb.add(_tab_updater, text=" 🔄 UPDATER ")
