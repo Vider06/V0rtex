@@ -28566,6 +28566,8 @@ def _lt_stop():
         if _lt_proc[0]: _lt_proc[0].terminate()
     except Exception: pass
 
+root.after(800, _lt_detect_ifaces)
+
 _lt_btn_row2 = tk.Frame(_lt_ind, bg=C["crust"]); _lt_btn_row2.pack(side=tk.RIGHT)
 _lt_start_btn = tk.Button(_lt_btn_row2, text="  START  ", command=_lt_start,
     font=FB, bg=C["sapphire"], fg=C["base"], relief="flat", padx=10, pady=4, cursor="hand2", bd=0)
@@ -28746,6 +28748,7 @@ def _nst_update_metrics():
         _nst_loss_v.set(f"Loss: {la:.0f}%")
         _nst_deg_v.set(f"Degradation: {deg:+.1f}%")
     root.after(0, _upd)
+    root.after(0, _nst_redraw_graph)
 
 def _nst_worker():
     import time as _nt10, random as _nr10
@@ -28777,6 +28780,7 @@ def _nst_start():
     _nst_status_v2.set("MONITORING"); _nst_status_lbl2.config(fg=C["green"])
     _nst_start_btn.config(state="disabled",bg=C["surface2"])
     _nst_stop_btn.config(state="normal",bg=C["red"])
+    root.after(200, _nst_redraw_graph)
     threading.Thread(target=_nst_worker, daemon=True).start()
 
 def _nst_stop():
