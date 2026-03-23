@@ -45,6 +45,128 @@ _SUB   = "#6c7086"
 _TXT   = "#cdd6f4"
 _BAR_C = "#a6e3a1"
 
+GITHUB_BASE  = "https://raw.githubusercontent.com/Vider06/V0rtex"
+ADAPTER_URL  = f"{GITHUB_BASE}/{BRANCH}/Adapters/v0rtex_adapter.py"
+COMPAT_URL   = f"{GITHUB_BASE}/{BRANCH}/compat_map.json"
+ADAPTER_VER  = "1.0.1.X0"
+
+
+def _fetch(url: str, timeout: int = 30) -> str:
+    import urllib.request as _ur
+    req = _ur.Request(url, headers={"User-Agent": f"V0RTEX-Adapter/{ADAPTER_VER}"})
+    with _ur.urlopen(req, timeout=timeout) as _r:
+        return _r.read().decode("utf-8")
+
+
+def _parse_ver(v: str) -> tuple:
+    v = str(v).strip().lstrip("v")
+    parts = []
+    for p in v.split("."):
+        p = p.upper().replace("X", "")
+        if p.isdigit():
+            parts.append(int(p))
+    while len(parts) < 4:
+        parts.append(0)
+    return tuple(parts[:4])
+
+
+def _self_update() -> None:
+    try:
+        log(f"  [ SELF-UPDATE ]  Checking adapter update... (current: {ADAPTER_VER})")
+        _new_code = _fetch(ADAPTER_URL, timeout=15)
+        _self_path = os.path.abspath(__file__)
+        with open(_self_path, "r", encoding="utf-8") as _sf:
+            _old_code = _sf.read()
+        if _new_code.strip() == _old_code.strip():
+            log("  ~ adapter is up to date")
+            return
+        log("  ↓ new adapter found — updating and relaunching...")
+        with open(_self_path, "w", encoding="utf-8") as _sf:
+            _sf.write(_new_code)
+        kw: dict = {}
+        if _WIN:
+            kw["creationflags"] = 0x08000000
+        import subprocess as _sp_su
+        _sp_su.Popen([PYTHON_EXE, _self_path] + sys.argv[1:], **kw)
+        log("  ✓ new adapter launched — exiting old instance")
+        sys.exit(0)
+    except Exception as _e:
+        log(f"  ~ self-update failed: {_e} — continuing with current version")
+
+
+def _trampoline_loop() -> None:
+    log("  [ TRAMPOLINE ]  Fetching compat_map...")
+    _splash_progress(19, "trampoline — fetching compat_map...")
+    try:
+        _compat = json.loads(_fetch(COMPAT_URL, timeout=15))
+        _chain  = _compat.get("chain", [])
+        log(f"  compat_map loaded — {len(_chain)} entries")
+    except Exception as _e:
+        log(f"  ~ compat_map fetch failed: {_e} — skipping trampoline")
+        return
+
+    if not _chain:
+        log("  ~ empty chain — skipping trampoline")
+        return
+
+    _latest_t = _parse_ver(NEW_VER)
+    _cur_hop  = OLD_VER
+
+    while True:
+        _cur_t   = _parse_ver(_cur_hop)
+        _cur_idx = -1
+        for _i, _entry in enumerate(_chain):
+            if _parse_ver(_entry["version"]) == _cur_t:
+                _cur_idx = _i
+                break
+        if _cur_idx == -1:
+            for _i, _entry in enumerate(_chain):
+                if _parse_ver(_entry["version"]) <= _cur_t:
+                    _cur_idx = _i
+            if _cur_idx != -1:
+                log(f"  ~ v{_cur_hop} not in chain — nearest lower index {_cur_idx}")
+
+        if _cur_idx == -1 or _cur_idx + 1 >= len(_chain):
+            log("  ~ no further hops in chain")
+            break
+
+        _next     = _chain[_cur_idx + 1]
+        _next_ver = _next["version"]
+        _next_t   = _parse_ver(_next_ver)
+
+        if _next_t >= _latest_t:
+            log(f"  ~ next hop v{_next_ver} is already the target — exiting trampoline loop")
+            break
+
+        _next_url = _next.get("raw_url", f"{GITHUB_BASE}/{BRANCH}/v0rtex.py")
+        log(f"  → hop: v{_cur_hop} → v{_next_ver}")
+        _splash_progress(19, f"trampoline — v{_cur_hop} → v{_next_ver}...")
+
+        try:
+            import ast as _ast
+            _code = _fetch(_next_url, timeout=60)
+            _ast.parse(_code)
+            os.makedirs(INSTALL_DIR, exist_ok=True)
+            with open(MAIN_SCRIPT, "w", encoding="utf-8") as _mf:
+                _mf.write(_code)
+            log(f"  ✓ v{_next_ver} installed")
+            _req_p = os.path.join(INSTALL_DIR, "requirements.txt")
+            if os.path.isfile(_req_p):
+                _run([PYTHON_EXE, "-m", "pip", "install", "-r", _req_p,
+                      "--prefer-binary", "-q", "--no-cache-dir", "--progress-bar", "off"],
+                     timeout=300)
+                log(f"  ✓ deps for v{_next_ver} installed")
+            os.makedirs(META_DIR, exist_ok=True)
+            with open(os.path.join(META_DIR, "vx_version"), "w", encoding="utf-8") as _vf:
+                json.dump({"version": _next_ver, "name": "V0RTEX", "author": "Vider_06"}, _vf, indent=2)
+            log(f"  ✓ vx_version → v{_next_ver}")
+            _cur_hop = _next_ver
+        except Exception as _he:
+            log(f"  ✗ hop v{_next_ver} failed: {_he} — falling back to direct update")
+            break
+
+    log(f"  [ TRAMPOLINE ]  done — current: v{_cur_hop}  target: v{NEW_VER}")
+
 
 def _run(cmd: list, timeout: int = 30, text: bool = False):
     kw: dict = {"capture_output": True, "timeout": timeout}
@@ -425,13 +547,15 @@ def _run_splash() -> None:
         _splash_closed.set()
 
 
+_self_update()
+
 _splash_thread = threading.Thread(target=_run_splash, daemon=True)
 _splash_thread.start()
 _splash_ready.wait(timeout=2.5)
 time.sleep(0.2)
 _splash_progress(2, "starting...")
 
-log(f"  new={NEW_VER}  old={OLD_VER}  branch={BRANCH}  src={_ver_source}")
+log(f"  adapter={ADAPTER_VER}  new={NEW_VER}  old={OLD_VER}  branch={BRANCH}  src={_ver_source}")
 
 log("[ 1/6 ]  Killing V0RTEX processes...")
 _splash_progress(5, "kill — stopping V0RTEX processes...")
@@ -503,6 +627,8 @@ except ImportError:
 
 time.sleep(0.8)
 _splash_progress(18, "kill — processes cleared")
+
+_trampoline_loop()
 
 if FRESH_INSTALL:
     import shutil as _shu_fresh, urllib.request as _ur_fresh, tempfile as _tmp_fresh
