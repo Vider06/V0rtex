@@ -29348,9 +29348,6 @@ def _launch_update_ui(clear_install=False):
                 import ctypes as _ct_adm, subprocess as _sp_uac
                 _ulog("⚡  Requesting administrator privileges...", "WARN")
                 try:
-
-
-
                     _base_args = [a for a in sys.argv if a != "--auto-update"]
                     _elev_args = _base_args + ["--auto-update"]
                     params = _sp_uac.list2cmdline(_elev_args)
@@ -29399,7 +29396,16 @@ def _launch_update_ui(clear_install=False):
                 rr.after(0, lambda: _upd_start_btn.config(state="normal"))
                 return
 
-        _ulog("\n[ 1/3 ]  Collecting process info...", "HEAD"); _uprog(5, "pids")
+        script_path    = os.path.abspath(__file__)
+        script_dir     = os.path.dirname(script_path)
+        _vx_system_dir = os.path.dirname(script_dir)
+        _settings_dir  = os.path.dirname(_vx_system_dir)
+        _settings_path = os.path.join(_settings_dir, "update_settings.json")
+        ts             = time.strftime("%Y%m%d_%H%M%S")
+
+        _do_fresh = getattr(_upd_opt_fresh, "get", lambda: clear_install)()
+
+        _ulog("\n[ 1/4 ]  Collecting process info...", "HEAD"); _uprog(5, "pids")
         _update_pids = [os.getpid()]
         try:
             import psutil as _psu_upd
@@ -29409,15 +29415,131 @@ def _launch_update_ui(clear_install=False):
         except Exception as _pse:
             _ulog(f"  ~ psutil unavailable ({_pse}) — only main PID", "WARN")
 
-        _ulog("\n[ 2/3 ]  Writing update_settings.json...", "HEAD"); _uprog(10, "settings")
-        script_path    = os.path.abspath(__file__)
-        script_dir     = os.path.dirname(script_path)
-        _vx_system_dir = os.path.dirname(script_dir)
-        _settings_dir  = os.path.dirname(_vx_system_dir)
-        _settings_path = os.path.join(_settings_dir, "update_settings.json")
-        ts             = time.strftime("%Y%m%d_%H%M%S")
+        _ulog("\n[ 2/4 ]  Choosing update options...", "HEAD"); _uprog(10, "options")
 
-        _do_fresh = getattr(_upd_opt_fresh, "get", lambda: clear_install)()
+        _data_reset_choice = [False]
+        if _do_fresh:
+            try:
+                _UFW, _UFH = 560, 320
+                _uf = tk.Toplevel(rr)
+                _uf.title("Fresh Install — Data Options")
+                _uf.configure(bg="#0d0d14")
+                _uf.geometry(f"{_UFW}x{_UFH}+{(rr.winfo_screenwidth()-_UFW)//2}+{(rr.winfo_screenheight()-_UFH)//2}")
+                _uf.resizable(False, False)
+                _uf.attributes("-topmost", True)
+                _uf.grab_set()
+                _uf.protocol("WM_DELETE_WINDOW", lambda: None)
+                _uf.after(30000, lambda: (_data_reset_choice.__setitem__(0, False), _uf.destroy()) if _uf.winfo_exists() else None)
+                tk.Frame(_uf, bg="#fab387", height=3).pack(fill="x")
+                _hfd = tk.Frame(_uf, bg="#11111b", pady=8, padx=14); _hfd.pack(fill="x")
+                tk.Label(_hfd, text="  ● ● ●   FRESH INSTALL — DATA OPTIONS",
+                         font=("Consolas", 9, "bold"), bg="#11111b", fg="#585b70").pack(side="left")
+                tk.Label(_uf, text="⚠  What happens to your data?",
+                         font=("Consolas", 12, "bold"), bg="#0d0d14", fg="#fab387").pack(pady=(14, 4))
+                tk.Label(_uf,
+                         text="Program files will be removed and reinstalled from scratch.\n"
+                              "An EMERGENCY_RESTORE.zip backup will be created before any changes.",
+                         font=("Consolas", 9), bg="#0d0d14", fg="#cdd6f4",
+                         wraplength=500, justify="center").pack(pady=(0, 8))
+                tk.Frame(_uf, bg="#313244", height=1).pack(fill="x", padx=20)
+                _opf = tk.Frame(_uf, bg="#11111b", padx=24, pady=12); _opf.pack(fill="x")
+                tk.Label(_opf, text="☁  KEEP DATA  (safer)",
+                         font=("Consolas", 10, "bold"), bg="#11111b", fg="#a6e3a1").pack(anchor="w")
+                tk.Label(_opf,
+                         text="  Reinstalls program files. Keeps config, DB, rules, notes, API keys.",
+                         font=("Consolas", 8), bg="#11111b", fg="#7f849c", justify="left").pack(anchor="w", pady=(0, 8))
+                tk.Label(_opf, text="⚠  RESET EVERYTHING  (clean slate)",
+                         font=("Consolas", 10, "bold"), bg="#11111b", fg="#f38ba8").pack(anchor="w")
+                tk.Label(_opf,
+                         text="  Wipes ALL data. EMERGENCY_RESTORE.zip lets you roll back if needed.",
+                         font=("Consolas", 8), bg="#11111b", fg="#7f849c", justify="left").pack(anchor="w")
+                tk.Frame(_uf, bg="#313244", height=1).pack(fill="x", padx=20)
+                _bfd = tk.Frame(_uf, bg="#0d0d14", pady=10); _bfd.pack()
+                def _choose_keep(_dc=_data_reset_choice, _w=_uf):
+                    _dc[0] = False
+                    try: _w.grab_release(); _w.destroy()
+                    except Exception: pass
+                def _choose_reset(_dc=_data_reset_choice, _w=_uf):
+                    _dc[0] = True
+                    try: _w.grab_release(); _w.destroy()
+                    except Exception: pass
+                tk.Button(_bfd, text="☁  Keep My Data",
+                          font=("Consolas", 10, "bold"), bg="#a6e3a1", fg="#0d0d14",
+                          relief="flat", padx=20, pady=8, cursor="hand2", bd=0,
+                          command=_choose_keep).pack(side="left", padx=(0, 10))
+                tk.Button(_bfd, text="⚠  Reset Everything",
+                          font=("Consolas", 10, "bold"), bg="#f38ba8", fg="#0d0d14",
+                          relief="flat", padx=20, pady=8, cursor="hand2", bd=0,
+                          command=_choose_reset).pack(side="left")
+                rr.wait_window(_uf)
+            except Exception as _ufe:
+                _ulog(f"  ~ Data choice dialog error: {_ufe} — defaulting to KEEP DATA", "WARN")
+                _data_reset_choice[0] = False
+            _ulog(f"  ✔ User chose: {'RESET ALL' if _data_reset_choice[0] else 'KEEP DATA'}", "INFO")
+
+        _ulog("\n[ 3/4 ]  Creating EMERGENCY_RESTORE backup...", "HEAD"); _uprog(18, "backup")
+        _emergency_path = None
+        _userdata_path  = None
+        try:
+            _em_dir = _upd_tmp.gettempdir()
+            _emergency_path = os.path.join(_em_dir, f"EMERGENCY_RESTORE_{ts}.zip")
+            with _zf.ZipFile(_emergency_path, "w", _zf.ZIP_DEFLATED) as _ezw:
+                for _root_w, _dirs_w, _files_w in os.walk(_vx_system_dir):
+                    for _fw in _files_w:
+                        _fp_w = os.path.join(_root_w, _fw)
+                        try:
+                            _arc_w = os.path.relpath(_fp_w, _vx_system_dir)
+                            _ezw.write(_fp_w, _arc_w)
+                        except Exception:
+                            pass
+            _em_size = os.path.getsize(_emergency_path) // 1024
+            _ulog(f"  ✓ EMERGENCY_RESTORE.zip → {_emergency_path}  ({_em_size} KB)", "OK")
+        except Exception as _eme:
+            _ulog(f"  ~ Emergency backup failed: {_eme} — continuing anyway", "WARN")
+            _emergency_path = None
+
+        if _do_fresh and not _data_reset_choice[0]:
+            try:
+                _ud_path = os.path.join(_upd_tmp.gettempdir(), f"userdata_{ts}.zip")
+                _USER_FILES = ["config.json", "whitelist.txt", "notes.txt",
+                               "scan_history.db", "todo_list.json", "snippets.json",
+                               "rules_state.json"]
+                _USER_DIRS  = ["rules", "reports", "reports_pdf", "quarantine", "backups"]
+                with _zf.ZipFile(_ud_path, "w", _zf.ZIP_DEFLATED) as _uzw:
+                    for _uf2 in _USER_FILES:
+                        _ufp = os.path.join(script_dir, _uf2)
+                        if os.path.isfile(_ufp):
+                            _uzw.write(_ufp, _uf2)
+                    for _ud in _USER_DIRS:
+                        _udp = os.path.join(script_dir, _ud)
+                        if os.path.isdir(_udp):
+                            for _ur, _, _ufs in os.walk(_udp):
+                                for _uf3 in _ufs:
+                                    _ufp2 = os.path.join(_ur, _uf3)
+                                    try:
+                                        _uzw.write(_ufp2, os.path.relpath(_ufp2, script_dir))
+                                    except Exception:
+                                        pass
+                _userdata_path = _ud_path
+                _ud_size = os.path.getsize(_ud_path) // 1024
+                _ulog(f"  ✓ userdata.zip → {_ud_path}  ({_ud_size} KB)", "OK")
+            except Exception as _ude:
+                _ulog(f"  ~ User data backup failed: {_ude}", "WARN")
+                _userdata_path = None
+
+        _ulog("\n[ 4/4 ]  Fetching update adapter...", "HEAD"); _uprog(40, "adapter")
+        _adapter_path = None
+        try:
+            adapter_code = _upd_fetch_text(_GITHUB_ADAPTER_URL, timeout=20)
+            import ast as _ast_ua
+            _ast_ua.parse(adapter_code)
+            _afd, _adapter_path = _upd_tmp.mkstemp(suffix="_v0rtex_adapter.py",
+                                                    dir=_upd_tmp.gettempdir())
+            with open(_afd, "w", encoding="utf-8") as _af:
+                _af.write(adapter_code)
+            _ulog(f"  ✓ adapter fetched ({len(adapter_code):,} bytes)", "OK")
+        except Exception as _afe:
+            _ulog(f"  ✗ adapter fetch failed: {_afe}", "ERR")
 
         _update_settings = {
             "install_dir":                  script_dir,
@@ -29431,11 +29553,13 @@ def _launch_update_ui(clear_install=False):
             "preserve_config":              _upd_opt_cfg.get(),
             "update_rules":                 _upd_opt_rules.get(),
             "fresh_install":                _do_fresh,
-            "data_reset":                   False,
+            "data_reset":                   _data_reset_choice[0],
             "restart_level":                "admin" if CONFIG.get("require_admin_start", False) else "user",
             "v0rtex_pids":                  _update_pids,
             "adapter_pid":                  0,
             "backup_path":                  "",
+            "emergency_backup_path":        _emergency_path or "",
+            "userdata_backup_path":         _userdata_path or "",
             "log_dir":                      os.path.join(_vx_system_dir, "v0rtex_utils",
                                                          "debug_log", "update_log"),
             "started_ts":                   ts,
@@ -29449,64 +29573,6 @@ def _launch_update_ui(clear_install=False):
             _ulog(f"  ✓ update_settings.json → {_settings_path}", "OK")
         except Exception as _swe:
             _ulog(f"  ~ settings write failed: {_swe} — continuing anyway", "WARN")
-
-        bk_path = None
-        if _upd_opt_bk.get():
-            _ulog("\n[ 2b/3 ]  Creating backup...", "HEAD"); _uprog(15, "backup")
-            try:
-                bk_dir  = os.path.join(script_dir, "backups")
-                os.makedirs(bk_dir, exist_ok=True)
-                bk_path = os.path.join(bk_dir, f"pre_update_{ts}.zip")
-                with _zf.ZipFile(bk_path, "w", _zf.ZIP_DEFLATED) as _zw:
-                    for _fn in ["config.json", "whitelist.txt", "notes.txt",
-                                "scan_results.db", "scan_history.db",
-                                "todo_list.json", "snippets.json", "rules_state.json"]:
-                        _fp = os.path.join(script_dir, _fn)
-                        if os.path.isfile(_fp):
-                            _zw.write(_fp, _fn)
-                    _rules_d = os.path.join(script_dir, "rules")
-                    if os.path.isdir(_rules_d):
-                        for _rr2, _, _rfs in os.walk(_rules_d):
-                            for _rf in _rfs:
-                                _rfp = os.path.join(_rr2, _rf)
-                                _zw.write(_rfp, os.path.relpath(_rfp, script_dir))
-                    for _rep in ["reports", "reports_pdf"]:
-                        _rep_d = os.path.join(script_dir, _rep)
-                        if os.path.isdir(_rep_d):
-                            for _rf2 in os.listdir(_rep_d):
-                                _rfp2 = os.path.join(_rep_d, _rf2)
-                                if os.path.isfile(_rfp2) and os.path.getsize(_rfp2) < 5*1024*1024:
-                                    try:
-                                        _zw.write(_rfp2, f"{_rep}/{_rf2}")
-                                    except Exception:
-                                        pass
-                _ulog(f"  ✓ backup → {os.path.basename(bk_path)}", "OK")
-                _update_settings["backup_path"] = str(bk_path)
-                try:
-                    with open(_settings_path, "w", encoding="utf-8") as _sf2:
-                        _j.dump(_update_settings, _sf2, indent=2)
-                except Exception:
-                    pass
-            except Exception as _be:
-                _ulog(f"  ✗ backup failed: {_be}", "ERR")
-                rr.after(0, lambda: _upd_start_btn.config(state="normal"))
-                return
-        else:
-            _ulog("  ~ backup skipped (user choice)", "DIM"); _uprog(20, "")
-
-        _ulog("\n[ 3/3 ]  Fetching update adapter...", "HEAD"); _uprog(40, "adapter")
-        _adapter_path = None
-        try:
-            adapter_code = _upd_fetch_text(_GITHUB_ADAPTER_URL, timeout=20)
-            import ast as _ast_ua
-            _ast_ua.parse(adapter_code)
-            _afd, _adapter_path = _upd_tmp.mkstemp(suffix="_v0rtex_adapter.py",
-                                                    dir=_upd_tmp.gettempdir())
-            with open(_afd, "w", encoding="utf-8") as _af:
-                _af.write(adapter_code)
-            _ulog(f"  ✓ adapter fetched ({len(adapter_code):,} bytes)", "OK")
-        except Exception as _afe:
-            _ulog(f"  ✗ adapter fetch failed: {_afe}", "ERR")
 
         if not _adapter_path:
             _ulog("  → falling back to legacy update method...", "WARN")
