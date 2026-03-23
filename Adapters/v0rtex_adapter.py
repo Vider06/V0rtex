@@ -402,8 +402,20 @@ def _run_splash() -> None:
 
             r.after(150, _pump)
 
+        def _force_top():
+            if _splash_closed.is_set():
+                return
+            try:
+                r.lift()
+                r.attributes("-topmost", True)
+                r.focus_force()
+            except Exception:
+                pass
+            r.after(800, _force_top)
+
         r.after(0, _splash_ready.set)
         r.after(150, _pump)
+        r.after(200, _force_top)
         r.mainloop()
 
     except Exception as _se:
