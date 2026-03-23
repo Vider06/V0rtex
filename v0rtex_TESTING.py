@@ -29102,10 +29102,10 @@ _tab_fuzzy = tk.Frame(_look_nb, bg=C["base"])
 _look_nb.add(_tab_fuzzy, text="🧬 FUZZY")
 
 _fz_head = tk.Frame(_tab_fuzzy, bg=C["surface0"], padx=16, pady=10); _fz_head.pack(fill=tk.X)
-tk.Label(_fz_head, text="FUZZY HASH / SIMILARITY", font=FB, bg=C["surface0"], fg=C["pink"]).pack(anchor="w")
+tk.Label(_fz_head, text="FUZZY HASH / SIMILARITY", font=FB, bg=C["surface0"], fg=C["flamingo"]).pack(anchor="w")
 tk.Label(_fz_head, text="Compute rolling fuzzy hashes and similarity score between two files (ssdeep-style, no extra deps)",
          font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
-tk.Frame(_tab_fuzzy, bg=C["pink"], height=2).pack(fill=tk.X)
+tk.Frame(_tab_fuzzy, bg=C["flamingo"], height=2).pack(fill=tk.X)
 
 _fz_ctrl = tk.Frame(_tab_fuzzy, bg=C["surface0"], padx=12, pady=8); _fz_ctrl.pack(fill=tk.X)
 _fz_f1 = tk.StringVar(); _fz_f2 = tk.StringVar()
@@ -29117,7 +29117,7 @@ tk.Label(_fz_ctrl, text="  File B:", font=FS, bg=C["surface0"], fg=C["text"]).pa
 tk.Entry(_fz_ctrl, textvariable=_fz_f2, font=("Consolas",9), bg=C["mantle"], fg=C["text"],
          insertbackground=C["text"], relief="flat", bd=4, width=30).pack(side=tk.LEFT, padx=4)
 _mkbtn(_fz_ctrl, "Browse B", lambda: _fz_f2.set(filedialog.askopenfilename() or _fz_f2.get()), C["surface2"])
-_mkbtn(_fz_ctrl, "🧬 Compute", lambda: _fz_run(), C["pink"])
+_mkbtn(_fz_ctrl, "🧬 Compute", lambda: _fz_run(), C["flamingo"])
 
 _fz_single_row = tk.Frame(_tab_fuzzy, bg=C["base"], padx=12, pady=4); _fz_single_row.pack(fill=tk.X)
 _fz_single_v = tk.StringVar()
@@ -29136,7 +29136,7 @@ _fz_sc = tk.Scrollbar(_tab_fuzzy, orient="vertical", command=_fz_out.yview,
 _fz_sc.pack(side=tk.RIGHT, fill=tk.Y)
 _fz_out.pack(fill=tk.BOTH, expand=True)
 _fz_out.configure(yscrollcommand=_fz_sc.set)
-_fz_out.tag_configure("HEAD", foreground=C["pink"],  font=("Consolas",9,"bold"))
+_fz_out.tag_configure("HEAD", foreground=C["flamingo"],  font=("Consolas",9,"bold"))
 _fz_out.tag_configure("OK",   foreground=C["green"])
 _fz_out.tag_configure("WARN", foreground=C["yellow"])
 _fz_out.tag_configure("VAL",  foreground=C["mauve"])
