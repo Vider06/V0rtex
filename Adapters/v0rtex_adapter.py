@@ -705,8 +705,15 @@ time.sleep(0.3)
 _launch_ok = False
 try:
     if os.path.isfile(MAIN_SCRIPT):
-        _popen([PYTHON_EXE, MAIN_SCRIPT, "--just-updated", OLD_VER])
-        log(f"  ✓ V0RTEX v{NEW_VER} launched  (--just-updated {OLD_VER})")
+        _sentinel = os.path.join(INSTALL_DIR, "_setup_complete")
+        if not os.path.isfile(_sentinel):
+            try:
+                open(_sentinel, "w").close()
+                log("  ✓ _setup_complete sentinel created")
+            except Exception as _se:
+                log(f"  ~ sentinel create failed: {_se}")
+        _popen([PYTHON_EXE, MAIN_SCRIPT, "--v0rtex-post-update", "--just-updated", OLD_VER])
+        log(f"  ✓ V0RTEX v{NEW_VER} launched  (--v0rtex-post-update --just-updated {OLD_VER})")
         _launch_ok = True
     else:
         log(f"  ✗ v0rtex.py not found: {MAIN_SCRIPT}")
