@@ -87,7 +87,7 @@ def _vx_load_ver():
                 str(_d.get("author","Vider_06")).strip())
     except Exception:
         _vx_load_ver._from_file = False
-        return (".".join(["1","0","1","X0"]), "V"+"0RTEX", "Vider"+"_06")
+        return (".".join(["1","0","1","X1"]), "V"+"0RTEX", "Vider"+"_06")
 
 _VX_VER, _VX_NAME, _VX_AUTH = _vx_load_ver()
 _pre_sl(f"version loaded: {_VX_VER}  from_file={_vx_load_ver._from_file}", "BOOT")
@@ -114,8 +114,8 @@ _T = "".join
 
 
 _ADM_BADGE   = _T(["⚠ ELEV", "ATED ·", " ADMIN"])
-_ADM_BADGE_W = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX v","1.0.1",".X0  by Vider_06"])
-_ADM_BADGE_R = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX RECOVERY TERMINAL  v","1.0.1",".X0"])
+_ADM_BADGE_W = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX v","1.0.1",".X1  by Vider_06"])
+_ADM_BADGE_R = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX RECOVERY TERMINAL  v","1.0.1",".X1"])
 _ADM_BADGE_S = _T(["⚡ ELEV", "ATED — ", "ADMIN"])   
 
 
@@ -159,7 +159,9 @@ def _setup_panic(title="Setup Error", body="", detail="", setup_root=None):
 
     try:
         import datetime as _dt
-        _log_dir = _os.path.join(_os.path.dirname(_os.path.abspath(_s.argv[0])), "debug_log")
+        _log_dir = globals().get("DEBUG_DIR") or _os.path.join(
+            _os.path.dirname(_os.path.dirname(_os.path.abspath(_s.argv[0]))),
+            "v0rtex_utils", "debug_log", "crash_log")
         _os.makedirs(_log_dir, exist_ok=True)
         _ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
         _crash_path = _os.path.join(_log_dir, f"SETUP_CRASH_{_ts}.txt")
@@ -3949,7 +3951,7 @@ def _run_setup_ui():
                     _bat = (
                         '@echo off\r\n'
                         'setlocal EnableDelayedExpansion\r\n'
-                        'title V0RTEX v1.0.1 - Launcher\r\n'
+                        'title V0RTEX v1.0.1.X1 - Launcher\r\n'
                         'color 0A\r\n'
                         'python --version >nul 2>&1\r\n'
                         'if %errorLevel% neq 0 (\r\n'
@@ -6365,9 +6367,6 @@ def _run_silent_update_ui(install_dir, python_exe, title="V0RTEX — POST-UPDATE
             _set_pct(88, "Finalizing...")
             for _sub in (
                 "rules", "rules/external", "reports",
-                "debug_log", "debug_log/crash_log",
-                "debug_log/session_log", "debug_log/trampoline_log",
-                "debug_log/admin_log", "debug_log/update_log",
                 "quarantine", "backups", "_recovery",
                 "sandbox_env", "threat_feeds",
             ):
@@ -6375,6 +6374,16 @@ def _run_silent_update_ui(install_dir, python_exe, title="V0RTEX — POST-UPDATE
                     _suo.makedirs(
                         _suo.path.join(install_dir, _sub),
                         exist_ok=True)
+                except Exception:
+                    pass
+            _utils_suu = _suo.path.join(_suo.path.dirname(install_dir), "v0rtex_utils")
+            for _dsub in (
+                "debug_log", "debug_log/crash_log",
+                "debug_log/session_log", "debug_log/trampoline_log",
+                "debug_log/admin_log", "debug_log/update_log",
+            ):
+                try:
+                    _suo.makedirs(_suo.path.join(_utils_suu, _dsub), exist_ok=True)
                 except Exception:
                     pass
 
@@ -9278,7 +9287,6 @@ CRITICAL_FILES = [
 
 
 _REQUIRED_DIRS = [
-    globals().get("DEBUG_DIR", os.path.join(BASE_DIR, "debug_log")),
     os.path.join(BASE_DIR, "reports"),
     os.path.join(BASE_DIR, "quarantine"),
     os.path.join(BASE_DIR, "rules"),
@@ -29826,12 +29834,6 @@ def _launch_update_ui(clear_install=False):
             _std_dirs = [
                 "rules", os.path.join("rules", "external"),
                 "reports", "reports_pdf", "modules",
-                "debug_log",
-                os.path.join("debug_log", "crash_log"),
-                os.path.join("debug_log", "session_log"),
-                os.path.join("debug_log", "trampoline_log"),
-                os.path.join("debug_log", "admin_log"),
-                os.path.join("debug_log", "update_log"),
                 "quarantine", "backups",
                 "sandbox_env", os.path.join("sandbox_env", "drop"),
                 "threat_feeds", "pcap_dumps",
@@ -29839,6 +29841,16 @@ def _launch_update_ui(clear_install=False):
             ]
             for _d2 in _std_dirs:
                 try: os.makedirs(os.path.join(script_dir, _d2), exist_ok=True)
+                except Exception: pass
+            _utils_dir_upd = os.path.join(os.path.dirname(script_dir), "v0rtex_utils")
+            for _dsub in (
+                "debug_log", os.path.join("debug_log", "crash_log"),
+                os.path.join("debug_log", "session_log"),
+                os.path.join("debug_log", "trampoline_log"),
+                os.path.join("debug_log", "admin_log"),
+                os.path.join("debug_log", "update_log"),
+            ):
+                try: os.makedirs(os.path.join(_utils_dir_upd, _dsub), exist_ok=True)
                 except Exception: pass
             _ulog("  \u2713 Directory tree recreated", "OK")
 
@@ -31793,7 +31805,7 @@ exc_type=None, exc_val=None, exc_tb=None,
             except Exception as _e:
                 errors.append(f"notes.txt: {_e}")
 
-        for _dname in ["_recovery", "backups", "debug_log", "quarantine", "reports", "rules"]:
+        for _dname in ["_recovery", "backups", "quarantine", "reports", "rules"]:
             dp = _ros.path.join(bd, _dname)
             if _ros.path.isdir(dp):
                 skipped.append(f"{_dname}/")
@@ -31803,6 +31815,14 @@ exc_type=None, exc_val=None, exc_tb=None,
                     created.append(f"{_dname}/")
                 except Exception as _de:
                     errors.append(f"{_dname}/: {_de}")
+        _utils_regen = _ros.path.join(_ros.path.dirname(bd), "v0rtex_utils")
+        for _dsub in ("debug_log", _ros.path.join("debug_log", "crash_log"),
+                      _ros.path.join("debug_log", "session_log"),
+                      _ros.path.join("debug_log", "trampoline_log"),
+                      _ros.path.join("debug_log", "admin_log"),
+                      _ros.path.join("debug_log", "update_log")):
+            try: _ros.makedirs(_ros.path.join(_utils_regen, _dsub), exist_ok=True)
+            except Exception: pass
 
 
         _replog("", "DIM")
