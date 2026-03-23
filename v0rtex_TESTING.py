@@ -28947,7 +28947,8 @@ _GITHUB_REPO_RAW     = f"{_GITHUB_BASE}/{_PLATFORM_BRANCH}"
 _GITHUB_PAGE_URL     = "https://github.com/Vider06/V0rtex"
 _GITHUB_API_RELEASE  = "https://api.github.com/repos/Vider06/V0rtex/releases/latest"
 _GITHUB_VERSION_URL  = f"{_GITHUB_REPO_RAW}/version.txt"
-_GITHUB_SCRIPT_URL   = f"{_GITHUB_REPO_RAW}/v0rtex.py"
+_REMOTE_SCRIPT_NAME  = "v0rtex_TESTING.py" if "TESTING" in _PLATFORM_BRANCH.upper() else "v0rtex.py"
+_GITHUB_SCRIPT_URL   = f"{_GITHUB_REPO_RAW}/{_REMOTE_SCRIPT_NAME}"
 _GITHUB_MANIFEST_URL = f"{_GITHUB_REPO_RAW}/update_manifest.json"
 
 _GITHUB_ADAPTER_URL  = f"{_GITHUB_BASE}/{_PLATFORM_BRANCH}/Adapters/v0rtex_adapter.py"
@@ -29682,7 +29683,7 @@ def _launch_update_ui(clear_install=False):
 
         _ulog("\n[ 2b/7 ]  Downloading v0rtex.py…","HEAD"); _uprog(20,"download")
         try:
-            new_script = _upd_fetch_text(f"{base_url}/v0rtex.py", timeout=60)
+            new_script = _upd_fetch_text(f"{base_url}/{_REMOTE_SCRIPT_NAME}", timeout=60)
             _ulog(f"  ✓ Downloaded {len(new_script):,} bytes","OK")
         except Exception as e:
             _ulog(f"  ✗ Download failed: {e}","ERR")
