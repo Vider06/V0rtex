@@ -5,6 +5,15 @@ Format: `[version] — date — summary`
 
 ---
 
+## [1.0.0.X0] — 2026-03-23
+
+### Fixed
+- **`_detect_platform_branch()`** — now returns the correct release branch per platform (`Windows_Release` / `MacOS_Release` / `Linux_release`) instead of the hardcoded development value `TESTING-GENERAL`.
+- **`_REMOTE_SCRIPT_NAME`** — simplified to `"v0rtex.py"` unconditionally. The conditional check for `TESTING` in the branch name was redundant now that branch detection is correct.
+- **Reinstall script — `NameError: name '_PLATFORM_BRANCH' is not defined`** — the generated `v0rtex_reinstall.py` now resolves the platform branch inline at runtime via a local `_ri_branch` variable, instead of relying on `_PLATFORM_BRANCH` from the parent scope (which is not available when the script runs standalone).
+
+---
+
 ## [0.9.9.X0] — 2026-03-17
 
 ### Added

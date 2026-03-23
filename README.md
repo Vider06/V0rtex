@@ -1,4 +1,4 @@
-# V0RTEX v0.9.9.X0
+# V0RTEX v1.0.0.X0
 
 **V0RTEX** is a self-contained Windows malware analysis platform built entirely in Python + Tkinter.  
 One file. No external launcher. No installer required beyond running `python v0rtex.py`.
@@ -148,7 +148,7 @@ Go to **YARA** tab → **LIBRARY** → select the rule repositories you want (Ne
 
 ```
 V0rtex_System/
-├── V0RTEX_v0.9.9.X0/               ← main install directory
+├── V0RTEX_v1.0.0.X0/               ← main install directory
 │   ├── v0rtex.py                   ← the entire application (single file)
 │   ├── config.json                 ← all user settings and API keys
 │   ├── scan_history.db             ← SQLite scan database

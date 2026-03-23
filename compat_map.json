@@ -1,7 +1,7 @@
 {
   "_comment": "V0RTEX compatibility map — Windows_Release branch. Add a new entry each time a version is released. raw_url must point to the exact commit/tag raw URL of v0rtex.py for that version. max_direct_hops: if the user is more than this many steps behind, the TRAMPOLINE method is used instead of a direct jump.",
 
-  "latest_version": "0.9.7",
+  "latest_version": "1.0.0.X0",
 
   "max_direct_hops": 5,
 
@@ -10,6 +10,16 @@
       "version": "0.9.7",
       "raw_url": "https://raw.githubusercontent.com/Vider06/V0rtex/Windows_Release/v0rtex.py",
       "notes": "Initial release on this branch"
+    },
+    {
+      "version": "0.9.9.X0",
+      "raw_url": "https://raw.githubusercontent.com/Vider06/V0rtex/Windows_Release/v0rtex.py",
+      "notes": "Centralized versioning, Recovery UI overhaul, Performance tab, System Check/Fixer"
+    },
+    {
+      "version": "1.0.0.X0",
+      "raw_url": "https://raw.githubusercontent.com/Vider06/V0rtex/Windows_Release/v0rtex.py",
+      "notes": "Branch detection fix, reinstall script NameError fix"
     }
   ]
 }
