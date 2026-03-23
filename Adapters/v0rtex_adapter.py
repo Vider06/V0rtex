@@ -48,7 +48,7 @@ _BAR_C = "#a6e3a1"
 GITHUB_BASE  = "https://raw.githubusercontent.com/Vider06/V0rtex"
 ADAPTER_URL  = f"{GITHUB_BASE}/{BRANCH}/Adapters/v0rtex_adapter.py"
 COMPAT_URL   = f"{GITHUB_BASE}/{BRANCH}/compat_map.json"
-ADAPTER_VER  = "1.0.1.X0"
+ADAPTER_VER  = "1.0.1.X1"
 
 
 def _fetch(url: str, timeout: int = 30) -> str:
