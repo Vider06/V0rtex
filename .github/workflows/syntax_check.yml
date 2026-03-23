@@ -13,4 +13,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Check v0rtex.py syntax
-        run: python -m py_compile v0rtex.py && echo "OK"
+        run: |
+          if [ ! -f v0rtex.py ]; then
+            echo "v0rtex.py not present on this branch — skipping syntax check"
+            exit 0
+          fi
+          python -m py_compile v0rtex.py && echo "OK"
