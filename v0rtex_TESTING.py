@@ -28661,7 +28661,8 @@ def _lt_upd_stats():
 def _lt_worker():
     import time as _lt4
     tshark = CONFIG.get("tshark_path","tshark")
-    iface  = _lt_iface_v.get().strip()
+    _iface_raw = _lt_iface_v.get().strip()
+    iface = _iface_raw.split(" (")[0].strip() if " (" in _iface_raw else _iface_raw
     filt   = _lt_filter_v.get().strip()
     count  = _lt_count_v.get()
     cmd = [tshark,"-l","-n","-T","fields",
@@ -28902,7 +28903,8 @@ def _nst_update_metrics():
         pings = [x for x in _nst_data["ping"] if x is not None]
         dns   = [x for x in _nst_data["dns"]  if x is not None]
         loss  = _nst_data["loss"]; n = len(_nst_data["ping"])
-    if not pings: return
+    if n == 0: return
+    if not pings: pings = [0.0]
     pa=sum(pings)/len(pings); pm=min(pings); px=max(pings)
     jit=px-pm; da=sum(dns)/len(dns) if dns else 0; dx=max(dns) if dns else 0
     la=sum(loss)/len(loss) if loss else 0
@@ -28935,7 +28937,7 @@ def _nst_worker():
             _nst_data["ping"].append(pm); _nst_data["dns"].append(dm); _nst_data["loss"].append(lo)
             for k11 in ("ping","dns","loss"):
                 if len(_nst_data[k11]) > 200: _nst_data[k11] = _nst_data[k11][-200:]
-        tag11 = "OK" if pm and pm<80 else ("WARN" if pm and pm<200 else "BAD")
+        tag11 = "OK" if pm and pm<80 else ("WARN" if pm and pm<200 else ("DIM" if not pm else "BAD"))
         ps = f"{pm:.1f} ms" if pm else "TIMEOUT"
         ds = f"{dm:.1f} ms" if dm else "FAIL"
         _nst_log_add(f"ping {host}: {ps}  |  dns {dns_host}: {ds}", tag11)
