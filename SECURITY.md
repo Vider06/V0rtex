@@ -22,7 +22,7 @@ Do not run it on a production system or on any machine containing data you canno
 
 ## Architecture overview
 
-V0RTEX is a **single-file Python application** (~33,000 lines) that runs entirely on the user's machine. There is no server-side component, no cloud backend, and no telemetry of any kind. All processing happens locally except for explicit user-triggered external lookups (VirusTotal, Shodan, AbuseIPDB, etc.).
+V0RTEX is a **single-file Python application** (~35,000 lines) that runs entirely on the user's machine. There is no server-side component, no cloud backend, and no telemetry of any kind. All processing happens locally except for explicit user-triggered external lookups (VirusTotal, Shodan, AbuseIPDB, etc.).
 
 The application consists of:
 - A **setup wizard** that installs dependencies, creates the directory structure, writes embedded helper scripts, and configures Windows Defender exclusions
