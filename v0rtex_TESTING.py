@@ -6531,7 +6531,7 @@ def _run_setup_ui():
 
 
 
-def _run_silent_update_ui(install_dir, python_exe, title="V0RTEX IS UPDATING!"):
+def _run_silent_update_ui(install_dir, python_exe, title="V0RTEX — POST-UPDATE SETUP"):
     import tkinter as _suk
     import tkinter.ttk as _sutt
     import threading as _suth
@@ -6564,7 +6564,7 @@ def _run_silent_update_ui(install_dir, python_exe, title="V0RTEX IS UPDATING!"):
     except Exception:
         return
 
-    root_upd.title("V0RTEX Updater")
+    root_upd.title("V0RTEX — Post-Update Setup")
     root_upd.configure(bg=_BG)
     root_upd.resizable(False, False)
     _W, _H = 520, 320
@@ -6572,6 +6572,9 @@ def _run_silent_update_ui(install_dir, python_exe, title="V0RTEX IS UPDATING!"):
     _sh = root_upd.winfo_screenheight()
     root_upd.geometry(f"{_W}x{_H}+{(_sw - _W) // 2}+{(_sh - _H) // 2}")
     root_upd.overrideredirect(True)
+    root_upd.attributes("-topmost", True)
+    root_upd.lift()
+    root_upd.focus_force()
 
     _suk.Frame(root_upd, bg=_ACC, height=3).pack(fill="x")
     _hf = _suk.Frame(root_upd, bg=_PNL, padx=16, pady=10)
@@ -6653,6 +6656,16 @@ def _run_silent_update_ui(install_dir, python_exe, title="V0RTEX IS UPDATING!"):
             pass
 
     root_upd.after(120, _spin_tick)
+
+    def _force_top_su():
+        try:
+            root_upd.lift()
+            root_upd.attributes("-topmost", True)
+            root_upd.focus_force()
+        except Exception:
+            return
+        root_upd.after(800, _force_top_su)
+    root_upd.after(300, _force_top_su)
 
     def _log(msg, tag="DIM"):
         def _d():
@@ -6840,10 +6853,12 @@ def _check_first_run():
 
     if _o.path.exists(_o.path.join(script_dir, "_setup_complete")):
         if _post_reinstall:
+            import time as _t_su; _t_su.sleep(0.5)
             _run_silent_update_ui(script_dir, _s.executable,
                                   title="V0RTEX REINSTALL IN PROGRESS!")
             return
         if _post_update:
+            import time as _t_su; _t_su.sleep(3.0)
             _run_silent_update_ui(script_dir, _s.executable)
             return
         return
