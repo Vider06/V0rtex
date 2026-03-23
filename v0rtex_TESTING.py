@@ -376,8 +376,11 @@ if "--trampoline-update" in __import__("sys").argv:
             if sys.platform == "win32":
                 _d = _me + ".del"
                 os.rename(_me, _d)
+                _si_del = subprocess.STARTUPINFO()
+                _si_del.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                _si_del.wShowWindow = 0
                 subprocess.Popen(["cmd", "/c", f'ping 127.0.0.1 -n 3 >nul && del /f /q "{_d}"'],
-                                 creationflags=0x08000008, close_fds=True)
+                                 creationflags=0x08000000, startupinfo=_si_del, close_fds=True)
             else:
                 os.remove(_me)
         except Exception:
@@ -28979,14 +28982,11 @@ tk.Frame(_tab_updater, bg=C["surface2"], height=1).pack(fill=tk.X)
 _upd_cfg = tk.Frame(_tab_updater, bg=C["surface0"], padx=14, pady=8); _upd_cfg.pack(fill=tk.X)
 tk.Label(_upd_cfg, text="GitHub raw URL:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
 _upd_repo_v = tk.StringVar(value=_GITHUB_REPO_RAW)
-tk.Entry(_upd_cfg, textvariable=_upd_repo_v, width=72, font=("Consolas",9),
+tk.Entry(_upd_cfg, textvariable=_upd_repo_v, font=("Consolas",9),
          bg=C["mantle"], fg=C["text"], relief="flat", bd=4,
-         insertbackground=C["text"]).pack(side=tk.LEFT, padx=6)
+         insertbackground=C["text"]).pack(side=tk.LEFT, padx=6, fill=tk.X, expand=True)
 def _upd_open_github():
     import webbrowser; webbrowser.open(_GITHUB_PAGE_URL)
-tk.Button(_upd_cfg, text="🔗 GitHub", font=("Consolas",9), bg=C["surface1"], fg=C["blue"],
-          relief="flat", bd=0, padx=8, pady=3, cursor="hand2",
-          command=_upd_open_github).pack(side=tk.LEFT, padx=(2,0))
 
 _upd_optrow = tk.Frame(_tab_updater, bg=C["base"], padx=14, pady=4); _upd_optrow.pack(fill=tk.X)
 _upd_auto_v = tk.BooleanVar(value=CONFIG.get("auto_update_check", True))
@@ -29216,9 +29216,20 @@ def _launch_update_ui(clear_install=False):
     tk.Frame(left, bg=_BRD2, height=1).pack(fill="x", pady=(10,8))
     tk.Label(left, text="OPTIONS", font=("Consolas",8,"bold"), bg=_PNL, fg=_DIM).pack(anchor="w")
     tk.Frame(left, bg=_BRD2, height=1).pack(fill="x", pady=(4,8))
-    _upd_opt_bk    = tk.BooleanVar(value=True)
-    _upd_opt_rules = tk.BooleanVar(value=True)
-    _upd_opt_cfg   = tk.BooleanVar(value=not clear_install)
+    _au_restored = {}
+    _au_tmp2 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "_upd_tmp_opts.json")
+    if os.path.isfile(_au_tmp2):
+        try:
+            with open(_au_tmp2, encoding="utf-8") as _auf2:
+                _au_restored = json.load(_auf2)
+            os.remove(_au_tmp2)
+        except Exception:
+            pass
+    if _au_restored.get("fresh_install", False):
+        clear_install = True
+    _upd_opt_bk    = tk.BooleanVar(value=_au_restored.get("backup_before",   True))
+    _upd_opt_rules = tk.BooleanVar(value=_au_restored.get("update_rules",    True))
+    _upd_opt_cfg   = tk.BooleanVar(value=_au_restored.get("preserve_config", not clear_install))
     _upd_opt_restore = tk.BooleanVar(value=False)
     _upd_restore_path = tk.StringVar(value="")
     for _vv, _tt in [(_upd_opt_bk,"Backup before update"),
@@ -29348,8 +29359,20 @@ def _launch_update_ui(clear_install=False):
                     if ret > 32:
                         _ulog("✓  Admin granted — relaunching updater as administrator...", "OK")
                         _ulog("   This window will close now.", "DIM")
-
-
+                        try:
+                            _tmp_opts = {
+                                "backup_before":   _upd_opt_bk.get(),
+                                "preserve_config": _upd_opt_cfg.get(),
+                                "update_rules":    _upd_opt_rules.get(),
+                                "fresh_install":   _upd_opt_fresh.get(),
+                            }
+                            _tmp_opts_path = os.path.join(
+                                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                "_upd_tmp_opts.json")
+                            with open(_tmp_opts_path, "w", encoding="utf-8") as _tf:
+                                json.dump(_tmp_opts, _tf)
+                        except Exception:
+                            pass
                         root.after(800, rr.destroy)
                         root.after(1000, root.destroy)
                         return
@@ -30489,12 +30512,12 @@ def _show_update_ui_if_needed():
         notif = tk.Toplevel(root)
         notif.title("V0RTEX — Update Available")
         notif.configure(bg=_BG)
-        notif.resizable(False, False)
-        W, H = 480, 270
+        notif.resizable(True, True)
+        W, H = 480, 340
         sw, sh = notif.winfo_screenwidth(), notif.winfo_screenheight()
         notif.geometry(f"{W}x{H}+{(sw-W)//2}+{max((sh-H)//3, 30)}")
+        notif.minsize(420, 300)
         notif.attributes("-topmost", True)
-        notif.grab_set()
 
         tk.Frame(notif, bg=_BLU, height=3).pack(fill="x")
 
@@ -30564,6 +30587,8 @@ def _show_update_ui_if_needed():
 
 
 def _startup_update_check():
+    if "--auto-update" in sys.argv:
+        return
     if CONFIG.get("auto_update_check", True) or _upd_auto_v.get():
         _upd_check(silent=True)
 
@@ -34946,7 +34971,18 @@ _sl("[DBG] PRE-MAINLOOP: all module-level code done, entering mainloop", "BOOT")
 if "--auto-update" in sys.argv:
     _sl("[AUTO-UPDATE] flag detected — auto-opening updater UI", "BOOT")
     try:
-        root.after(600, lambda: _launch_update_ui(clear_install=False))
+        _au_fresh = False
+        _au_tmp = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "_upd_tmp_opts.json")
+        if os.path.isfile(_au_tmp):
+            try:
+                with open(_au_tmp, encoding="utf-8") as _auf:
+                    _au_saved = json.load(_auf)
+                os.remove(_au_tmp)
+                _au_fresh = _au_saved.get("fresh_install", False)
+                _sl(f"[AUTO-UPDATE] restored opts: {_au_saved}", "BOOT")
+            except Exception:
+                pass
+        root.after(600, lambda _f=_au_fresh: _launch_update_ui(clear_install=_f))
     except Exception as _au_e:
         _sl(f"[AUTO-UPDATE] failed to schedule _launch_update_ui: {_au_e}", "WARN")
 
