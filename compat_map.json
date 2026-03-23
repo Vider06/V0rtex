@@ -1,7 +1,7 @@
 {
   "_comment": "V0RTEX compatibility map — Windows_Release branch. Add a new entry each time a version is released. raw_url must point to the exact commit/tag raw URL of v0rtex.py for that version. max_direct_hops: if the user is more than this many steps behind, the TRAMPOLINE method is used instead of a direct jump.",
 
-  "latest_version": "1.0.0.X0",
+  "latest_version": "1.0.1.X1",
 
   "max_direct_hops": 5,
 
@@ -19,7 +19,17 @@
     {
       "version": "1.0.0.X0",
       "raw_url": "https://raw.githubusercontent.com/Vider06/V0rtex/Windows_Release/v0rtex.py",
-      "notes": "Branch detection fix, reinstall script NameError fix"
+      "notes": "Adapter pipeline, Tor/Proxy/Noise/LiveTraffic/ConnStats tabs, IMPHASH, FUZZY, Log Censor"
+    },
+    {
+      "version": "1.0.1.X0",
+      "raw_url": "https://raw.githubusercontent.com/Vider06/V0rtex/Windows_Release/v0rtex.py",
+      "notes": "Trampoline moved to adapter, adapter self-update, acronym updated"
+    },
+    {
+      "version": "1.0.1.X1",
+      "raw_url": "https://raw.githubusercontent.com/Vider06/V0rtex/Windows_Release/v0rtex.py",
+      "notes": "debug_log location fix — no longer created inside install dir"
     }
   ]
 }

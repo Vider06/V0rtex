@@ -1,9 +1,9 @@
 {
-  "version": "1.0.0.X0",
+  "version": "1.0.1.X1",
   "release_date": "2026-03-23",
   "files": [
     "v0rtex.py"
   ],
   "min_python": "3.10",
-  "changelog": "v1.0.0.X0 — 2026-03-23\n\nFIXED\n- _detect_platform_branch() now returns the correct release branch per platform (Windows_Release / MacOS_Release / Linux_release) instead of hardcoded TESTING-GENERAL.\n- _REMOTE_SCRIPT_NAME simplified to v0rtex.py — conditional on TESTING branch no longer needed.\n- Reinstall script: _PLATFORM_BRANCH resolved inline at runtime inside the generated script instead of at generation time, fixing NameError on first-run setup."
+  "changelog": "v1.0.1.X1 — 2026-03-23\n\nFIXED\n- debug_log/ no longer created inside the install directory — five separate code paths were incorrectly placing debug_log/ under V0RTEX_vX.X.X.XX/ instead of v0rtex_utils/debug_log/. All five fixed: _setup_panic, _REQUIRED_DIRS, in-app updater, Recovery Selective Regen, _run_silent_update_ui.\n\nv1.0.1.X0 — 2026-03-23\n\nCHANGED\n- Trampoline logic moved from v0rtex.py to v0rtex_adapter.py. The --trampoline-update block (369 lines) removed from v0rtex.py. Adapter now owns the full update chain.\n- v0rtex_adapter.py is now self-updating: fetches its own latest version before starting the splash UI, relaunches if newer.\n- Trampoline loop integrated into adapter: fetches compat_map.json, installs each intermediate version silently until one hop before target, then runs normal 6-step pipeline.\n- V0RTEX acronym updated: V=Vulnerability O=Oriented R=Recon T=Threat E=Exploitation X=eXaminer.\n\nv1.0.0.X0 — 2026-03-23\n\nADDED\n- v0rtex_adapter.py post-update adapter with 6-step pipeline and live splash UI.\n- NET: Proxy, Tor, Noise Gen, Live Traffic, Conn Stats, Ping tabs.\n- IOC: IMPHASH tab. LOOK: FUZZY, BINPAT tabs.\n- CFG: UPDATE LOG tab. SET: PRIVACY tab. HOME: README sub-tab.\n- Log censor system with per-category rules and Temp_Log_Storage.\n- Crash hooks: _early_crash_hook, _vx_debug_excepthook, _tk_callback_exception_handler.\n- Emergency rollback button in PROT > BACKUP.\n- PROT > System Check: FULL SCAN sub-tab.\n\nFIXED\n- Tkinter callback exceptions now routed to crash handler.\n- Cold-start performance improved via deferred tab init."
 }
