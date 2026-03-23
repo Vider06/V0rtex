@@ -456,16 +456,41 @@ _splash_progress(18, "kill — processes cleared")
 if FRESH_INSTALL:
     log("  [ FRESH INSTALL ]  Removing V0rtex_System directory...")
     _splash_progress(20, "fresh install — wiping V0rtex_System...")
-    import shutil as _shu_fresh
+    import shutil as _shu_fresh, urllib.request as _ur_fresh
     try:
         if os.path.isdir(VX_SYSTEM_DIR):
             _shu_fresh.rmtree(VX_SYSTEM_DIR, ignore_errors=True)
-            log(f"  \u2713 Removed: {VX_SYSTEM_DIR}")
+            log(f"  ✓ Removed: {VX_SYSTEM_DIR}")
         else:
             log("  ~ VX_SYSTEM_DIR not found, skipping wipe")
     except Exception as _fe:
         log(f"  ~ Fresh install wipe error: {_fe}")
-    time.sleep(0.5)
+    time.sleep(0.3)
+    log("  [ FRESH INSTALL ]  Re-downloading v0rtex.py...")
+    _splash_progress(22, "fresh install — downloading v0rtex.py...")
+    try:
+        _fr_url = f"https://raw.githubusercontent.com/Vider06/V0rtex/{BRANCH}/v0rtex.py"
+        _fr_req = _ur_fresh.Request(_fr_url, headers={"User-Agent": "V0RTEX-Adapter/2.0"})
+        with _ur_fresh.urlopen(_fr_req, timeout=60) as _fr_resp:
+            _fr_code = _fr_resp.read().decode("utf-8")
+        os.makedirs(INSTALL_DIR, exist_ok=True)
+        with open(MAIN_SCRIPT, "w", encoding="utf-8") as _fr_f:
+            _fr_f.write(_fr_code)
+        log(f"  ✓ v0rtex.py downloaded ({len(_fr_code):,} bytes)")
+        _req_out = os.path.join(INSTALL_DIR, "requirements.txt")
+        if not os.path.isfile(_req_out):
+            try:
+                _req_url = f"https://raw.githubusercontent.com/Vider06/V0rtex/{BRANCH}/requirements.txt"
+                _req_req2 = _ur_fresh.Request(_req_url, headers={"User-Agent": "V0RTEX-Adapter/2.0"})
+                with _ur_fresh.urlopen(_req_req2, timeout=30) as _rr:
+                    with open(_req_out, "w", encoding="utf-8") as _rf:
+                        _rf.write(_rr.read().decode("utf-8"))
+                log("  ✓ requirements.txt downloaded")
+            except Exception as _rqe:
+                log(f"  ~ requirements.txt fetch failed: {_rqe}")
+    except Exception as _fre:
+        log(f"  ✗ Fresh install download failed: {_fre}")
+    time.sleep(0.3)
 
 
 log("[ 2/6 ]  Checking obsolete dependencies...")
@@ -631,9 +656,13 @@ try:
     if _WIN:
         _tmp = _self + ".del"
         os.rename(_self, _tmp)
+        _si_adp = subprocess.STARTUPINFO()
+        _si_adp.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        _si_adp.wShowWindow = 0
         subprocess.Popen(
             ["cmd", "/c", f"ping 127.0.0.1 -n 3 >nul && del /f /q \"{_tmp}\""],
-            creationflags=0x08000008,
+            creationflags=0x08000000,
+            startupinfo=_si_adp,
             close_fds=True,
         )
     else:
