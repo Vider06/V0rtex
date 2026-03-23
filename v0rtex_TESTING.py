@@ -28959,28 +28959,29 @@ _UPDATE_CHECK_LOCK   = threading.Lock()
 _tab_updater = tk.Frame(_stg_nb, bg=C["base"])
 _stg_nb.add(_tab_updater, text=" 🔄 UPDATER ")
 
-_upd_h = tk.Frame(_tab_updater, bg=C["surface0"], padx=16, pady=10); _upd_h.pack(fill=tk.X)
-tk.Label(_upd_h, text="V0RTEX UPDATER", font=FB, bg=C["surface0"], fg=C["blue"]).pack(anchor="w")
+_upd_h = tk.Frame(_tab_updater, bg=C["surface0"], padx=16, pady=6); _upd_h.pack(fill=tk.X)
+_upd_h_row = tk.Frame(_upd_h, bg=C["surface0"]); _upd_h_row.pack(fill=tk.X)
+tk.Label(_upd_h_row, text="V0RTEX UPDATER", font=FB, bg=C["surface0"], fg=C["blue"]).pack(side=tk.LEFT, anchor="w")
+tk.Label(_upd_h_row, text=f"  ·  Branch: {_PLATFORM_BRANCH}",
+         font=("Consolas",8), bg=C["surface0"], fg=C["teal"]).pack(side=tk.LEFT, anchor="w", pady=(4,0))
 tk.Label(_upd_h, text="Check for updates on GitHub and apply them automatically",
          font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
-tk.Label(_upd_h, text=f"Branch: {_PLATFORM_BRANCH}",
-         font=("Consolas",8), bg=C["surface0"], fg=C["teal"]).pack(anchor="w")
 tk.Frame(_tab_updater, bg=C["blue"], height=2).pack(fill=tk.X)
 
-_upd_statbar = tk.Frame(_tab_updater, bg=C["crust"], padx=16, pady=8); _upd_statbar.pack(fill=tk.X)
+_upd_statbar = tk.Frame(_tab_updater, bg=C["crust"], padx=16, pady=5); _upd_statbar.pack(fill=tk.X)
 _upd_status_sv   = tk.StringVar(value=f"Current version: v{_VORTEX_VERSION}")
 _upd_remote_sv   = tk.StringVar(value="Remote version: — (not checked)")
-_upd_indicator_l = tk.Label(_upd_statbar, text="●", font=("Consolas",16),
+_upd_indicator_l = tk.Label(_upd_statbar, text="●", font=("Consolas",14),
                               bg=C["crust"], fg=C["overlay0"])
 _upd_indicator_l.pack(side=tk.LEFT, padx=(0,8))
 _upd_stat_col = tk.Frame(_upd_statbar, bg=C["crust"]); _upd_stat_col.pack(side=tk.LEFT, fill=tk.X)
-tk.Label(_upd_stat_col, textvariable=_upd_status_sv, font=("Consolas",10,"bold"),
+tk.Label(_upd_stat_col, textvariable=_upd_status_sv, font=("Consolas",9,"bold"),
          bg=C["crust"], fg=C["text"]).pack(anchor="w")
-tk.Label(_upd_stat_col, textvariable=_upd_remote_sv, font=("Consolas",9),
+tk.Label(_upd_stat_col, textvariable=_upd_remote_sv, font=("Consolas",8),
          bg=C["crust"], fg=C["overlay0"]).pack(anchor="w")
 tk.Frame(_tab_updater, bg=C["surface2"], height=1).pack(fill=tk.X)
 
-_upd_cfg = tk.Frame(_tab_updater, bg=C["surface0"], padx=14, pady=8); _upd_cfg.pack(fill=tk.X)
+_upd_cfg = tk.Frame(_tab_updater, bg=C["surface0"], padx=14, pady=5); _upd_cfg.pack(fill=tk.X)
 tk.Label(_upd_cfg, text="GitHub raw URL:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
 _upd_repo_v = tk.StringVar(value=_GITHUB_REPO_RAW)
 tk.Entry(_upd_cfg, textvariable=_upd_repo_v, font=("Consolas",9),
@@ -28989,14 +28990,13 @@ tk.Entry(_upd_cfg, textvariable=_upd_repo_v, font=("Consolas",9),
 def _upd_open_github():
     import webbrowser; webbrowser.open(_GITHUB_PAGE_URL)
 
-_upd_optrow = tk.Frame(_tab_updater, bg=C["base"], padx=14, pady=4); _upd_optrow.pack(fill=tk.X)
+_upd_bottom_row = tk.Frame(_tab_updater, bg=C["surface0"], padx=14, pady=5); _upd_bottom_row.pack(fill=tk.X)
 _upd_auto_v = tk.BooleanVar(value=CONFIG.get("auto_update_check", True))
-_upd_auto_chk = tk.Checkbutton(_upd_optrow, text="Check for updates on startup",
-    variable=_upd_auto_v, font=FS, bg=C["base"], fg=C["text"],
-    selectcolor=C["surface1"], activebackground=C["base"])
+_upd_auto_chk = tk.Checkbutton(_upd_bottom_row, text="Check for updates on startup",
+    variable=_upd_auto_v, font=FS, bg=C["surface0"], fg=C["text"],
+    selectcolor=C["surface1"], activebackground=C["surface0"])
 _upd_auto_chk.pack(side=tk.LEFT)
-
-_upd_btnrow = tk.Frame(_tab_updater, bg=C["surface0"], padx=14, pady=8); _upd_btnrow.pack(fill=tk.X)
+_upd_btnrow = _upd_bottom_row
 
 _upd_out_frame = tk.Frame(_tab_updater, bg=C["base"]); _upd_out_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=(2,4))
 _upd_out_sc_y = tk.Scrollbar(_upd_out_frame, orient="vertical", bg=C["surface1"],
@@ -30580,15 +30580,15 @@ def _show_update_ui_if_needed():
         notif.title("V0RTEX — Update Available")
         notif.configure(bg=_BG)
         notif.resizable(True, True)
-        W, H = 480, 340
+        W, H = 520, 360
         sw, sh = notif.winfo_screenwidth(), notif.winfo_screenheight()
         notif.geometry(f"{W}x{H}+{(sw-W)//2}+{max((sh-H)//3, 30)}")
-        notif.minsize(420, 300)
+        notif.minsize(460, 320)
         notif.attributes("-topmost", True)
 
         tk.Frame(notif, bg=_BLU, height=3).pack(fill="x")
 
-        hdr = tk.Frame(notif, bg=_BG, padx=22, pady=16); hdr.pack(fill="x")
+        hdr = tk.Frame(notif, bg=_BG, padx=22, pady=12); hdr.pack(fill="x")
         tk.Label(hdr, text="⚡  Update Available!",
                  font=("Consolas", 14, "bold"), bg=_BG, fg=_BLU).pack(anchor="w")
 
@@ -30631,21 +30631,21 @@ def _show_update_ui_if_needed():
             import webbrowser
             webbrowser.open(_GITHUB_PAGE_URL)
 
-        tk.Button(bot, text="⚡ Update Now",
+        tk.Button(bot, text="⚡  Update Now",
                   font=("Consolas", 10, "bold"), bg=_GRN, fg="#000",
-                  relief="flat", bd=0, padx=14, pady=7,
+                  relief="flat", bd=0, padx=18, pady=8,
                   cursor="hand2", activebackground="#7ecf9b",
-                  command=_do_update).pack(side="left", padx=(0, 6))
+                  command=_do_update).pack(side="left", padx=(0, 8))
 
-        tk.Button(bot, text="🔗 Read more on GitHub",
+        tk.Button(bot, text="🔗  GitHub",
                   font=("Consolas", 9), bg=_BRD, fg=_BLU,
-                  relief="flat", bd=0, padx=12, pady=7,
+                  relief="flat", bd=0, padx=14, pady=8,
                   cursor="hand2", activebackground="#252545",
-                  command=_open_github).pack(side="left", padx=(0, 6))
+                  command=_open_github).pack(side="left", padx=(0, 8))
 
         tk.Button(bot, text="Later",
                   font=("Consolas", 9), bg=_BG, fg=_DIM,
-                  relief="flat", bd=0, padx=10, pady=7,
+                  relief="flat", bd=0, padx=14, pady=8,
                   cursor="hand2", activebackground=_BRD,
                   command=notif.destroy).pack(side="right")
 
