@@ -27,6 +27,7 @@ EMERGENCY_BK_PATH: str  = meta.get("emergency_backup_path", "")
 USERDATA_BK_PATH:  str  = meta.get("userdata_backup_path", "")
 UTILS_DIR   = os.path.join(VX_SYSTEM_DIR, "v0rtex_utils")
 META_DIR    = os.path.join(UTILS_DIR, ".vx_meta")
+_REMOTE_SCRIPT_NAME = "v0rtex_TESTING.py" if "TESTING" in BRANCH.upper() else "v0rtex.py"
 MAIN_SCRIPT = os.path.join(INSTALL_DIR, "v0rtex.py")
 DEPS_REMOVE = os.path.join(META_DIR, ".deps_to_remove")
 LOG_DIR     = os.path.join(UTILS_DIR, "debug_log", "update_log")
@@ -493,7 +494,7 @@ if FRESH_INSTALL:
     _splash_progress(18, "fresh install — downloading v0rtex.py first...")
     log("  [ FRESH INSTALL ]  Downloading v0rtex.py before wipe...")
     try:
-        _fr_url = f"https://raw.githubusercontent.com/Vider06/V0rtex/{BRANCH}/v0rtex.py"
+        _fr_url = f"https://raw.githubusercontent.com/Vider06/V0rtex/{BRANCH}/{_REMOTE_SCRIPT_NAME}"
         log(f"  ► {_fr_url}")
         _fr_req = _ur_fresh.Request(_fr_url, headers={"User-Agent": "V0RTEX-Adapter/2.0"})
         with _ur_fresh.urlopen(_fr_req, timeout=60) as _fr_resp:
@@ -727,7 +728,6 @@ else:
     _cleanup_emergency_backups()
 
 time.sleep(2.0)
-log("  → Cleaning up...")
 log("  \u2192 Cleaning up...")
 try:
     if META_PATH and os.path.isfile(META_PATH):
