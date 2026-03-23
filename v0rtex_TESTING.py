@@ -28655,6 +28655,7 @@ def _lt_worker():
         with _lt_slk: _lt_stats["start"] = _lt4.monotonic()
         for line in proc.stdout:
             if not _lt_running[0]: break
+            if line.startswith("tshark:"): continue
             parts = line.strip().split("|")
             if len(parts) < 10: continue
             fnum,flen,si,di,tsp,tdp,usp,udp2,proto,info = (parts[i] if i<len(parts) else "" for i in range(10))
@@ -28758,13 +28759,18 @@ for _sv8,_c8 in ((_nst_ping_v,C["green"]),(_nst_dns_v,C["blue"]),
     tk.Label(_nst_ind2, textvariable=_sv8, font=FS, bg=C["crust"], fg=_c8).pack(side=tk.LEFT, padx=8)
 
 _nst_body2 = tk.Frame(_tab_net_stats, bg=C["base"]); _nst_body2.pack(fill=tk.BOTH, expand=True, padx=6, pady=4)
-_nst_left2  = tk.Frame(_nst_body2, bg=C["base"]); _nst_left2.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0,6))
-_nst_right2 = tk.Frame(_nst_body2, bg=C["base"], width=250); _nst_right2.pack(side=tk.LEFT, fill=tk.Y)
-_nst_right2.pack_propagate(False)
 
-_nst_graph_frame = tk.Frame(_nst_left2, bg=C["mantle"], height=160)
+_nst_graph_frame = tk.Frame(_nst_body2, bg=C["mantle"], height=180)
 _nst_graph_frame.pack(fill=tk.X, pady=(0, 4))
 _nst_graph_frame.pack_propagate(False)
+
+_nst_metrics_row = tk.Frame(_nst_body2, bg=C["surface0"], padx=10, pady=4)
+_nst_metrics_row.pack(fill=tk.X, pady=(0, 4))
+
+_nst_lower = tk.Frame(_nst_body2, bg=C["base"])
+_nst_lower.pack(fill=tk.BOTH, expand=True)
+_nst_left2  = _nst_lower
+_nst_right2 = tk.Frame(_nst_lower, bg=C["base"], width=0)
 _nst_canvas_ref = [None]
 _nst_fig_ref    = [None]
 
@@ -28827,17 +28833,19 @@ for _t9,_c9 in [("OK",C["green"]),("WARN",C["yellow"]),("BAD",C["red"]),
     _nst_log2.tag_configure(_t9, foreground=_c9)
 
 _nst_mvars = {}
-_nst_rc = tk.Frame(_nst_right2, bg=C["surface0"], padx=8, pady=8); _nst_rc.pack(fill=tk.BOTH, expand=True)
-tk.Label(_nst_rc, text="METRICS", font=("Consolas",7,"bold"), bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
-tk.Frame(_nst_rc, bg=C["surface2"], height=1).pack(fill=tk.X, pady=(2,4))
-for _mk in ("Ping avg","Ping min","Ping max","Jitter","DNS avg","DNS max",
-             "Loss avg","Samples","Baseline","Degradation"):
+for _mk, _mc in [
+    ("Ping avg", C["green"]), ("Ping min", C["teal"]), ("Ping max", C["yellow"]),
+    ("Jitter", C["peach"]), ("DNS avg", C["blue"]), ("DNS max", C["sapphire"]),
+    ("Loss avg", C["red"]), ("Samples", C["overlay0"]),
+    ("Baseline", C["overlay0"]), ("Degradation", C["flamingo"]),
+]:
     _mv2 = tk.StringVar(value="—"); _nst_mvars[_mk] = _mv2
-    _mr3 = tk.Frame(_nst_rc, bg=C["surface0"]); _mr3.pack(fill=tk.X, pady=1)
-    tk.Label(_mr3, text=f"{_mk}:", font=("Consolas",7), bg=C["surface0"], fg=C["overlay0"],
-        width=14, anchor="w").pack(side=tk.LEFT)
-    tk.Label(_mr3, textvariable=_mv2, font=("Consolas",7,"bold"),
-        bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
+    _mc2 = tk.Frame(_nst_metrics_row, bg=C["surface0"], padx=8)
+    _mc2.pack(side=tk.LEFT)
+    tk.Label(_mc2, text=f"{_mk}:", font=("Consolas",7), bg=C["surface0"],
+             fg=C["overlay0"]).pack(anchor="w")
+    tk.Label(_mc2, textvariable=_mv2, font=("Consolas",8,"bold"),
+             bg=C["surface0"], fg=_mc).pack(anchor="w")
 
 def _nst_log_add(msg, tag="DIM"):
     import datetime as _nd9
@@ -28944,64 +28952,6 @@ tk.Button(_nst_btn_row2, text="Clear", command=lambda: (
     font=FS, bg=C["surface1"], fg=C["text"], relief="flat", padx=8, pady=4, cursor="hand2", bd=0
 ).pack(side=tk.LEFT, padx=2)
 
-
-_tab_debuglog = tk.Frame(_stg_nb, bg=C["base"])
-_stg_nb.add(_tab_debuglog, text=" DEBUG LOG ")
-_dblogh = tk.Frame(_tab_debuglog, bg=C["surface0"], padx=16, pady=10); _dblogh.pack(fill=tk.X)
-tk.Label(_dblogh, text="DEBUG LOG VIEWER", font=FB, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
-tk.Label(_dblogh, text="Browse and search debug log files in the debug_log folder", font=FS, bg=C["surface0"], fg=C["overlay0"]).pack(anchor="w")
-tk.Frame(_tab_debuglog, bg=C["overlay0"], height=2).pack(fill=tk.X)
-_dlog_ctrl = tk.Frame(_tab_debuglog, bg=C["surface0"], padx=12, pady=8); _dlog_ctrl.pack(fill=tk.X)
-_dlog_file_v = tk.StringVar()
-_dlog_files_cb = ttk.Combobox(_tab_debuglog, textvariable=_dlog_file_v,
-                               width=42, font=("Consolas",9), state="readonly")
-_dlog_files_cb.pack(fill=tk.X, padx=12, pady=(0,4))
-_dlog_flt_v = tk.StringVar()
-tk.Label(_dlog_ctrl, text="Filter:", font=FS, bg=C["surface0"], fg=C["text"]).pack(side=tk.LEFT)
-_dlog_flt_e = tk.Entry(_dlog_ctrl, textvariable=_dlog_flt_v, width=22, font=("Consolas",9),
-                        bg=C["mantle"], fg=C["text"], relief="flat", bd=4,
-                        insertbackground=C["text"])
-_dlog_flt_e.pack(side=tk.LEFT, padx=4)
-_LOG_DIR = DEBUG_DIR
-def _dlog_populate():
-    os.makedirs(_LOG_DIR, exist_ok=True)
-    files = sorted(
-        [f for f in os.listdir(_LOG_DIR) if os.path.isfile(os.path.join(_LOG_DIR,f))],
-        reverse=True)
-    _dlog_files_cb["values"] = files
-    if files and not _dlog_file_v.get():
-        _dlog_file_v.set(files[0])
-def _dlog_open():
-    fname = _dlog_file_v.get()
-    if not fname: return
-    fp = os.path.join(_LOG_DIR, fname)
-    flt = _dlog_flt_v.get().strip().lower()
-    _dlog_out.config(state="normal"); _dlog_out.delete("1.0",tk.END)
-    try:
-        with open(fp,"r",encoding="utf-8",errors="replace") as f:
-            for line in f:
-                if flt and flt not in line.lower(): continue
-                _dlog_out.insert(tk.END, line)
-    except Exception as e:
-        _dlog_out.insert(tk.END, f"Error: {e}\n")
-    _dlog_out.config(state="disabled")
-def _dlog_open_folder():
-    if os.path.isdir(_LOG_DIR):
-        if sys.platform=="win32": os.startfile(_LOG_DIR)
-        else: subprocess.Popen(["xdg-open",_LOG_DIR])
-_mkbtn(_dlog_ctrl,"🔄 Refresh List",lambda:_dlog_populate(),C["surface2"],C["text"])
-_mkbtn(_dlog_ctrl,"📖 Open",lambda:_dlog_open(),C["overlay0"])
-_mkbtn(_dlog_ctrl,"📂 Folder",lambda:_dlog_open_folder(),C["surface1"],C["text"])
-_dlog_flt_e.bind("<Return>", lambda e: _dlog_open())
-_dlog_sc = tk.Scrollbar(_tab_debuglog, orient="vertical", bg=C["surface1"],
-                         troughcolor=C["base"], relief="flat", width=7)
-_dlog_out = tk.Text(_tab_debuglog, bg="#0a0a10", fg=C["subtext"], font=("Consolas",8),
-                    relief="flat", bd=0, padx=10, pady=8, state="disabled", wrap="none",
-                    yscrollcommand=_dlog_sc.set)
-_dlog_sc.config(command=_dlog_out.yview)
-_dlog_sc.pack(side=tk.RIGHT, fill=tk.Y); _dlog_out.pack(fill=tk.BOTH, expand=True, padx=8, pady=(4,8))
-_dlog_populate()
-_sl("[DBG] CP5 dlog_populate done", "BOOT")
 
 _tab_binpat = tk.Frame(_look_nb, bg=C["base"])
 _look_nb.add(_tab_binpat, text="🔎BINPAT")
@@ -30608,6 +30558,7 @@ _mkbtn(_upd_btnrow,"🔍 Check for Update",lambda: _upd_check(silent=False),C["b
 _mkbtn(_upd_btnrow,"⚡ Normal Update",lambda: _launch_update_ui(clear_install=False),C["green"])
 _mkbtn(_upd_btnrow,"🔥 Clear Install",lambda: _launch_update_ui(clear_install=True),C["red"])
 _mkbtn(_upd_btnrow,"🔗 Open on GitHub",lambda: __import__("webbrowser").open(_GITHUB_PAGE_URL),C["surface2"],C["blue"])
+_mkbtn(_upd_btnrow,"💾 Emergency Rollback",lambda: (_nb.select(_tab_approt), _ap_nb.select(_ap_bk_tab)),C["surface2"],C["red"])
 
 def _check_update_corrupted():
     """On startup: check if previous update crashed and show recovery UI."""
