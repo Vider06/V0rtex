@@ -1,0 +1,105 @@
+name: Dependency Check
+
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+    branches-ignore:
+      - main
+  schedule:
+    # Every Monday 08:00 UTC
+    - cron: "0 8 * * 1"
+
+jobs:
+  deps:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            branch-hint: windows
+          - os: ubuntu-latest
+            branch-hint: linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Find requirements.txt
+        id: req
+        shell: bash
+        run: |
+          FILE=$(find . -name "requirements.txt" | head -1)
+          if [ -z "$FILE" ]; then
+            echo "found=false" >> $GITHUB_OUTPUT
+          else
+            echo "found=true" >> $GITHUB_OUTPUT
+            echo "path=$FILE" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install dependencies
+        if: steps.req.outputs.found == 'true'
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          # Try normal install first, fall back to --user
+          pip install -r "${{ steps.req.outputs.path }}" \
+            --prefer-binary --no-cache-dir -q \
+            || pip install -r "${{ steps.req.outputs.path }}" \
+               --user --prefer-binary --no-cache-dir -q
+
+      - name: Import check — core packages
+        shell: python
+        run: |
+          import importlib, importlib.util, sys, subprocess
+
+          # Refresh path so --user installs are visible
+          import site
+          for sp in ([site.getusersitepackages()] if hasattr(site,'getusersitepackages') else []) + \
+                    (site.getsitepackages() if hasattr(site,'getsitepackages') else []):
+              if sp and sp not in sys.path:
+                  sys.path.insert(0, sp)
+          importlib.invalidate_caches()
+
+          pkgs = [
+              ("requests",     "requests"),
+              ("pefile",       "pefile"),
+              ("psutil",       "psutil"),
+              ("tkinterdnd2",  "tkinterdnd2"),
+              ("fpdf2",        "fpdf"),
+              ("watchdog",     "watchdog"),
+              ("pystray",      "pystray"),
+              ("Pillow",       "PIL"),
+              ("cryptography", "cryptography"),
+              ("reportlab",    "reportlab"),
+              ("chardet",      "chardet"),
+              ("dnspython",    "dns"),
+              ("python-whois", "whois"),
+              ("PyYAML",       "yaml"),
+              ("olefile",      "olefile"),
+              ("numpy",        "numpy"),
+              ("matplotlib",   "matplotlib"),
+          ]
+          failed = []
+          for pkg, mod in pkgs:
+              ok = False
+              try:
+                  importlib.import_module(mod); ok = True
+              except ImportError:
+                  r = subprocess.run([sys.executable, "-c", f"import {mod}"],
+                                     capture_output=True)
+                  ok = r.returncode == 0
+              print(f"  {'✓' if ok else '✗'} {pkg}")
+              if not ok:
+                  failed.append(pkg)
+          if failed:
+              print(f"\nMISSING: {failed}")
+              sys.exit(1)
+          print("All packages importable.")
