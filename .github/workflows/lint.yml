@@ -2,11 +2,9 @@ name: Lint (flake8)
 
 on:
   push:
-    branches-ignore:
-      - main
+    branches: ["**"]
   pull_request:
-    branches-ignore:
-      - main
+    branches: ["**"]
 
 jobs:
   lint:
@@ -35,6 +33,7 @@ jobs:
             -not -path "./.git/*" \
             | sort | tr '\n' ' ')
           if [ -z "$FILES" ]; then
+            echo "No .py files found — skipping."
             echo "found=false" >> $GITHUB_OUTPUT
           else
             echo "found=true" >> $GITHUB_OUTPUT
@@ -45,17 +44,13 @@ jobs:
         if: steps.find.outputs.found == 'true'
         run: |
           flake8 ${{ steps.find.outputs.files }} \
-            --count \
-            --select=E9,F63,F7,F82 \
-            --show-source \
-            --statistics
+            --count --select=E9,F63,F7,F82 \
+            --show-source --statistics
 
       - name: Lint — style warnings (exit-zero, max-line 200)
         if: steps.find.outputs.found == 'true'
         run: |
           flake8 ${{ steps.find.outputs.files }} \
-            --count \
-            --exit-zero \
-            --max-complexity=15 \
-            --max-line-length=200 \
+            --count --exit-zero \
+            --max-complexity=15 --max-line-length=200 \
             --statistics
