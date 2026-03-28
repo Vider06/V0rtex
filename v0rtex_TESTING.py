@@ -1,4 +1,3 @@
-# TESTING
 import os as _os_enc, sys as _sys_enc
 def _fix_encoding_self():
     """If this file was accidentally saved as UTF-16 (null bytes), re-save as UTF-8."""
@@ -21,374 +20,6 @@ def _fix_encoding_self():
 _fix_encoding_self()
 del _fix_encoding_self, _os_enc, _sys_enc
 
-if "--trampoline-update" in __import__("sys").argv:
-    def _trampoline_update_main():
-        import os, sys, json, subprocess, shutil, time, tempfile, urllib.request, ast
-
-        _SELF_PATH = os.path.abspath(__file__)
-        _args      = sys.argv
-        try:
-            _si = _args.index("--trampoline-update") + 1
-            _settings_path = _args[_si] if _si < len(_args) and _args[_si] else None
-        except (ValueError, IndexError):
-            _settings_path = None
-
-        _settings = {}
-        if _settings_path and os.path.isfile(_settings_path):
-            try:
-                with open(_settings_path, encoding="utf-8") as _f:
-                    _settings = json.load(_f)
-            except Exception as _e:
-                print(f"[TRAMPOLINE] settings load error: {_e}")
-
-        INSTALL_DIR = _settings.get("install_dir", os.path.join(os.path.dirname(_SELF_PATH), "v0rtex_system"))
-        PYTHON_EXE  = _settings.get("python_exe", sys.executable)
-        BRANCH      = _settings.get("branch", "Windows_Release")
-        CUR_VER     = _settings.get("trampoline_current_version", _settings.get("old_version", "?"))
-        GITHUB_BASE = "https://raw.githubusercontent.com/Vider06/V0rtex"
-        COMPAT_URL  = f"{GITHUB_BASE}/{BRANCH}/compat_map.json"
-        ADAPTER_DIR = f"{GITHUB_BASE}/{BRANCH}/Adapter"
-        UTILS_DIR   = os.path.join(os.path.dirname(INSTALL_DIR), "v0rtex_utils")
-        LOG_DIR     = _settings.get("log_dir") or os.path.join(UTILS_DIR, "debug_log", "update_log")
-
-        def _log(msg, tag="INFO"):
-            ts   = time.strftime("%H:%M:%S")
-            line = f"[{ts}] [{tag:<5}] [TRAMPOLINE v{CUR_VER}] {msg}"
-            print(line)
-            try:
-                os.makedirs(LOG_DIR, exist_ok=True)
-                day = time.strftime("%Y%m%d")
-                with open(os.path.join(LOG_DIR, f"trampoline_chain_{day}.log"), "a", encoding="utf-8") as lf:
-                    lf.write(line + "\n")
-            except Exception:
-                pass
-
-        def _fetch(url, timeout=30):
-            req = urllib.request.Request(url, headers={"User-Agent": "V0RTEX-Trampoline/2.0"})
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return r.read().decode("utf-8")
-
-        def _parse_ver(v):
-            v = str(v).strip().lstrip("v")
-            parts = []
-            for p in v.split("."):
-                p = p.upper().replace("X", "")
-                if p.isdigit():
-                    parts.append(int(p))
-            while len(parts) < 4:
-                parts.append(0)
-            return tuple(parts[:4])
-
-        def _save_settings():
-            if _settings_path:
-                try:
-                    with open(_settings_path, "w", encoding="utf-8") as sf:
-                        json.dump(_settings, sf, indent=2)
-                except Exception as e:
-                    _log(f"settings save error: {e}", "WARN")
-
-        _log(f"Trampoline hop started — install_dir={INSTALL_DIR}", "BOOT")
-
-        _log("[ 1/4 ] Installing current version...")
-        try:
-            os.makedirs(INSTALL_DIR, exist_ok=True)
-            for _sd in ["rules", os.path.join("rules", "external"), "quarantine", "reports",
-                        "reports_pdf", "backups", "_recovery", "sandbox_env",
-                        os.path.join("sandbox_env", "drop"), "threat_feeds", "pcap_dumps"]:
-                os.makedirs(os.path.join(INSTALL_DIR, _sd), exist_ok=True)
-            META_DIR = os.path.join(UTILS_DIR, ".vx_meta")
-            os.makedirs(META_DIR, exist_ok=True)
-            target = os.path.join(INSTALL_DIR, "v0rtex.py")
-            if os.path.abspath(_SELF_PATH) != os.path.abspath(target):
-                shutil.copy2(_SELF_PATH, target)
-                _log(f"  v0rtex.py installed → {target}", "OK")
-            else:
-                _log("  already in install dir", "INFO")
-            with open(os.path.join(META_DIR, "vx_version"), "w", encoding="utf-8") as vf:
-                json.dump({"version": CUR_VER, "name": "V0RTEX", "author": "Vider_06"}, vf, indent=2)
-            _log(f"  vx_version → {CUR_VER}", "OK")
-        except Exception as e:
-            _log(f"  install error: {e}", "ERR")
-
-        _log("[ 2/4 ] Installing dependencies...")
-        _req = os.path.join(INSTALL_DIR, "requirements.txt")
-        if os.path.isfile(_req):
-            try:
-                r = subprocess.run(
-                    [PYTHON_EXE, "-m", "pip", "install", "-r", _req,
-                     "--prefer-binary", "--no-cache-dir", "-q", "--progress-bar", "off"],
-                    capture_output=True, text=True, timeout=300)
-                _log(f"  pip done (rc={r.returncode})", "OK" if r.returncode == 0 else "WARN")
-            except Exception as e:
-                _log(f"  deps error: {e}", "WARN")
-        else:
-            _log("  no requirements.txt, skipping", "WARN")
-
-        _log("[ 3/4 ] Fetching compat_map...")
-        _compat = {}
-        try:
-            _compat = json.loads(_fetch(COMPAT_URL, timeout=15))
-            _log(f"  compat_map loaded — {len(_compat.get('chain', []))} entries", "OK")
-        except Exception as e:
-            _log(f"  compat_map error: {e}", "ERR")
-
-        _log("[ 4/4 ] Finding next hop...")
-        _chain   = _compat.get("chain", [])
-        _cur_t   = _parse_ver(CUR_VER)
-        _cur_idx = -1
-        _is_final = False
-
-        for _i, _entry in enumerate(_chain):
-            if _parse_ver(_entry["version"]) == _cur_t:
-                _cur_idx = _i
-                break
-        if _cur_idx == -1:
-            for _i, _entry in enumerate(_chain):
-                if _parse_ver(_entry["version"]) <= _cur_t:
-                    _cur_idx = _i
-            _log(f"  version {CUR_VER} not in chain, using index {_cur_idx}", "WARN")
-
-        if _cur_idx >= 0 and _cur_idx + 1 < len(_chain):
-            _next = _chain[_cur_idx + 1]
-        else:
-            _next     = None
-            _is_final = True
-
-        if _next and not _is_final:
-            _next_ver = _next["version"]
-            _next_url = _next.get("raw_url", f"{GITHUB_BASE}/{BRANCH}/v0rtex.py")
-            _log(f"  next hop: v{_next_ver}", "INFO")
-            try:
-                _code = _fetch(_next_url, timeout=60)
-                ast.parse(_code)
-                _tmp = os.path.join(tempfile.gettempdir(),
-                                    f"_v0rtex_tramp_{_next_ver.replace('.', '_')}.py")
-                with open(_tmp, "w", encoding="utf-8") as nf:
-                    nf.write(_code)
-                _log(f"  downloaded → {_tmp}", "OK")
-                _bk = _settings.get("backup_path", "")
-                if _bk and os.path.isfile(_bk):
-                    _bk2 = os.path.join(tempfile.gettempdir(), os.path.basename(_bk))
-                    try:
-                        shutil.copy2(_bk, _bk2)
-                        _settings["backup_path"] = _bk2
-                    except Exception:
-                        pass
-                _settings["trampoline_current_version"] = _next_ver
-                _settings["old_version"] = _next_ver
-                _save_settings()
-                shutil.rmtree(INSTALL_DIR, ignore_errors=True)
-                _log("  v0rtex_system deleted", "OK")
-                time.sleep(0.3)
-                kw = {}
-                if sys.platform == "win32":
-                    kw["creationflags"] = 0x08000000
-                subprocess.Popen([PYTHON_EXE, _tmp, "--trampoline-update",
-                                  _settings_path or ""], **kw)
-                _log("  next hop launched", "OK")
-            except Exception as e:
-                _log(f"  hop failed: {e} — falling back to silent_update", "ERR")
-                _is_final = True
-
-        if _is_final:
-            _log("  final hop — installing and relaunching V0RTEX", "INFO")
-
-            _splash_root_t  = [None]
-            _splash_sv_t    = [None]
-            _splash_done_t  = threading.Event()
-            def _run_final_splash():
-                try:
-                    import tkinter as _tk2
-                    _r2 = _tk2.Tk()
-                    _r2.overrideredirect(True)
-                    _r2.configure(bg="#0d0d14")
-                    _r2.attributes("-topmost", True)
-                    _r2.geometry("360x90+16+16")
-                    _tk2.Frame(_r2, bg="#cba6f7", height=2).pack(fill="x")
-                    _inner = _tk2.Frame(_r2, bg="#0d0d14", padx=12, pady=10); _inner.pack(fill="both", expand=True)
-                    _tk2.Label(_inner, text="V0RTEX", font=("Consolas",11,"bold"), bg="#0d0d14", fg="#cba6f7").pack(anchor="w")
-                    _sv2 = _tk2.StringVar(value="FINALIZING UPDATE...")
-                    _splash_sv_t[0] = _sv2
-                    _tk2.Label(_inner, textvariable=_sv2, font=("Consolas",9), bg="#0d0d14", fg="#a6e3a1").pack(anchor="w")
-                    _splash_root_t[0] = _r2
-                    def _watch():
-                        if _splash_done_t.is_set():
-                            try: _r2.destroy()
-                            except Exception: pass
-                            return
-                        _r2.after(300, _watch)
-                    _r2.after(300, _watch)
-                    _r2.mainloop()
-                except Exception: pass
-            threading.Thread(target=_run_final_splash, daemon=True).start()
-            time.sleep(0.3)
-
-            def _set_final_status(msg):
-                try:
-                    if _splash_sv_t[0] and _splash_root_t[0]:
-                        _splash_root_t[0].after(0, lambda m=msg: _splash_sv_t[0].set(m))
-                except Exception: pass
-
-            _set_final_status("Rebuilding directories...")
-            _REQUIRED_DIRS = [
-                INSTALL_DIR,
-                os.path.join(INSTALL_DIR,"rules"), os.path.join(INSTALL_DIR,"rules","external"),
-                os.path.join(INSTALL_DIR,"quarantine"), os.path.join(INSTALL_DIR,"reports"),
-                os.path.join(INSTALL_DIR,"reports_pdf"), os.path.join(INSTALL_DIR,"backups"),
-                os.path.join(INSTALL_DIR,"_recovery"), os.path.join(INSTALL_DIR,"sandbox_env"),
-                os.path.join(INSTALL_DIR,"sandbox_env","drop"), os.path.join(INSTALL_DIR,"threat_feeds"),
-                os.path.join(INSTALL_DIR,"pcap_dumps"), UTILS_DIR,
-                os.path.join(UTILS_DIR,".vx_meta"),
-                os.path.join(UTILS_DIR,"debug_log","crash_log"),
-                os.path.join(UTILS_DIR,"debug_log","session_log"),
-                os.path.join(UTILS_DIR,"debug_log","trampoline_log"),
-                os.path.join(UTILS_DIR,"debug_log","admin_log"),
-                os.path.join(UTILS_DIR,"debug_log","update_log"),
-                os.path.join(UTILS_DIR,"debug_log","setup_log"),
-                os.path.join(UTILS_DIR,"debug_log","recovery_ops"),
-                os.path.join(UTILS_DIR,"Crash_Full_Report"),
-            ]
-            for _d3 in _REQUIRED_DIRS:
-                try: os.makedirs(_d3, exist_ok=True)
-                except Exception: pass
-            _log("  ✓ directories OK", "OK")
-
-            _set_final_status("Installing V0RTEX...")
-            _target_py = os.path.join(INSTALL_DIR, "v0rtex.py")
-            if os.path.abspath(_SELF_PATH) != os.path.abspath(_target_py):
-                try:
-                    shutil.copy2(_SELF_PATH, _target_py)
-                    _log(f"  ✓ v0rtex.py installed", "OK")
-                except Exception as _ie: _log(f"  ✗ install: {_ie}", "ERR")
-            else:
-                _log("  · already in install dir", "INFO")
-
-            _set_final_status("Installing dependencies...")
-            _req2 = os.path.join(INSTALL_DIR, "requirements.txt")
-            if os.path.isfile(_req2):
-                try:
-                    _rr2 = subprocess.run([PYTHON_EXE,"-m","pip","install","-r",_req2,
-                                           "--upgrade","--prefer-binary","-q","--no-cache-dir","--progress-bar","off"],
-                                          capture_output=True, text=True, timeout=360)
-                    _log(f"  {'✓' if _rr2.returncode==0 else '~'} pip (rc={_rr2.returncode})",
-                         "OK" if _rr2.returncode==0 else "WARN")
-                except Exception as _pe: _log(f"  ~ pip: {_pe}", "WARN")
-            else:
-                _log("  ~ no requirements.txt", "WARN")
-
-            _set_final_status("Restoring user data...")
-            _preserve2   = _settings.get("preserve_config", True)
-            _data_reset2 = _settings.get("data_reset", False)
-            _bk2         = _settings.get("backup_path", "")
-            if _bk2 and os.path.isfile(_bk2) and _preserve2 and not _data_reset2:
-                try:
-                    import zipfile as _zf2
-                    with _zf2.ZipFile(_bk2,"r") as _zr2:
-                        _names2 = _zr2.namelist()
-                        for _fn2 in ["config.json","whitelist.txt","notes.txt","todo_list.json",
-                                     "snippets.json","rules_state.json","scan_history.db","scan_results.db"]:
-                            if _fn2 in _names2:
-                                try: _zr2.extract(_fn2, INSTALL_DIR); _log(f"  ✓ restored {_fn2}", "OK")
-                                except Exception: pass
-                        for _zn2 in _names2:
-                            if _zn2.startswith(("reports/","reports_pdf/","rules/")):
-                                try: _zr2.extract(_zn2, INSTALL_DIR)
-                                except Exception: pass
-                    _log("  ✓ backup restore complete", "OK")
-                except Exception as _ze: _log(f"  ✗ backup restore: {_ze}", "ERR")
-            else:
-                _log("  ~ restore skipped", "INFO")
-
-            _META_DIR2 = os.path.join(UTILS_DIR, ".vx_meta")
-            try:
-                with open(os.path.join(_META_DIR2,"vx_version"),"w",encoding="utf-8") as _vf2:
-                    json.dump({"version": CUR_VER, "name": "V0RTEX", "author": "Vider_06"}, _vf2, indent=2)
-                _log(f"  ✓ vx_version → {CUR_VER}", "OK")
-            except Exception: pass
-
-            _RESTART_LVL = _settings.get("restart_level", "user")
-            _set_final_status(f"UPDATE COMPLETED!  RESTARTING AT {_RESTART_LVL.upper()} LEVEL...")
-            _log(f"  → restart_level: {_RESTART_LVL}", "INFO")
-            time.sleep(1.2)
-
-            _need_admin2  = (_RESTART_LVL == "admin")
-            _cur_pid2     = os.getpid()
-            _tram2_path   = os.path.join(UTILS_DIR, "_vx_post_update_relaunch.py")
-            _tram2_log    = os.path.join(UTILS_DIR,"debug_log","trampoline_log","_post_update_relaunch.log")
-
-            if sys.platform == "win32":
-                _pyw2 = PYTHON_EXE.replace("python.exe","pythonw.exe")
-                if not os.path.isfile(_pyw2): _pyw2 = PYTHON_EXE
-                _tram2_code = (
-                    f"import os,sys,time,subprocess,ctypes\n"
-                    f"_PID={_cur_pid2}\n_TARGET=r\"{_target_py}\"\n_PYTHON=r\"{_pyw2}\"\n"
-                    f"_SELF=r\"{_tram2_path}\"\n_TASK=\"V0RTEXPostUpdateRelaunch\"\n"
-                    f"_LOG=r\"{_tram2_log}\"\n_ADMIN={_need_admin2}\n"
-                    "def _log(m):\n import datetime\n try:\n  with open(_LOG,'a',encoding='utf-8') as f: f.write(f'[{datetime.datetime.now().strftime(\"%H:%M:%S\")}] {m}\\n')\n except: pass\n"
-                    "_log('trampoline started')\nk32=ctypes.windll.kernel32\ntime.sleep(0.5)\n"
-                    "try:\n h=k32.OpenProcess(0x0001|0x1000,False,_PID)\n if h: k32.TerminateProcess(h,0);k32.CloseHandle(h);_log('killed')\nexcept Exception as e: _log(f'err: {e}')\n"
-                    "for _ in range(30):\n h2=k32.OpenProcess(0x1000,False,_PID)\n if not h2: break\n k32.CloseHandle(h2);time.sleep(0.2)\n"
-                    "time.sleep(0.4)\n"
-                    "subprocess.run(['schtasks','/delete','/tn',_TASK,'/f'],capture_output=True)\n"
-                    "if _ADMIN:\n import ctypes as _c2;_c2.windll.shell32.ShellExecuteW(None,'runas',_PYTHON,f'\"{_TARGET}\"',None,1)\nelse:\n subprocess.Popen([_PYTHON,_TARGET],creationflags=0x08000000)\n"
-                    "_log('launched')\ntime.sleep(1)\ntry: os.remove(_SELF)\nexcept: pass\n"
-                )
-                try:
-                    os.makedirs(os.path.dirname(_tram2_log), exist_ok=True)
-                    with open(_tram2_path,"w",encoding="utf-8") as _tf2: _tf2.write(_tram2_code)
-                    subprocess.run(["schtasks","/delete","/tn","V0RTEXPostUpdateRelaunch","/f"],capture_output=True)
-                    _ret2 = subprocess.run([
-                        "schtasks","/create","/tn","V0RTEXPostUpdateRelaunch",
-                        "/tr",f'"{_pyw2}" "{_tram2_path}"',"/sc","ONCE","/st","00:00","/f","/RL","LIMITED"
-                    ], capture_output=True, text=True)
-                    if _ret2.returncode == 0:
-                        subprocess.run(["schtasks","/run","/tn","V0RTEXPostUpdateRelaunch"],capture_output=True)
-                        _log("  ✓ relaunch trampoline triggered", "OK")
-                    else:
-                        raise RuntimeError(_ret2.stderr.strip())
-                except Exception as _ste2:
-                    _log(f"  ✗ schtasks: {_ste2} — direct launch", "WARN")
-                    subprocess.Popen([PYTHON_EXE, _target_py], creationflags=0x08000000)
-            else:
-                _real_user2 = os.environ.get("SUDO_USER","")
-                _tram2_code = (
-                    f"import os,sys,time,subprocess,signal\n_PID={_cur_pid2}\n_TARGET=r\"{_target_py}\"\n"
-                    f"_PYTHON=r\"{PYTHON_EXE}\"\n_SELF=r\"{_tram2_path}\"\n_REAL_USER=\"{_real_user2}\"\n_ADMIN={_need_admin2}\n"
-                    "time.sleep(0.4)\ntry: os.kill(_PID,signal.SIGTERM)\nexcept: pass\n"
-                    "for _ in range(25):\n try: os.kill(_PID,0)\n except OSError: break\n time.sleep(0.2)\n"
-                    "if _ADMIN: subprocess.Popen(['sudo',_PYTHON,_TARGET])\n"
-                    "elif _REAL_USER and os.geteuid()==0: subprocess.Popen(['sudo','-u',_REAL_USER,_PYTHON,_TARGET])\n"
-                    "else: subprocess.Popen([_PYTHON,_TARGET])\n"
-                    "time.sleep(1)\ntry: os.remove(_SELF)\nexcept: pass\n"
-                )
-                try:
-                    with open(_tram2_path,"w",encoding="utf-8") as _tf2: _tf2.write(_tram2_code)
-                    subprocess.Popen([PYTHON_EXE,_tram2_path], start_new_session=True, close_fds=True)
-                    _log("  ✓ unix relaunch trampoline launched", "OK")
-                except Exception as _ule2:
-                    _log(f"  ✗ unix trampoline: {_ule2}", "WARN")
-                    subprocess.Popen([PYTHON_EXE, _target_py])
-
-            _splash_done_t.set()
-
-        _log("Trampoline hop done, self-deleting", "INFO")
-        try:
-            _me = os.path.abspath(__file__)
-            if sys.platform == "win32":
-                _d = _me + ".del"
-                os.rename(_me, _d)
-                _si_del = subprocess.STARTUPINFO()
-                _si_del.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                _si_del.wShowWindow = 0
-                subprocess.Popen(["cmd", "/c", f'ping 127.0.0.1 -n 3 >nul && del /f /q "{_d}"'],
-                                 creationflags=0x08000000, startupinfo=_si_del, close_fds=True)
-            else:
-                os.remove(_me)
-        except Exception:
-            pass
-
-    _trampoline_update_main()
-    import sys as _tsys; _tsys.exit(0)
 
 import os, sys, subprocess, traceback, threading, time as _time_crash
 
@@ -456,7 +87,7 @@ def _vx_load_ver():
                 str(_d.get("author","Vider_06")).strip())
     except Exception:
         _vx_load_ver._from_file = False
-        return (".".join(["1","0","0","X0"]), "V"+"0RTEX", "Vider"+"_06")
+        return (".".join(["1","0","1","X1"]), "V"+"0RTEX", "Vider"+"_06")
 
 _VX_VER, _VX_NAME, _VX_AUTH = _vx_load_ver()
 _pre_sl(f"version loaded: {_VX_VER}  from_file={_vx_load_ver._from_file}", "BOOT")
@@ -483,8 +114,8 @@ _T = "".join
 
 
 _ADM_BADGE   = _T(["⚠ ELEV", "ATED ·", " ADMIN"])
-_ADM_BADGE_W = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX v","1.0.0",".X0  by Vider_06"])
-_ADM_BADGE_R = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX RECOVERY TERMINAL  v","1.0.0",".X0"])
+_ADM_BADGE_W = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX v","1.0.1",".X1  by Vider_06"])
+_ADM_BADGE_R = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX RECOVERY TERMINAL  v","1.0.1",".X1"])
 _ADM_BADGE_S = _T(["⚡ ELEV", "ATED — ", "ADMIN"])   
 
 
@@ -528,7 +159,9 @@ def _setup_panic(title="Setup Error", body="", detail="", setup_root=None):
 
     try:
         import datetime as _dt
-        _log_dir = _os.path.join(_os.path.dirname(_os.path.abspath(_s.argv[0])), "debug_log")
+        _log_dir = globals().get("DEBUG_DIR") or _os.path.join(
+            _os.path.dirname(_os.path.dirname(_os.path.abspath(_s.argv[0]))),
+            "v0rtex_utils", "debug_log", "crash_log")
         _os.makedirs(_log_dir, exist_ok=True)
         _ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
         _crash_path = _os.path.join(_log_dir, f"SETUP_CRASH_{_ts}.txt")
@@ -675,6 +308,87 @@ def _setup_panic(title="Setup Error", body="", detail="", setup_root=None):
         _t.Button(bot, text="  📋  VIEW LOG  ",
                   command=_view_log,
                   bg=_GRN2, fg=_GRN, font=("Consolas", 10, "bold"),
+                  relief="flat", padx=14, pady=8,
+                  cursor="hand2", bd=0).pack(side=_t.LEFT, padx=4)
+
+        def _view_session_log_panic():
+            _dbg = globals().get("DEBUG_DIR") or _os.path.join(
+                _os.path.dirname(_os.path.dirname(_os.path.abspath(_s.argv[0]))),
+                "v0rtex_utils", "debug_log")
+            _slw = _t.Toplevel(_r)
+            _slw.title("Session Log — debug_log/")
+            _slw.geometry("720x480")
+            _slw.configure(bg=_BG)
+            _slw.attributes("-topmost", True)
+            try: _r.grab_release(); _slw.grab_set()
+            except Exception: pass
+            def _close_slw():
+                try: _slw.grab_release(); _r.grab_set()
+                except Exception: pass
+                try: _slw.destroy()
+                except Exception: pass
+            _slw.protocol("WM_DELETE_WINDOW", _close_slw)
+            _slh = _t.Frame(_slw, bg="#11111b", pady=5, padx=10); _slh.pack(fill=_t.X)
+            _t.Label(_slh, text="  ● ● ●   SESSION LOG — debug_log/",
+                     font=("Consolas", 9), bg="#11111b", fg=_DIM).pack(side=_t.LEFT)
+            _t.Button(_slh, text=" ✕ ", command=_close_slw,
+                      bg="#11111b", fg=_DIM, font=("Consolas", 9),
+                      relief="flat", bd=0, cursor="hand2").pack(side=_t.RIGHT)
+            _sl_sc = _t.Scrollbar(_slw, orient="vertical", bg=_BRD,
+                                   troughcolor=_BG, relief="flat", bd=0, width=7)
+            _sl_sc.pack(side=_t.RIGHT, fill=_t.Y)
+            _sl_txt = _t.Text(_slw, bg="#11111b", fg=_GRN,
+                              font=("Consolas", 8), relief="flat", bd=0,
+                              padx=10, pady=8, wrap="word", state="disabled",
+                              yscrollcommand=_sl_sc.set)
+            _sl_sc.config(command=_sl_txt.yview)
+            _sl_txt.pack(fill=_t.BOTH, expand=True)
+            _log_content = ""
+            try:
+                for _sd in (_os.path.join(_dbg, "session_log"), _dbg):
+                    if _os.path.isdir(_sd):
+                        _cands = sorted([f for f in _os.listdir(_sd) if f.endswith(".txt")], reverse=True)
+                        if _cands:
+                            with open(_os.path.join(_sd, _cands[0]), encoding="utf-8", errors="replace") as _lf:
+                                _log_content = _lf.read()
+                            break
+            except Exception as _le:
+                _log_content = f"Could not read session log: {_le}"
+            if not _log_content:
+                _log_content = detail or "No session log found."
+            _sl_txt.config(state="normal")
+            _sl_txt.insert(_t.END, _log_content)
+            _sl_txt.see(_t.END)
+            _sl_txt.config(state="disabled")
+            _slbtm = _t.Frame(_slw, bg=_BG); _slbtm.pack(side=_t.BOTTOM, fill=_t.X, pady=6, padx=10)
+            _t.Button(_slbtm, text="⎘ Copy", command=lambda: (
+                _r.clipboard_clear(), _r.clipboard_append(_sl_txt.get("1.0", _t.END).strip())),
+                bg=_BRD, fg=_GRN, font=("Consolas", 9),
+                relief="flat", padx=10, pady=5, cursor="hand2", bd=0).pack(side=_t.LEFT)
+            _t.Button(_slbtm, text="  Close  ", command=_close_slw,
+                      bg=_BRD, fg=_DIM, font=("Consolas", 9),
+                      relief="flat", padx=10, pady=5, cursor="hand2", bd=0).pack(side=_t.RIGHT)
+
+        def _safe_exit_panic():
+            try: _r.destroy()
+            except Exception: pass
+            if setup_root:
+                try: setup_root.destroy()
+                except Exception: pass
+            try:
+                import os as _ose2; _ose2._exit(0)
+            except Exception: pass
+            _s.exit(0)
+
+        _t.Button(bot, text="  📄  SESSION LOG  ",
+                  command=_view_session_log_panic,
+                  bg="#1e2a3a", fg="#89b4fa", font=("Consolas", 10, "bold"),
+                  relief="flat", padx=14, pady=8,
+                  cursor="hand2", bd=0).pack(side=_t.LEFT, padx=4)
+
+        _t.Button(bot, text="  ✓  SAFE EXIT  ",
+                  command=_safe_exit_panic,
+                  bg="#1a2a1a", fg=_GRN, font=("Consolas", 10, "bold"),
                   relief="flat", padx=14, pady=8,
                   cursor="hand2", bd=0).pack(side=_t.LEFT, padx=4)
 
@@ -1165,6 +879,10 @@ _DEFAULT_CONFIG = {
     "crash_zip_include_admin_log": True,
     "log_ops_count": 30,
     "auto_censor_logs": True,
+    "session_zip_enabled": True,
+    "session_zip_include_debug": True,
+    "session_zip_include_app_usage": True,
+    "session_zip_include_combined": True,
 }
 _SUBDIRS = [
     "modules", "rules", "rules/external",
@@ -2678,7 +2396,8 @@ def _do_reinstall():
             _dlog('GitHub download enabled — fetching latest…')
             _log('  → Downloading latest from GitHub…', 'INFO')
             import urllib.request as _ur
-            _req2 = _ur.Request('https://raw.githubusercontent.com/Vider06/V0rtex/main/v0rtex.py', headers={{'User-Agent': 'V0RTEX-Reinstall/1.0'}})
+            _ri_branch = 'Windows_Release' if sys.platform == 'win32' else ('MacOS_Release' if sys.platform == 'darwin' else 'Linux_release')
+            _req2 = _ur.Request(f'https://raw.githubusercontent.com/Vider06/V0rtex/{{_ri_branch}}/v0rtex.py', headers={{'User-Agent': 'V0RTEX-Reinstall/1.0'}})
             with _ur.urlopen(_req2, timeout=30) as _resp:
                 _remote = _resp.read().decode('utf-8', 'replace')
             if len(_remote) < 10000:
@@ -4317,7 +4036,7 @@ def _run_setup_ui():
                     _bat = (
                         '@echo off\r\n'
                         'setlocal EnableDelayedExpansion\r\n'
-                        'title V0RTEX v1.0.0 - Launcher\r\n'
+                        'title V0RTEX v1.0.1.X1 - Launcher\r\n'
                         'color 0A\r\n'
                         'python --version >nul 2>&1\r\n'
                         'if %errorLevel% neq 0 (\r\n'
@@ -5070,6 +4789,19 @@ def _run_setup_ui():
                                 _dlog(f"phase 5: {_pname} OK via --user plain", "OK")
                             else:
                                 _dlog(f"phase 5: {_pname} still failed", "WARN")
+                    try:
+                        import site as _sp5m, importlib as _ilp5
+                        _p5_add = []
+                        try: _p5_add.append(_sp5m.getusersitepackages())
+                        except Exception: pass
+                        try: _p5_add.extend(_sp5m.getsitepackages())
+                        except Exception: pass
+                        for _sp5 in _p5_add:
+                            if _sp5 and _sp5 not in sys.path:
+                                sys.path.insert(0, _sp5)
+                        _ilp5.invalidate_caches()
+                        _dlog(f"phase 5: sys.path refreshed ({len(_p5_add)} dirs), caches invalidated", "INFO")
+                    except Exception: pass
 
                 if installed_count or satisfied_count:
                     _log(f"  ✓ {installed_count} installed, {satisfied_count} already satisfied", "OK")
@@ -5086,6 +4818,20 @@ def _run_setup_ui():
 
                 _step_prog(98, "final import check…")
                 _dlog("final import check", "INFO")
+                try:
+                    import site as _site_fc, sys as _sys_fc, importlib as _il_fc
+                    _fc_paths = []
+                    try: _fc_paths.append(_site_fc.getusersitepackages())
+                    except Exception: pass
+                    try: _fc_paths.extend(_site_fc.getsitepackages())
+                    except Exception: pass
+                    for _sp in _fc_paths:
+                        if _sp and _sp not in _sys_fc.path:
+                            _sys_fc.path.insert(0, _sp)
+                    try: _il_fc.invalidate_caches()
+                    except Exception: pass
+                    _dlog(f"final check: path refreshed, {len(_fc_paths)} site dirs", "INFO")
+                except Exception: pass
                 _PKG_TO_MOD_FINAL = {
                     "requests":     "requests",
                     "pefile":       "pefile",
@@ -5120,14 +4866,25 @@ def _run_setup_ui():
                     _record_activity(f"final import check… {_ff_idx}: {_fname}")
                     _fmod  = _PKG_TO_MOD_FINAL.get(_fname.lower(), _fname)
                     _fopt  = (YARA_PKG in _fpkg)
+                    _fimported = False
                     try:
                         __import__(_fmod)
-                        _final_ok.append(_fname)
+                        _fimported = True
                     except ImportError:
-                        if _fopt:
-                            _final_miss_opt.append(_fname)
-                        else:
-                            _final_miss_req.append(_fname)
+                        try:
+                            _fsub = subprocess.run(
+                                [sys.executable, "-c", f"import {_fmod}"],
+                                capture_output=True, timeout=15)
+                            if _fsub.returncode == 0:
+                                _fimported = True
+                                _dlog(f"final check: {_fname} OK via subprocess", "INFO")
+                        except Exception: pass
+                    if _fimported:
+                        _final_ok.append(_fname)
+                    elif _fopt:
+                        _final_miss_opt.append(_fname)
+                    else:
+                        _final_miss_req.append(_fname)
 
                 
                 try:
@@ -5706,11 +5463,11 @@ def _run_setup_ui():
         except Exception as _ex:
             try: os.makedirs = _outer_makedirs
             except Exception: pass
-            _log(f"\n  ✗ FATAL: {_ex}", "ERR")
-            _log(_tb.format_exc(), "DIM")
-            root.after(0, lambda: _setup_panic(
-                "Setup Fatal Error", str(_ex), _tb.format_exc(), setup_root=root))
-
+            _ex_str = str(_ex); _ex_tb = _tb.format_exc()
+            _log(f"\n  ✗ FATAL: {_ex_str}", "ERR")
+            _log(_ex_tb, "DIM")
+            root.after(0, lambda s=_ex_str, t=_ex_tb: _setup_panic(
+                "Setup Fatal Error", s, t, setup_root=root))
     def _unlock_launch():
         try:
             btn_launch[0].config(state="normal", bg=C["green"],
@@ -6733,9 +6490,6 @@ def _run_silent_update_ui(install_dir, python_exe, title="V0RTEX — POST-UPDATE
             _set_pct(88, "Finalizing...")
             for _sub in (
                 "rules", "rules/external", "reports",
-                "debug_log", "debug_log/crash_log",
-                "debug_log/session_log", "debug_log/trampoline_log",
-                "debug_log/admin_log", "debug_log/update_log",
                 "quarantine", "backups", "_recovery",
                 "sandbox_env", "threat_feeds",
             ):
@@ -6743,6 +6497,16 @@ def _run_silent_update_ui(install_dir, python_exe, title="V0RTEX — POST-UPDATE
                     _suo.makedirs(
                         _suo.path.join(install_dir, _sub),
                         exist_ok=True)
+                except Exception:
+                    pass
+            _utils_suu = _suo.path.join(_suo.path.dirname(install_dir), "v0rtex_utils")
+            for _dsub in (
+                "debug_log", "debug_log/crash_log",
+                "debug_log/session_log", "debug_log/trampoline_log",
+                "debug_log/admin_log", "debug_log/update_log",
+            ):
+                try:
+                    _suo.makedirs(_suo.path.join(_utils_suu, _dsub), exist_ok=True)
                 except Exception:
                     pass
 
@@ -8166,7 +7930,9 @@ _UTILS_DIR        = os.path.join(os.path.dirname(BASE_DIR), "v0rtex_utils")
 DEBUG_DIR         = os.path.join(_UTILS_DIR, "debug_log")
 _pre_sl(f"DEBUG_DIR: {DEBUG_DIR}", "BOOT")
 QUARANTINE_DIR    = os.path.join(BASE_DIR, "quarantine")
-APP_USAGE_LOG_DIR = os.path.join(BASE_DIR, "app_usage_log")
+APP_USAGE_LOG_DIR = os.path.join(_UTILS_DIR, "app_usage_log")
+FLUSH_LOG_DIR     = os.path.join(DEBUG_DIR, "flush_log")
+SESSION_ZIP_DIR   = os.path.join(_UTILS_DIR, "Session_Zip")
 QUALITY_CAPTURE_DIR = os.path.join(BASE_DIR, "Quality_Capture")
 
 TEMP_LOG_STORAGE  = os.path.join(_UTILS_DIR, "Temp_Log_Storage")
@@ -8177,13 +7943,14 @@ _TLS_SUBS = ("session_log", "silent_log", "live_traffic",
              "admin_log", "setup_log", "recovery_ops", "update_log")
 _AUL_SUBS = ("live_traffic", "conn_quality", "tor", "proxy", "noise_gen")
 _DBG_SUBS = ("crash_log", "session_log", "silent_log", "trampoline_log",
-             "admin_log", "update_log", "setup_log", "recovery_ops")
+             "admin_log", "update_log", "setup_log", "recovery_ops", "flush_log")
 
 for _d in (
     REPORTS_DIR, RULES_EXTERN_DIR, QUARANTINE_DIR,
     APP_USAGE_LOG_DIR, QUALITY_CAPTURE_DIR,
     TEMP_LOG_STORAGE, _UTILS_DIR,
     os.path.join(_UTILS_DIR, "UNCENSORED"),
+    FLUSH_LOG_DIR, SESSION_ZIP_DIR,
 ):
     os.makedirs(_d, exist_ok=True)
 
@@ -8261,7 +8028,7 @@ def _censor_text_with_config(text: str, rules: dict) -> str:
 
 def _silent_log_censor_flush(force_rules: dict = None) -> None:
     import shutil as _scsh, datetime as _scd, time as _sct
-    _dbg_path = os.path.join(DEBUG_DIR, "flush_debug.txt")
+    _dbg_path = os.path.join(FLUSH_LOG_DIR, "flush_debug.txt")
     def _fdbg(msg):
         try:
             with open(_dbg_path, "a", encoding="utf-8") as _fd:
@@ -8342,6 +8109,48 @@ def _silent_log_censor_flush(force_rules: dict = None) -> None:
     _fdbg("flush complete")
 
 
+
+def _create_session_zip() -> None:
+    import zipfile as _szf, datetime as _szd, shutil as _szsh
+    try:
+        if not CONFIG.get("session_zip_enabled", True):
+            return
+        _ts = _szd.datetime.now().strftime("%Y%m%d_%H%M%S")
+        _sess_dir = os.path.join(SESSION_ZIP_DIR, f"session_{_ts}")
+        os.makedirs(_sess_dir, exist_ok=True)
+        _inc_dbg = CONFIG.get("session_zip_include_debug", True)
+        _inc_app = CONFIG.get("session_zip_include_app_usage", True)
+        _inc_comb = CONFIG.get("session_zip_include_combined", True)
+
+        def _zip_tree(src_root, zip_path):
+            if not os.path.isdir(src_root):
+                return False
+            with _szf.ZipFile(zip_path, "w", _szf.ZIP_DEFLATED) as _zf:
+                for _root, _dirs, _files in os.walk(src_root):
+                    for _fn in _files:
+                        _fp = os.path.join(_root, _fn)
+                        _arc = os.path.relpath(_fp, os.path.dirname(src_root))
+                        try: _zf.write(_fp, _arc)
+                        except Exception: pass
+            return True
+
+        if _inc_dbg:
+            _zip_tree(DEBUG_DIR, os.path.join(_sess_dir, f"debug_log_{_ts}.zip"))
+        if _inc_app:
+            _zip_tree(APP_USAGE_LOG_DIR, os.path.join(_sess_dir, f"app_usage_log_{_ts}.zip"))
+        if _inc_comb:
+            _comb_path = os.path.join(_sess_dir, f"combined_{_ts}.zip")
+            with _szf.ZipFile(_comb_path, "w", _szf.ZIP_DEFLATED) as _zf:
+                for _src, _tag in ((DEBUG_DIR, "debug_log"), (APP_USAGE_LOG_DIR, "app_usage_log")):
+                    if not os.path.isdir(_src): continue
+                    for _root, _dirs, _files in os.walk(_src):
+                        for _fn in _files:
+                            _fp = os.path.join(_root, _fn)
+                            _arc = os.path.join(_tag, os.path.relpath(_fp, _src))
+                            try: _zf.write(_fp, _arc)
+                            except Exception: pass
+    except Exception:
+        pass
 
 try:
     import json as _jvx
@@ -9646,7 +9455,6 @@ CRITICAL_FILES = [
 
 
 _REQUIRED_DIRS = [
-    globals().get("DEBUG_DIR", os.path.join(BASE_DIR, "debug_log")),
     os.path.join(BASE_DIR, "reports"),
     os.path.join(BASE_DIR, "quarantine"),
     os.path.join(BASE_DIR, "rules"),
@@ -10822,6 +10630,8 @@ def _safe_destroy_root():
         with _SILENT_LOG_LOCK:
             pass
         _silent_log_censor_flush()
+        try: _create_session_zip()
+        except Exception: pass
     except Exception:
         try:
             import traceback as _fbtb3
@@ -11525,6 +11335,7 @@ def _dash_populate_recent():
     except Exception: pass
 
 def _dash_health_tick():
+    if _APP_DYING[0]: return
     try:
         if _psutil:
             _dash_sv_cpu.set(f"{_psutil.cpu_percent(interval=None):.0f}%")
@@ -11540,7 +11351,8 @@ def _dash_health_tick():
         yr = globals().get("_yara_rules")
         _dash_sv_yara.set("Loaded ✓" if yr else "Not loaded")
     except Exception: pass
-    root.after(4000, _dash_health_tick)
+    if not _APP_DYING[0]:
+        root.after(4000, _dash_health_tick)
 
 def _dash_full_refresh():
     _dash_populate_recent()
@@ -11620,6 +11432,7 @@ def _update_charts():
         return
     _chart_last_update = now
     _chart_update_pending = False
+    if _chart_fig is None: return
     _chart_fig.clear(); _chart_fig.set_facecolor(C["surface0"])
     rows = _db_query("SELECT malicious,suspicious,undetected,file,timestamp,yara_hits,entropy FROM scans ORDER BY timestamp DESC LIMIT 30")
 
@@ -17049,9 +16862,11 @@ def _ckpt_on_tab_shown():
     except Exception: pass
 
 def _ckpt_tab_poll():
+    if _APP_DYING[0]: return
     try:
         _ckpt_count_sv.set(f"{_ckpt_counter[0]} checkpoint{'s' if _ckpt_counter[0]!=1 else ''}")
-        root.after(2000, _ckpt_tab_poll)
+        if not _APP_DYING[0]:
+            root.after(2000, _ckpt_tab_poll)
     except Exception: pass
 root.after(3000, _ckpt_tab_poll)
 root.after(1500, _ckpt_flush_buffer)
@@ -19389,6 +19204,21 @@ _gs_check(_sp4, "Include system info (sysinfo.json) in crash ZIP",  _gs_v_zip_sy
 _gs_check(_sp4, "Include redacted config.json in crash ZIP",         _gs_v_zip_cfg)
 _gs_check(_sp4, "Include admin status log in crash ZIP",              _gs_v_zip_adm)
 
+_sp5 = _gs_section(_gs_pv_inner, "SESSION ZIP", C["blue"])
+_gs_v_szip_en      = tk.BooleanVar(value=CONFIG.get("session_zip_enabled", True))
+_gs_v_szip_debug   = tk.BooleanVar(value=CONFIG.get("session_zip_include_debug", True))
+_gs_v_szip_app     = tk.BooleanVar(value=CONFIG.get("session_zip_include_app_usage", True))
+_gs_v_szip_combined= tk.BooleanVar(value=CONFIG.get("session_zip_include_combined", True))
+tk.Label(_sp5, text=
+    "  On exit → v0rtex_utils/Session_Zip/<session_timestamp>/\n"
+    "  Creates per-session subfolder with zipped log archives.",
+    font=FS, bg=C["surface0"], fg=C["overlay0"],
+    justify="left", wraplength=520).pack(anchor="w", padx=8, pady=(2,4))
+_gs_check(_sp5, "Enable Session ZIP on exit",                  _gs_v_szip_en)
+_gs_check(_sp5, "Include debug_log ZIP",                       _gs_v_szip_debug)
+_gs_check(_sp5, "Include app_usage_log ZIP",                   _gs_v_szip_app)
+_gs_check(_sp5, "Include combined ZIP (debug + app_usage)",    _gs_v_szip_combined)
+
 
 _gs_paths = tk.Frame(_gs_nb, bg=C["base"]); _gs_nb.add(_gs_paths, text=" PATHS ")
 _sp_canvas = tk.Canvas(_gs_paths, bg=C["base"], highlightthickness=0); _sp_canvas.pack(fill=tk.BOTH, expand=True)
@@ -19480,6 +19310,10 @@ def _gs_save_all():
             "crash_zip_include_sysinfo":     _gs_v_zip_sys.get(),
             "crash_zip_include_config":      _gs_v_zip_cfg.get(),
             "crash_zip_include_admin_log":   _gs_v_zip_adm.get(),
+            "session_zip_enabled":           _gs_v_szip_en.get(),
+            "session_zip_include_debug":     _gs_v_szip_debug.get(),
+            "session_zip_include_app_usage": _gs_v_szip_app.get(),
+            "session_zip_include_combined":  _gs_v_szip_combined.get(),
 
             "tshark_path":        _gs_v_tshark.get().strip(),
             "proxy":              _gs_v_proxy.get().strip(),
@@ -20204,9 +20038,11 @@ def _watchdog_thread():
 
 
 def _schedule_ping():
+    if _APP_DYING[0]: return
     _ui_ping()
-    try: root.after(2000, _schedule_ping)
-    except Exception: pass
+    if not _APP_DYING[0]:
+        try: root.after(2000, _schedule_ping)
+        except Exception: pass
 
 _sl("[DBG] CP4 watchdog+approt tab done", "BOOT")
 
@@ -20621,10 +20457,12 @@ def _pd_set_status(s):
     _pd_status_lbl.config(fg=color_map.get(s, C["text"]))
 
 def _pd_sync():
+    if _APP_DYING[0]: return
     try: _pd_set_status(_def_status_sv.get())
     except Exception: pass
-    try: root.after(1500, _pd_sync)
-    except Exception: pass
+    if not _APP_DYING[0]:
+        try: root.after(1500, _pd_sync)
+        except Exception: pass
 
 root.after(600, _pd_sync)
 
@@ -23503,6 +23341,8 @@ def _write_and_launch_uninstall():
         except Exception: pass
         try: _silent_log_censor_flush()
         except Exception: pass
+        try: _create_session_zip()
+        except Exception: pass
     except Exception: pass
     _launch_script(script_path)
 
@@ -24289,6 +24129,8 @@ def _restart_app():
     def _shutdown():
         import time as _trs
         try: _silent_log_censor_flush()
+        except Exception: pass
+        try: _create_session_zip()
         except Exception: pass
         _trs.sleep(0.3)
         try: os._exit(0)
@@ -26572,8 +26414,9 @@ def _http_run():
             r = requests.head(url, allow_redirects=_http_follow_v.get(), timeout=10,
                               headers={"User-Agent":"V0RTEX/1.0"})
         except Exception as e:
-            root.after(0, lambda: (_http_out.config(state="normal"),
-                                   _http_out.insert(tk.END,f"\n  Error: {e}\n"),
+            _err_msg = str(e)
+            root.after(0, lambda m=_err_msg: (_http_out.config(state="normal"),
+                                   _http_out.insert(tk.END,f"\n  Error: {m}\n"),
                                    _http_out.config(state="disabled"))); return
         def _show():
             _http_out.config(state="normal")
@@ -28387,12 +28230,14 @@ def _noise_disarm():
     _sl("Noise Generator stopped", "NOISE")
 
 def _noise_stats_tick():
+    if _APP_DYING[0]: return
     with _noise_stats_lock:
         s = _noise_stats["sent"]; e = _noise_stats["errors"]; l = _noise_stats["last_domain"]
     _noise_sent_sv.set(f"Sent: {s}")
     _noise_err_sv.set(f"Errors: {e}")
     _noise_last_sv.set(f"Last: {l or '—'}")
-    root.after(1000, _noise_stats_tick)
+    if not _APP_DYING[0]:
+        root.after(1000, _noise_stats_tick)
 
 def _noise_info_popup():
     _w = tk.Toplevel(root); _w.title("DNS Noise Generator — Info")
@@ -28563,24 +28408,33 @@ _lt_iface_cb = ttk.Combobox(_lt_ctrl, textvariable=_lt_iface_v, width=22,
     font=("Consolas",9), state="readonly")
 _lt_iface_cb.pack(side=tk.LEFT, padx=(0,4))
 
+_LT_VIRTUAL_KEYWORDS = ("virtual", "loopback", "lan*", "bluetooth", "vmware",
+                         "virtualbox", "vpn", "tap", "tun", "npcap loopback")
+
 def _lt_detect_ifaces():
     tshark = CONFIG.get("tshark_path", "tshark")
     try:
         r = subprocess.run([tshark, "-D"], capture_output=True, text=True, timeout=5,
                            creationflags=0x08000000 if sys.platform=="win32" else 0)
         lines = (r.stdout or r.stderr or "").strip().splitlines()
-        ifaces = []
+        physical = []
+        virtual  = []
         for ln in lines:
             ln = ln.strip()
             if not ln: continue
             parts = ln.split(" ", 1)
-            if len(parts) >= 2:
-                ifaces.append(parts[1].strip())
-            elif parts:
-                ifaces.append(parts[0].strip())
+            desc = parts[1].strip() if len(parts) >= 2 else parts[0].strip()
+            desc_l = desc.lower()
+            if any(k in desc_l for k in _LT_VIRTUAL_KEYWORDS):
+                virtual.append(desc)
+            else:
+                physical.append(desc)
+        ifaces = physical + virtual
         if ifaces:
             _lt_iface_cb["values"] = ifaces
             _lt_iface_v.set(ifaces[0])
+            if physical:
+                _lt_append(f"  ✓ {len(physical)} physical + {len(virtual)} virtual interfaces detected", "DIM")
     except Exception as e:
         _lt_append(f"Interface detect error: {e}", "WARN")
 
@@ -28880,15 +28734,32 @@ def _nst_log_add(msg, tag="DIM"):
     root.after(0, _d)
 
 def _nst_ping_host(host):
-    import socket as _psk, time as _ptm
-    for _port in (80, 443, 53):
+    import time as _ptm
+    if sys.platform == "win32":
         try:
             t0 = _ptm.monotonic()
-            with _psk.create_connection((host, _port), timeout=2): pass
-            return (_ptm.monotonic() - t0) * 1000
-        except OSError: continue
-        except Exception: return None
-    return None
+            r = _subprocess_orig.run(
+                ["ping", "-n", "1", "-w", "1500", host],
+                capture_output=True, text=True, timeout=4,
+                creationflags=0x08000000)
+            elapsed = (_ptm.monotonic() - t0) * 1000
+            if r.returncode == 0:
+                import re as _pre
+                m = _pre.search(r"[=<](\d+)ms", r.stdout)
+                return float(m.group(1)) if m else elapsed
+            return None
+        except Exception:
+            return None
+    else:
+        import socket as _psk
+        for _port in (80, 443, 53):
+            try:
+                t0 = _ptm.monotonic()
+                with _psk.create_connection((host, _port), timeout=2): pass
+                return (_ptm.monotonic() - t0) * 1000
+            except OSError: continue
+            except Exception: return None
+        return None
 
 def _nst_dns_ms(host):
     import socket as _dsk, time as _dtm
@@ -29206,14 +29077,19 @@ _VORTEX_VERSION      = _VX_VER
 
 
 def _detect_platform_branch():
-    return "TESTING-GENERAL"
+    import sys as _bsys
+    if _bsys.platform == "win32":
+        return "Windows_Release"
+    if _bsys.platform == "darwin":
+        return "MacOS_Release"
+    return "Linux_release"
 _PLATFORM_BRANCH     = _detect_platform_branch()
 _GITHUB_BASE         = "https://raw.githubusercontent.com/Vider06/V0rtex"
 _GITHUB_REPO_RAW     = f"{_GITHUB_BASE}/{_PLATFORM_BRANCH}"
 _GITHUB_PAGE_URL     = "https://github.com/Vider06/V0rtex"
 _GITHUB_API_RELEASE  = "https://api.github.com/repos/Vider06/V0rtex/releases/latest"
 _GITHUB_VERSION_URL  = f"{_GITHUB_REPO_RAW}/version.txt"
-_REMOTE_SCRIPT_NAME  = "v0rtex_TESTING.py" if "TESTING" in _PLATFORM_BRANCH.upper() else "v0rtex.py"
+_REMOTE_SCRIPT_NAME  = "v0rtex.py"
 _GITHUB_SCRIPT_URL   = f"{_GITHUB_REPO_RAW}/{_REMOTE_SCRIPT_NAME}"
 _GITHUB_MANIFEST_URL = f"{_GITHUB_REPO_RAW}/update_manifest.json"
 
@@ -30163,12 +30039,6 @@ def _launch_update_ui(clear_install=False):
             _std_dirs = [
                 "rules", os.path.join("rules", "external"),
                 "reports", "reports_pdf", "modules",
-                "debug_log",
-                os.path.join("debug_log", "crash_log"),
-                os.path.join("debug_log", "session_log"),
-                os.path.join("debug_log", "trampoline_log"),
-                os.path.join("debug_log", "admin_log"),
-                os.path.join("debug_log", "update_log"),
                 "quarantine", "backups",
                 "sandbox_env", os.path.join("sandbox_env", "drop"),
                 "threat_feeds", "pcap_dumps",
@@ -30176,6 +30046,16 @@ def _launch_update_ui(clear_install=False):
             ]
             for _d2 in _std_dirs:
                 try: os.makedirs(os.path.join(script_dir, _d2), exist_ok=True)
+                except Exception: pass
+            _utils_dir_upd = os.path.join(os.path.dirname(script_dir), "v0rtex_utils")
+            for _dsub in (
+                "debug_log", os.path.join("debug_log", "crash_log"),
+                os.path.join("debug_log", "session_log"),
+                os.path.join("debug_log", "trampoline_log"),
+                os.path.join("debug_log", "admin_log"),
+                os.path.join("debug_log", "update_log"),
+            ):
+                try: os.makedirs(os.path.join(_utils_dir_upd, _dsub), exist_ok=True)
                 except Exception: pass
             _ulog("  \u2713 Directory tree recreated", "OK")
 
@@ -32130,7 +32010,7 @@ exc_type=None, exc_val=None, exc_tb=None,
             except Exception as _e:
                 errors.append(f"notes.txt: {_e}")
 
-        for _dname in ["_recovery", "backups", "debug_log", "quarantine", "reports", "rules"]:
+        for _dname in ["_recovery", "backups", "quarantine", "reports", "rules"]:
             dp = _ros.path.join(bd, _dname)
             if _ros.path.isdir(dp):
                 skipped.append(f"{_dname}/")
@@ -32140,6 +32020,14 @@ exc_type=None, exc_val=None, exc_tb=None,
                     created.append(f"{_dname}/")
                 except Exception as _de:
                     errors.append(f"{_dname}/: {_de}")
+        _utils_regen = _ros.path.join(_ros.path.dirname(bd), "v0rtex_utils")
+        for _dsub in ("debug_log", _ros.path.join("debug_log", "crash_log"),
+                      _ros.path.join("debug_log", "session_log"),
+                      _ros.path.join("debug_log", "trampoline_log"),
+                      _ros.path.join("debug_log", "admin_log"),
+                      _ros.path.join("debug_log", "update_log")):
+            try: _ros.makedirs(_ros.path.join(_utils_regen, _dsub), exist_ok=True)
+            except Exception: pass
 
 
         _replog("", "DIM")
@@ -35217,6 +35105,7 @@ tk.Label(_sbar, text=f"{_VX_NAME} v{_VX_VER}  by {_VX_AUTH}",
 
 _sl("[DBG] CP11 statusbar packed", "BOOT")
 def _sbar_tick():
+    if _APP_DYING[0]: return
     try:
         import datetime as _dtsb
         _sb_time_sv.set(_dtsb.datetime.now().strftime("%H:%M:%S"))
@@ -35249,7 +35138,8 @@ def _sbar_tick():
             except Exception: pass
     except Exception:
         pass
-    root.after(1000, _sbar_tick)
+    if not _APP_DYING[0]:
+        root.after(1000, _sbar_tick)
 
 root.after(1200, _sbar_tick)
 
