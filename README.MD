@@ -1,1 +1,1 @@
-This is a testing version. This version is unstable, the version number is no different from the normal versions, it's absolutely not a good idea download this version, it might break/crash. 
+This is a testing version. This version is unstable, the version number is no different from the normal versions, it's absolutely not a good idea to download this version, it might break/crash. 
