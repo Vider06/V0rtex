@@ -1,10 +1,14 @@
 ---
-name: Custom issue template
-about: Describe this issue template's purpose here.
+name: Custom
+about: Anything that doesn't fit the other templates
 title: ''
-labels: ''
-assignees: ''
-
+labels: General
+assignees: Vider06
 ---
 
+**Describe your request or issue**
 
+**Context**
+<!-- Any relevant detail: V0RTEX version, OS, tab, etc. -->
+
+**Additional context / screenshots**
