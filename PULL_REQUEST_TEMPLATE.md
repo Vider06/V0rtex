@@ -2,7 +2,16 @@
 
 <!-- What does this PR do? Keep it concise. -->
 
-## Type of Change
+## Target branch
+
+- [ ] `Windows_Release`
+- [ ] `Macos_Release`
+- [ ] `Linux_Release`
+- [ ] `TESTING-GENERAL`
+
+> PRs opened against `main` will be closed.
+
+## Type of change
 
 - [ ] Bug fix
 - [ ] New feature / new tab or sub-tab
@@ -13,7 +22,7 @@
 
 ## Testing
 
-- [ ] Tested on Windows 10 or 11
+- [ ] Tested on the target OS
 - [ ] Python version tested: `3.___`
 - [ ] No regressions observed in existing tabs
 
@@ -31,6 +40,6 @@
 
 By submitting this PR, I confirm that I am the sole author of the submitted code, that I have the right to assign these rights, and that I assign all intellectual property rights of this contribution to Vider_06, the Author of V0RTEX.
 
-## Related Issues
+## Related issues
 
 <!-- Closes #... / Fixes #... / Related to #... -->
