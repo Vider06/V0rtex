@@ -1,5 +1,6 @@
-# V0RTEX
 
+# V0RTEX
+<img width="207" height="210" alt="Delta Project - Copia" src="https://github.com/user-attachments/assets/0ff13fb4-c637-4714-b61c-19d630a887d4" />
 > `V = Vulnerability · O = Oriented · R = Recon · T = Threat · E = Exploitation · X = eXaminer`
 
 **V0RTEX** is an open-source, single-file Windows malware analysis platform built in Python + Tkinter.  
