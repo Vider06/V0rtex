@@ -14,8 +14,8 @@ Do not run it on a production system or on any machine containing data you canno
 
 | Version | Supported |
 |---------|-----------|
-| 0.9.9.X (current) | ✅ Active development, all fixes applied here |
-| 0.9.8.X | ⚠️ Best-effort — upgrade strongly recommended |
+| 1.0.1.X1 (current) | ✅ Active development, all fixes applied here |
+| 1.0.0.X0 | ⚠️ Best-effort — upgrade strongly recommended |
 | < 0.9.8 | ❌ No support |
 
 ---
