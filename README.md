@@ -108,37 +108,33 @@ The installer:
 For educational and cybersecurity research only.  
 Misuse is discouraged.
 
----
-# 📎 Useful Attachments
+## 📎 Useful Attachments
 
-This section contains important project resources, legal documents, and plugin repositories related to V0RTEX.
+### 📚 Documentation
+- 📖 [Wiki ufficiale](https://github.com/Vider06/V0rtex/wiki)
+- 🧭 [Repository principale](https://github.com/Vider06/V0rtex)
 
----
+### ⚖️ Legal & Policies
+- 📜 [License](https://github.com/Vider06/V0rtex/blob/main/LICENSE)
+- 📌 [Code of Conduct](https://github.com/Vider06/V0rtex/blob/main/CODE_OF_CONDUCT.md)
+- 🔐 [Security Policy](https://github.com/Vider06/V0rtex/blob/main/SECURITY.md)
 
-## 📄 Project Documents
+### 🧩 Supported Systems & Branch Docs
+- 🪟 [Windows Release Changelog](https://github.com/Vider06/V0rtex/blob/Windows_Release/CHANGELOG.md)
+- 🐧 [Linux Release Changelog](https://github.com/Vider06/V0rtex/blob/Linux_Release/CHANGELOG.md)
+- 🍎 [macOS Release Changelog](https://github.com/Vider06/V0rtex/blob/Macos_Release/CHANGELOG.md)
+- 🧪 [Testing General Changelog](https://github.com/Vider06/V0rtex/blob/TESTING-GENERAL/CHANGELOG.md)
+- 🌐 [Main Changelog](https://github.com/Vider06/V0rtex/blob/main/CHANGELOG.md)
 
-- [License](https://github.com/Vider06/V0rtex/blob/main/LICENSE)
-- [Code of Conduct](https://github.com/Vider06/V0rtex/blob/main/CODE_OF_CONDUCT.md)
-- [Contributing Guidelines](https://github.com/Vider06/V0rtex/blob/main/CONTRIBUTING.md)
-- [Changelog](https://github.com/Vider06/V0rtex/blob/main/CHANGELOG.md)
+### 🔌 Plugin Ecosystem
+- 🟢 [Official Plugins Repository](https://github.com/Vider06/V0rtex-Plugin-Official)
+- 🔴 [Banned Plugins Repository](https://github.com/Vider06/V0rtex-Banned-Plugins)
 
----
+### ⚙️ Installation Modes
+- 🚀 Automatic Installer (Main Branch)
+- 🧰 Manual Installation (Branch-based setup via OS-specific releases)
 
-## 🔌 Official Plugin Repository
-
-- [Official Plugins](https://github.com/Vider06/V0rtex-Plugin-Official)
-
----
-
-## 🚫 Banned / Restricted Plugins
-
-- [Banned Plugins](https://github.com/Vider06/V0rtex-Banned-Plugins)
-
----
-
-## ⚠️ Note
-
-Plugins are separated for security and stability reasons:
-
-- Official plugins are tested and maintained  
-- Banned plugins are blocked due to risk, instability, or policy violations
+### 🧠 Notes
+- Installer gestisce solo dipendenze core V0RTEX
+- Le dipendenze runtime sono gestite dallo setup wizard interno
+- Ogni branch OS mantiene changelog separato per tracciabilità
