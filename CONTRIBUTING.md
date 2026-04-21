@@ -4,10 +4,19 @@
 
 V0RTEX is proprietary software. Copyright © 2024–2026 Vider_06. All rights reserved.
 
-**By submitting a contribution (Pull Request, patch, or any code change), you assign all intellectual property rights of that contribution to the Author (Vider_06).** Your contribution becomes part of V0RTEX and is subject to the same license terms. You confirm that you are the sole author of the submitted code and that you have the right to assign these rights.
+By submitting a contribution (Pull Request, patch, or any code change), you grant the Author (Vider_06) a perpetual, worldwide, irrevocable, royalty-free license to use, modify, integrate, and distribute your contribution as part of V0RTEX.
 
-If you do not agree to this, do not submit a contribution.
+You acknowledge that:
+- Your contribution may be modified or merged without further notice
+- Your contribution becomes part of a closed-source proprietary project
+- You retain authorship of your original submission, but not exclusive rights once merged
 
+You confirm that:
+- You are the sole author of the submitted code
+- You have the legal right to grant the above license
+- Your contribution does not include malicious, hidden, or unauthorized functionality
+
+If you do not agree, do not submit a contribution.
 ---
 
 ## Before You Start
