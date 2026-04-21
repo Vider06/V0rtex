@@ -1,0 +1,197 @@
+name: V0RTEX Security Engine v2 (Logging Enhanced)
+
+on:
+  pull_request:
+    branches: ["main", "Windows_Release", "Linux_Release", "Macos_Release", "TESTING-GENERAL"]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Pipeline start
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "[V0RTEX SECURITY ENGINE]"
+          echo "STATUS: STARTED"
+          echo "EVENT: pull_request"
+          echo "BRANCH: ${{ github.base_ref }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Diff analysis
+        id: diff
+        run: |
+          echo "[INFO] Fetching diff..."
+
+          git fetch origin ${{ github.base_ref }}
+          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD)
+
+          echo "$DIFF" > diff.txt
+
+          RISK=0
+
+          echo "[INFO] Scanning diff patterns..."
+
+          echo "$DIFF" | grep -qE "eval\(|exec\(|__import__" && {
+            echo "[WARN] Dangerous runtime pattern detected"
+            RISK=$((RISK+50))
+          } || true
+
+          echo "$DIFF" | grep -qE "socket|requests|urllib" && {
+            echo "[INFO] Network-related imports detected"
+            RISK=$((RISK+15))
+          } || true
+
+          echo "$DIFF" | grep -qE "crypto|encrypt|decrypt|hash" && {
+            echo "[INFO] Crypto-related changes detected"
+            RISK=$((RISK+10))
+          } || true
+
+          echo "$DIFF" | grep -qE "\.github/workflows" && {
+            echo "[WARN] Workflow modification detected"
+            RISK=$((RISK+40))
+          } || true
+
+          echo "risk=$RISK" >> $GITHUB_OUTPUT
+          echo "[INFO] Diff analysis complete"
+
+      - name: AST security scan
+        run: |
+          echo "::group::AST SECURITY SCAN"
+          echo "[INFO] Starting AST analysis..."
+
+          python - << 'EOF'
+          import ast, os, sys
+
+          risky = []
+
+          for root, _, files in os.walk("."):
+              for f in files:
+                  if not f.endswith(".py"):
+                      continue
+
+                  path = os.path.join(root, f)
+
+                  try:
+                      with open(path, "r", encoding="utf-8") as file:
+                          tree = ast.parse(file.read(), filename=path)
+                  except Exception:
+                      print(f"[ERROR] Parse failure: {path}")
+                      risky.append(path)
+                      continue
+
+                  for node in ast.walk(tree):
+                      if isinstance(node, ast.Call):
+                          name = getattr(node.func, "id", None)
+                          if name in ("eval", "exec"):
+                              print(f"[CRITICAL] Dangerous call: {path}")
+                              risky.append(path)
+
+          if risky:
+              print("\n[FAIL] Risky files detected:", risky)
+              sys.exit(1)
+
+          print("[OK] AST scan clean")
+          EOF
+
+          echo "[INFO] AST scan completed"
+          echo "::endgroup::"
+
+      - name: Secret detection
+        run: |
+          echo "::group::SECRET SCAN"
+
+          echo "[INFO] Searching for leaked secrets..."
+
+          if grep -R -nE "API_KEY|TOKEN|SECRET|PASSWORD|PRIVATE_KEY" . --include="*.py"; then
+            echo "[CRITICAL] Secret detected!"
+            exit 1
+          fi
+
+          echo "[OK] No secrets found"
+          echo "::endgroup::"
+
+      - name: Dependency audit
+        run: |
+          echo "::group::DEPENDENCY AUDIT"
+
+          python -m pip install --upgrade pip
+
+          if [ -f requirements.txt ]; then
+            echo "[INFO] Installing dependencies..."
+            pip install -r requirements.txt
+
+            pip install pip-audit
+
+            echo "[INFO] Running pip check..."
+            pip check
+
+            echo "[INFO] Running vulnerability scan..."
+            pip-audit
+          else
+            echo "[INFO] No requirements.txt found"
+          fi
+
+          echo "::endgroup::"
+
+      - name: Compile safety
+        run: |
+          echo "::group::COMPILE CHECK"
+
+          python - << 'EOF'
+          import py_compile, os, sys
+
+          print("[INFO] Compiling Python files...")
+
+          for root, _, files in os.walk("."):
+              for f in files:
+                  if not f.endswith(".py"):
+                      continue
+
+                  path = os.path.join(root, f)
+
+                  try:
+                      py_compile.compile(path, doraise=True)
+                  except Exception:
+                      print(f"[ERROR] Compile failed: {path}")
+                      sys.exit(1)
+
+          print("[OK] All files compile correctly")
+          EOF
+
+          echo "::endgroup::"
+
+      - name: Risk evaluation
+        run: |
+          RISK=${{ steps.diff.outputs.risk }}
+
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "[RISK ENGINE]"
+          echo "FINAL SCORE: $RISK"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          if [ "$RISK" -ge 80 ]; then
+            echo "[BLOCKED] High-risk PR"
+            exit 1
+          elif [ "$RISK" -ge 40 ]; then
+            echo "[REVIEW] Manual inspection required"
+          else
+            echo "[SAFE] No critical issues detected"
+          fi
+
+      - name: Pipeline end
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "[V0RTEX SECURITY ENGINE]"
+          echo "STATUS: FINISHED"
+          echo "RESULT: COMPLETED"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
