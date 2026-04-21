@@ -1,99 +1,182 @@
+# ⚡ V0RTEX
 
-# V0RTEX
-> `V = Vulnerability · O = Oriented · R = Recon · T = Threat · E = Exploitation · X = eXaminer`
+> V = Vulnerability · O = Oriented · R = Recon · T = Threat · E = Exploitation · X = eXaminer
 
-**V0RTEX** is an open-source, single-file Windows malware analysis platform built in Python + Tkinter.  
-One script. No installer required beyond running `python v0rtex.py`.
+V0RTEX is a cross-platform malware analysis platform built in Python.
 
-**Author:** Vider_06  
-**Platform:** Windows 10 / 11 (64-bit)  
-**Python:** 3.10 or higher — including 3.12, 3.13, 3.14  
-**License:** Copyright © 2024–2026 Vider_06. All rights reserved. See [LICENSE](LICENSE).
+It provides a complete offline security lab for:
+- static analysis
+- dynamic monitoring
+- network inspection
+- IOC extraction
+- sandbox-style execution tracking
 
----
-
-## What is V0RTEX?
-
-V0RTEX is a complete malware analysis lab inside a single Python script (~35,000 lines). It covers the full analysis workflow — from initial triage and static analysis through dynamic monitoring and post-analysis reporting — and includes network privacy tools, a self-protection layer, a trampoline-based auto-updater, and a full Windows system health checker.
-
-It is designed for malware analysts, SOC operators, and security researchers who want a self-contained environment with no cloud dependency and no external launcher.
+No cloud required. No external runtime dependencies beyond initial setup.
 
 ---
 
-## Features at a Glance
+## 🧠 What is V0RTEX?
+
+V0RTEX is a self-contained malware analysis environment designed for security researchers, SOC analysts, and reverse engineers.
+
+It unifies multiple analysis tools into a single workflow, covering everything from initial triage to deep system and network inspection.
+
+The goal is to reduce tool fragmentation and provide a unified analysis pipeline.
+
+---
+
+## 🚀 Features at a Glance
 
 | Area | Highlights |
-|---|---|
-| **Static Analysis** | Hashes · PE headers · Imports/Exports · Strings · Entropy · Sections · Suspicious API detection · IMPHASH |
-| **YARA** | Custom rule editor · Community library downloader · yara-python / yara-x multi-engine · Deobfuscator · Sigma viewer |
-| **IOC** | Auto-extraction · MITRE ATT&CK mapping · Feed import · Reputation · Secrets scanner |
-| **Network** | Live connections · PCAP · Port scan · DNS · WHOIS · SSL/TLS · Proxy · Tor · Noise generator · Live traffic · Connection stats |
-| **VirusTotal** | File scan · Hash lookup · Bulk batch · URL scan |
-| **Threat APIs** | VirusTotal · MalwareBazaar · AbuseIPDB · URLScan · AlienVault OTX · Shodan · GreyNoise · HybridAnalysis |
-| **Sandbox** | Auto-scan drop folder · Process monitor · File analyzer · Cuckoo/CAPE integration |
-| **Crypto / Encoding** | AES-256-GCM · RSA · SHA-3 · BLAKE2 · Base64/Hex/XOR · JWT · ROT · Vigenère |
-| **Lookup** | HEX · REGEX · DOC · SIG · DIFF · Archive · Macro · B64 · XOR · PE-HDR · Unicode · BinPat · Fuzzy hash |
-| **Process** | Live scanner · Services · Startup items · Env variables · Handles · Process tree · Registry browser |
-| **Defense** | Real-time watchdog · Quarantine · Self-defense · Integrity check · Folder protection · Auto-backup · Emergency rollback |
-| **Privacy** | Log censor · Auto-censor toggle · Per-category rules · Temp log storage management |
-| **System Check** | Defender status · SFC · DISM · Disk SMART · Startup persistence · System Fixer · Full deep scan |
-| **Updater** | Adapter-based pipeline · Trampoline chain for large version gaps · Self-updating adapter · Fresh install / data reset modes |
-
-**21 main tabs · 90+ sub-tabs**
+|------|------------|
+| Static Analysis | Hashes · PE parsing · Imports/Exports · Strings · Entropy · Sections · IMPHASH · API anomaly detection |
+| YARA Engine | Rule editor · Rule packs · Multi-engine support · Deobfuscation helpers |
+| IOC System | Auto extraction · MITRE mapping · Threat correlation · Feed import |
+| Network Analysis | Live connections · DNS monitoring · Port scan · PCAP analysis · SSL/TLS inspection |
+| Threat Intelligence | VirusTotal · MalwareBazaar · AbuseIPDB · OTX · Shodan · GreyNoise · HybridAnalysis |
+| Sandbox Layer | Process monitoring · Drop folder analysis · Execution tracking |
+| Crypto / Encoding | AES · RSA · SHA-3 · BLAKE2 · Base64 · XOR · JWT analysis |
+| System Analysis | Registry · Services · Startup items · Process tree · Persistence detection |
+| Defense Layer | Real-time monitoring · Quarantine · Integrity checks · Backup & rollback |
+| Privacy Layer | Log sanitization · Auto-censor rules · Secure temp storage |
+| System Health | Defender status · SFC · DISM · Disk analysis |
+| Updater System | Adapter-based pipeline · Trampoline version migration system |
 
 ---
 
-## Branches
+## ⚙️ Architecture Overview
 
-This repository uses separate branches for active development and platform-specific releases.
+V0RTEX is modular and built around internal systems:
 
-| Branch | Description |
-|---|---|
-| `main` | This overview, changelog, and stable release files |
-| `Windows_Release` | Latest stable Windows build — full README and source |
-| `Linux_Release` | Linux build |
-| `MacOS_Release` | macOS build |
-| `TESTING-GENERAL` | Development and testing |
-
-For installation instructions, the full tab reference, and the complete folder structure, see the **[Windows_Release branch README](https://github.com/Vider06/V0rtex/blob/Windows_Release/README.md)**.
+- Installer → Bootstraps environment
+- Core Engine → Main analysis system
+- Adapter System → Version compatibility layer
+- Trampoline System → Cross-version migration engine
+- Updater → Release-based update pipeline
+- OS Layer → Controlled via Supported_os.json
 
 ---
 
-## Quick Start
+## 📊 OS Compatibility System
 
-```
-git clone -b Windows_Release https://github.com/Vider06/V0rtex.git
-cd V0rtex
-python v0rtex.py
-```
+Defined in:
 
-On first launch V0RTEX opens the **Setup Wizard** automatically. It installs all dependencies, handles YARA, auto-detects tshark, builds the folder structure, and adds Defender exclusions.
+Supported_os.json
 
-**Requirements:** Windows 10/11 (64-bit) · Python 3.10+ · Internet connection for first-run setup
+### Status types:
 
----
-
-## Version Scheme
-
-```
-MAJOR . BIG_UPDATE . SMALL_UPDATE . X[BUGFIX]
-
-Example: 1.0.1.X1
-  1       = major version
-  0       = big update batch
-  1       = small update
-  X1      = second bugfix release on this version
-```
+- Released → Fully supported and stable
+- Not Stable → Works but may contain bugs (confirmation required)
+- Pre-Release → Early testing stage
+- Work in Progress → Not yet available
+- Not Supported → Blocked installation
 
 ---
 
-## Changelog
+## ⚙️ Installation
 
-See [CHANGELOG.md](CHANGELOG.md) for the full history.
+### Requirements
+
+- Python 3.10+
+- requests module
+- Windows / Linux / macOS (depending on build)
+
+Install dependency:
+
+pip install requests
 
 ---
 
-## License
+### Run Installer
 
-Copyright © 2024–2026 Vider_06. All rights reserved.  
-See [LICENSE](LICENSE) for full terms.
+python install.py
+
+---
+
+The installer will:
+1. Detect operating system
+2. Load compatibility configuration
+3. Check OS support level
+4. Download correct release
+5. Extract files
+6. Launch setup wizard
+
+---
+
+## 🧪 First Launch
+
+On first run, V0RTEX automatically:
+
+- Configures dependencies
+- Detects system tools
+- Builds folder structure
+- Initializes modules
+- Prepares optional integrations
+
+---
+
+## 📦 Release System
+
+Each GitHub release contains OS-specific builds:
+
+v0rtex-windows.zip  
+v0rtex-linux.zip  
+v0rtex-macos.zip  
+
+---
+
+## 🔄 Versioning Scheme
+
+MAJOR.BIG_UPDATE.SMALL_UPDATE.BUGFIX
+
+Example:
+1.0.1.X1
+
+- MAJOR → architecture changes
+- BIG_UPDATE → major features
+- SMALL_UPDATE → improvements
+- BUGFIX → patches
+
+---
+
+## 📂 Repository Structure
+
+main            → Documentation + installer entry  
+Windows_Release → Windows build  
+Linux_Release   → Linux build  
+MacOS_Release   → macOS build  
+TESTING-GENERAL → Development branch  
+
+---
+
+## ⚠️ Stability Notes
+
+Some builds may be unstable depending on OS support.
+
+If marked as Not Stable, installer will ask confirmation before continuing.
+
+---
+
+## 🛠 Roadmap
+
+- Stable Linux release
+- Full macOS support
+- GUI dashboard mode
+- Auto-update without reinstall
+- Plugin system
+- Threat visualization graphs
+
+---
+
+## 📄 License
+
+Copyright © 2024–2026 Vider_06  
+All rights reserved.
+
+See LICENSE file for details.
+
+---
+
+## 💬 Notes
+
+V0RTEX is a modular cross-platform malware analysis framework focused on automation, system visibility, and unified threat analysis workflows.
