@@ -19,8 +19,6 @@ V0RTEX is a unified security analysis platform that combines:
 - System health and persistence analysis  
 - Encryption and encoding utilities  
 
-All in a single modular application.
-
 ---
 
 # ⚙️ Installation
@@ -38,7 +36,7 @@ The installer will:
 
 ---
 
-## 🟡 Manual Installation (Advanced Users)
+## 🟡 Manual Installation
 
 git clone -b Windows_Release https://github.com/Vider06/V0rtex.git  
 cd V0rtex  
@@ -51,7 +49,7 @@ python v0rtex.py
 - main → Installer + documentation  
 - Windows_Release → Stable Windows build  
 - Linux_Release → Linux build (WIP)  
-- MacOS_Release → macOS build (WIP)  
+- Macos_Release → macOS build (WIP)  
 - TESTING-GENERAL → development branch  
 
 ---
@@ -64,7 +62,7 @@ python v0rtex.py
 - String extraction  
 - Entropy analysis  
 - Import/export analysis  
-- Suspicious pattern detection  
+- Suspicious patterns detection  
 
 ## Network Analysis
 - Live connections monitoring  
@@ -93,60 +91,63 @@ python v0rtex.py
 
 # 🔄 Installer System
 
-The installer:
-- Detects OS automatically  
-- Handles installation safely  
-- Supports reinstall mode  
-- Launches V0RTEX after setup  
+The installer automatically:
+- Detects OS  
+- Handles dependencies  
+- Manages setup safely  
+- Launches V0RTEX after installation  
 
 ---
 
 # ⚠️ Disclaimer
 
-For educational and cybersecurity research purposes only.  
+For educational and cybersecurity research only.  
 Misuse is discouraged.
 
 ---
 
-# 📎 Useful Attachments
+# 📚 Documentation
 
-## 📚 Documentation
-- 📖 Official Wiki: https://github.com/Vider06/V0rtex/wiki
-
----
-
-## ⚖️ Legal & Policies
-- 📜 License: https://github.com/Vider06/V0rtex/blob/main/LICENSE.txt  
-- 📌 Code of Conduct: https://github.com/Vider06/V0rtex/blob/main/CODE_OF_CONDUCT.md  
-- 🔐 Security Policy: https://github.com/Vider06/V0rtex/blob/main/SECURITY.md  
-- 🤝 Contributing: https://github.com/Vider06/V0rtex/blob/main/CONTRIBUTING.md  
+- [Official Wiki](https://github.com/Vider06/V0rtex/wiki)  
+- [Main Repository](https://github.com/Vider06/V0rtex)
 
 ---
 
-## 🧩 Supported Systems & Branch READMEs
-- 🪟 Windows Release README: https://github.com/Vider06/V0rtex/blob/Windows_Release/README.md  
-- 🐧 Linux Release README: https://github.com/Vider06/V0rtex/blob/Linux_Release/README.md  
-- 🍎 macOS Release README: https://github.com/Vider06/V0rtex/blob/Macos_Release/README.md  
-- 🧪 Testing General README: https://github.com/Vider06/V0rtex/blob/TESTING-GENERAL/README.md  
-- 🌐 Main README: https://github.com/Vider06/V0rtex/blob/main/README.md  
+# ⚖️ Legal & Policies
+
+- [License](https://github.com/Vider06/V0rtex/blob/main/LICENSE)
+- [Code of Conduct](https://github.com/Vider06/V0rtex/blob/main/CODE_OF_CONDUCT.md)
+- [Security Policy](https://github.com/Vider06/V0rtex/blob/main/SECURITY.md)
 
 ---
 
-## 🔌 Plugin Ecosystem
-- 🟢 Official Plugins Repository: https://github.com/Vider06/V0rtex-Plugin-Official  
-- 🔴 Banned Plugins Repository: https://github.com/Vider06/V0rtex-Banned-Plugins  
+# 🧩 Branch Documentation
+
+- [Windows Release README](https://github.com/Vider06/V0rtex/blob/Windows_Release/README.md)
+- [Linux Release README](https://github.com/Vider06/V0rtex/blob/Linux_Release/README.md)
+- [MacOS Release README](https://github.com/Vider06/V0rtex/blob/Macos_Release/README.md)
+- [TESTING-GENERAL README](https://github.com/Vider06/V0rtex/blob/TESTING-GENERAL/README.md)
 
 ---
 
-## 🧠 Notes
-- Installer manages only core dependencies  
-- Runtime dependencies handled internally  
-- Each branch maintains its own documentation  
+# 🔌 Plugins
+
+- [Official Plugins](https://github.com/Vider06/V0rtex-Plugin-Official)
+- [Banned Plugins](https://github.com/Vider06/V0rtex-Banned-Plugins)
 
 ---
 
-# ⚖️ License
+# 🧠 Notes
 
-This project is distributed under the MIT License (see LICENSE.txt).
+- Installer handles only core setup  
+- Each OS branch is independently maintained  
+- Development happens in TESTING-GENERAL  
+- Main branch is documentation + orchestration only  
 
-You may use, modify, and distribute it under the license terms, provided attribution is retained and the license is included in all copies or substantial portions.
+---
+
+# 📦 License
+
+V0RTEX is licensed under the proprietary **VORTEX SOFTWARE LICENSE**.
+
+Copyright © 2024–2026 Vider_06. All rights reserved.
