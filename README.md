@@ -8,7 +8,7 @@ It provides a complete offline environment for malware analysis, system inspecti
 
 ---
 
-# 🚀 What is V0RTEX?
+# 🚀 What is V0RTEX
 
 V0RTEX is a unified security analysis platform that combines:
 
@@ -28,23 +28,22 @@ All in a single modular application.
 ## 🟢 Automatic Installer (Recommended)
 
 Run:
-```bash
 python v0rtex_installer.py
-```
+
 The installer will:
-- Detect your operating system automatically
-- Select the correct repository branch
-- Clone and set up V0RTEX
-- Launch the application
+- Detect your operating system automatically  
+- Select the correct repository branch  
+- Clone and set up V0RTEX  
+- Launch the application  
 
 ---
 
 ## 🟡 Manual Installation (Advanced Users)
-```bash
+
 git clone -b Windows_Release https://github.com/Vider06/V0rtex.git  
 cd V0rtex  
 python v0rtex.py  
-```
+
 ---
 
 # 🧠 Repository Structure
@@ -95,7 +94,6 @@ python v0rtex.py
 # 🔄 Installer System
 
 The installer:
-
 - Detects OS automatically  
 - Handles installation safely  
 - Supports reinstall mode  
@@ -105,36 +103,50 @@ The installer:
 
 # ⚠️ Disclaimer
 
-For educational and cybersecurity research only.  
+For educational and cybersecurity research purposes only.  
 Misuse is discouraged.
 
-## 📎 Useful Attachments
+---
 
-### 📚 Documentation
-- 📖 [Official Wiki](https://github.com/Vider06/V0rtex/wiki)
-- 🧭 [Main Repository](https://github.com/Vider06/V0rtex)
+# 📎 Useful Attachments
 
-### ⚖️ Legal & Policies
-- 📜 [License](https://github.com/Vider06/V0rtex/blob/main/LICENSE)
-- 📌 [Code of Conduct](https://github.com/Vider06/V0rtex/blob/main/CODE_OF_CONDUCT.md)
-- 🔐 [Security Policy](https://github.com/Vider06/V0rtex/blob/main/SECURITY.md)
+## 📚 Documentation
+- 📖 Official Wiki: https://github.com/Vider06/V0rtex/wiki
 
-### 🧩 Supported Systems & Branch Changelogs
-- 🪟 [Windows Release Changelog](https://github.com/Vider06/V0rtex/blob/Windows_Release/CHANGELOG.md)
-- 🐧 [Linux Release Changelog](https://github.com/Vider06/V0rtex/blob/Linux_Release/CHANGELOG.md)
-- 🍎 [macOS Release Changelog](https://github.com/Vider06/V0rtex/blob/Macos_Release/CHANGELOG.md)
-- 🧪 [Testing General Changelog](https://github.com/Vider06/V0rtex/blob/TESTING-GENERAL/CHANGELOG.md)
-- 🌐 [Main Changelog](https://github.com/Vider06/V0rtex/blob/main/CHANGELOG.md)
+---
 
-### 🔌 Plugin Ecosystem
-- 🟢 [Official Plugins Repository](https://github.com/Vider06/V0rtex-Plugin-Official)
-- 🔴 [Banned Plugins Repository](https://github.com/Vider06/V0rtex-Banned-Plugins)
+## ⚖️ Legal & Policies
+- 📜 License: https://github.com/Vider06/V0rtex/blob/main/LICENSE.txt  
+- 📌 Code of Conduct: https://github.com/Vider06/V0rtex/blob/main/CODE_OF_CONDUCT.md  
+- 🔐 Security Policy: https://github.com/Vider06/V0rtex/blob/main/SECURITY.md  
+- 🤝 Contributing: https://github.com/Vider06/V0rtex/blob/main/CONTRIBUTING.md  
 
-### ⚙️ Installation Modes
-- 🚀 Automatic Installer (Main Branch)
-- 🧰 Manual Installation (branch-based setup depending on OS release)
+---
 
-### 🧠 Notes
-- The installer only manages core V0RTEX dependencies
-- Runtime dependencies are handled by the internal setup wizard
-- Each OS branch maintains its own changelog for traceability
+## 🧩 Supported Systems & Branch READMEs
+- 🪟 Windows Release README: https://github.com/Vider06/V0rtex/blob/Windows_Release/README.md  
+- 🐧 Linux Release README: https://github.com/Vider06/V0rtex/blob/Linux_Release/README.md  
+- 🍎 macOS Release README: https://github.com/Vider06/V0rtex/blob/Macos_Release/README.md  
+- 🧪 Testing General README: https://github.com/Vider06/V0rtex/blob/TESTING-GENERAL/README.md  
+- 🌐 Main README: https://github.com/Vider06/V0rtex/blob/main/README.md  
+
+---
+
+## 🔌 Plugin Ecosystem
+- 🟢 Official Plugins Repository: https://github.com/Vider06/V0rtex-Plugin-Official  
+- 🔴 Banned Plugins Repository: https://github.com/Vider06/V0rtex-Banned-Plugins  
+
+---
+
+## 🧠 Notes
+- Installer manages only core dependencies  
+- Runtime dependencies handled internally  
+- Each branch maintains its own documentation  
+
+---
+
+# ⚖️ License
+
+This project is distributed under the MIT License (see LICENSE.txt).
+
+You may use, modify, and distribute it under the license terms, provided attribution is retained and the license is included in all copies or substantial portions.
