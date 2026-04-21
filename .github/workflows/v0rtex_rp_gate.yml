@@ -7,6 +7,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  issues: write
 
 jobs:
   security:
@@ -32,6 +33,7 @@ jobs:
         run: |
           git fetch origin ${{ github.base_ref }}
           DIFF=$(git diff origin/${{ github.base_ref }}...HEAD)
+
           echo "$DIFF" > diff.txt
 
           RISK=0
@@ -43,13 +45,18 @@ jobs:
 
           echo "risk=$RISK" >> $GITHUB_OUTPUT
 
+          echo "[INFO] Diff analysis complete"
+          echo "[INFO] Risk score = $RISK"
+
       - name: AST security scan
         run: |
+          echo "::group::AST SECURITY SCAN"
+
           python - << 'EOF'
-          import ast, os, json
+          import ast, os, json, sys
 
           results = []
-          risky = []
+          risky = False
 
           for root, _, files in os.walk("."):
               for f in files:
@@ -72,30 +79,49 @@ jobs:
                           name = getattr(node.func, "id", None)
                           if name in ("eval", "exec"):
                               file_risk = "CRITICAL"
-                              risky.append(path)
+                              risky = True
 
                   results.append({"file": path, "risk": file_risk})
 
           with open("ast_report.json", "w") as f:
               json.dump(results, f, indent=2)
 
-          print("AST SCAN COMPLETE")
+          if risky:
+              print("[FAIL] Critical patterns detected")
+              sys.exit(1)
+
+          print("[OK] AST scan clean")
           EOF
+
+          echo "::endgroup::"
 
       - name: Secret detection
         run: |
-          grep -R -nE "API_KEY|TOKEN|SECRET|PASSWORD|PRIVATE_KEY" . --include="*.py" > secrets.txt || true
+          echo "::group::SECRET SCAN"
+
+          if grep -R -nE "API_KEY|TOKEN|SECRET|PASSWORD|PRIVATE_KEY" . --include="*.py"; then
+            echo "[CRITICAL] Secrets detected"
+            exit 1
+          fi
+
+          echo "[OK] No secrets found"
+          echo "::endgroup::"
 
       - name: Dependency audit
         run: |
+          echo "::group::DEPENDENCY AUDIT"
+
           python -m pip install --upgrade pip
 
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
             pip install pip-audit
+
             pip check || true
             pip-audit || true
           fi
+
+          echo "::endgroup::"
 
       - name: Compile safety
         run: |
@@ -115,20 +141,24 @@ jobs:
 
           if failed:
               open("compile_fail.flag", "w").write("fail")
+              print("[ERROR] Compile errors detected")
+              sys.exit(1)
 
-          print("COMPILE DONE")
+          print("[OK] Compilation clean")
           EOF
 
       - name: Risk engine aggregation
         run: |
           RISK=${{ steps.diff.outputs.risk }}
 
-          STATUS="SAFE"
+          STATUS="LOW"
           if [ "$RISK" -ge 80 ]; then STATUS="CRITICAL"; fi
           if [ "$RISK" -ge 40 ] && [ "$RISK" -lt 80 ]; then STATUS="HIGH"; fi
-          if [ "$RISK" -lt 40 ]; then STATUS="LOW"; fi
 
           echo "{\"score\": $RISK, \"status\": \"$STATUS\"}" > security_report.json
+
+          echo "[INFO] Final risk = $RISK"
+          echo "[INFO] Status = $STATUS"
 
       - name: Upload security report
         uses: actions/upload-artifact@v4
@@ -142,19 +172,22 @@ jobs:
           script: |
             const fs = require('fs');
 
-            const report = JSON.parse(fs.readFileSync('security_report.json', 'utf8'));
+            let report = { score: -1, status: "NO_REPORT" };
 
-            const body = `## 🛡 V0RTEX Security Report
+            try {
+              report = JSON.parse(fs.readFileSync('security_report.json', 'utf8'));
+            } catch (e) {}
 
-**Score:** ${report.score}  
-**Status:** ${report.status}
-`;
+            const body =
+              "## 🛡 V0RTEX Security Report\n\n" +
+              "Score: " + report.score + "\n\n" +
+              "Status: " + report.status;
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body
+              body: body
             });
 
       - name: Final evaluation
@@ -162,17 +195,17 @@ jobs:
           RISK=${{ steps.diff.outputs.risk }}
 
           if [ -f compile_fail.flag ]; then
-            echo "COMPILATION FAILED"
+            echo "[BLOCKED] Compilation failed"
             exit 1
           fi
 
           if [ "$RISK" -ge 80 ]; then
-            echo "BLOCKED"
+            echo "[BLOCKED] High-risk PR"
             exit 1
           elif [ "$RISK" -ge 40 ]; then
-            echo "REVIEW REQUIRED"
+            echo "[REVIEW] Manual inspection required"
           else
-            echo "SAFE"
+            echo "[SAFE] No critical issues detected"
           fi
 
       - name: Pipeline end
