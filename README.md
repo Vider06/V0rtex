@@ -28,9 +28,9 @@ All in a single modular application.
 ## 🟢 Automatic Installer (Recommended)
 
 Run:
-
+```bash
 python v0rtex_installer.py
-
+```
 The installer will:
 - Detect your operating system automatically
 - Select the correct repository branch
