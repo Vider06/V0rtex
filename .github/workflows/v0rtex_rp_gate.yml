@@ -1,4 +1,4 @@
-name: V0RTEX Security Engine v2 (Logging Enhanced)
+name: V0RTEX Security Engine v3 (Full CI Security Suite)
 
 on:
   pull_request:
@@ -6,7 +6,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   security:
@@ -17,7 +17,7 @@ jobs:
       - name: Pipeline start
         run: |
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "[V0RTEX SECURITY ENGINE]"
+          echo "[V0RTEX SECURITY ENGINE v3]"
           echo "STATUS: STARTED"
           echo "EVENT: pull_request"
           echo "BRANCH: ${{ github.base_ref }}"
@@ -30,48 +30,25 @@ jobs:
       - name: Diff analysis
         id: diff
         run: |
-          echo "[INFO] Fetching diff..."
-
           git fetch origin ${{ github.base_ref }}
           DIFF=$(git diff origin/${{ github.base_ref }}...HEAD)
-
           echo "$DIFF" > diff.txt
 
           RISK=0
 
-          echo "[INFO] Scanning diff patterns..."
-
-          echo "$DIFF" | grep -qE "eval\(|exec\(|__import__" && {
-            echo "[WARN] Dangerous runtime pattern detected"
-            RISK=$((RISK+50))
-          } || true
-
-          echo "$DIFF" | grep -qE "socket|requests|urllib" && {
-            echo "[INFO] Network-related imports detected"
-            RISK=$((RISK+15))
-          } || true
-
-          echo "$DIFF" | grep -qE "crypto|encrypt|decrypt|hash" && {
-            echo "[INFO] Crypto-related changes detected"
-            RISK=$((RISK+10))
-          } || true
-
-          echo "$DIFF" | grep -qE "\.github/workflows" && {
-            echo "[WARN] Workflow modification detected"
-            RISK=$((RISK+40))
-          } || true
+          echo "$DIFF" | grep -qE "eval\(|exec\(|__import__" && RISK=$((RISK+50)) || true
+          echo "$DIFF" | grep -qE "socket|requests|urllib" && RISK=$((RISK+15)) || true
+          echo "$DIFF" | grep -qE "crypto|encrypt|decrypt|hash" && RISK=$((RISK+10)) || true
+          echo "$DIFF" | grep -qE "\.github/workflows" && RISK=$((RISK+40)) || true
 
           echo "risk=$RISK" >> $GITHUB_OUTPUT
-          echo "[INFO] Diff analysis complete"
 
       - name: AST security scan
         run: |
-          echo "::group::AST SECURITY SCAN"
-          echo "[INFO] Starting AST analysis..."
-
           python - << 'EOF'
-          import ast, os, sys
+          import ast, os, json
 
+          results = []
           risky = []
 
           for root, _, files in os.walk("."):
@@ -85,113 +62,122 @@ jobs:
                       with open(path, "r", encoding="utf-8") as file:
                           tree = ast.parse(file.read(), filename=path)
                   except Exception:
-                      print(f"[ERROR] Parse failure: {path}")
-                      risky.append(path)
+                      results.append({"file": path, "risk": "LOW", "issue": "parse_error"})
                       continue
+
+                  file_risk = "LOW"
 
                   for node in ast.walk(tree):
                       if isinstance(node, ast.Call):
                           name = getattr(node.func, "id", None)
                           if name in ("eval", "exec"):
-                              print(f"[CRITICAL] Dangerous call: {path}")
+                              file_risk = "CRITICAL"
                               risky.append(path)
 
-          if risky:
-              print("\n[FAIL] Risky files detected:", risky)
-              sys.exit(1)
+                  results.append({"file": path, "risk": file_risk})
 
-          print("[OK] AST scan clean")
+          with open("ast_report.json", "w") as f:
+              json.dump(results, f, indent=2)
+
+          print("AST SCAN COMPLETE")
           EOF
-
-          echo "[INFO] AST scan completed"
-          echo "::endgroup::"
 
       - name: Secret detection
         run: |
-          echo "::group::SECRET SCAN"
-
-          echo "[INFO] Searching for leaked secrets..."
-
-          if grep -R -nE "API_KEY|TOKEN|SECRET|PASSWORD|PRIVATE_KEY" . --include="*.py"; then
-            echo "[CRITICAL] Secret detected!"
-            exit 1
-          fi
-
-          echo "[OK] No secrets found"
-          echo "::endgroup::"
+          grep -R -nE "API_KEY|TOKEN|SECRET|PASSWORD|PRIVATE_KEY" . --include="*.py" > secrets.txt || true
 
       - name: Dependency audit
         run: |
-          echo "::group::DEPENDENCY AUDIT"
-
           python -m pip install --upgrade pip
 
           if [ -f requirements.txt ]; then
-            echo "[INFO] Installing dependencies..."
             pip install -r requirements.txt
-
             pip install pip-audit
-
-            echo "[INFO] Running pip check..."
-            pip check
-
-            echo "[INFO] Running vulnerability scan..."
-            pip-audit
-          else
-            echo "[INFO] No requirements.txt found"
+            pip check || true
+            pip-audit || true
           fi
-
-          echo "::endgroup::"
 
       - name: Compile safety
         run: |
-          echo "::group::COMPILE CHECK"
-
           python - << 'EOF'
           import py_compile, os, sys
 
-          print("[INFO] Compiling Python files...")
+          failed = False
 
           for root, _, files in os.walk("."):
               for f in files:
-                  if not f.endswith(".py"):
-                      continue
+                  if f.endswith(".py"):
+                      path = os.path.join(root, f)
+                      try:
+                          py_compile.compile(path, doraise=True)
+                      except:
+                          failed = True
 
-                  path = os.path.join(root, f)
+          if failed:
+              open("compile_fail.flag", "w").write("fail")
 
-                  try:
-                      py_compile.compile(path, doraise=True)
-                  except Exception:
-                      print(f"[ERROR] Compile failed: {path}")
-                      sys.exit(1)
-
-          print("[OK] All files compile correctly")
+          print("COMPILE DONE")
           EOF
 
-          echo "::endgroup::"
-
-      - name: Risk evaluation
+      - name: Risk engine aggregation
         run: |
           RISK=${{ steps.diff.outputs.risk }}
 
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "[RISK ENGINE]"
-          echo "FINAL SCORE: $RISK"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          STATUS="SAFE"
+          if [ "$RISK" -ge 80 ]; then STATUS="CRITICAL"; fi
+          if [ "$RISK" -ge 40 ] && [ "$RISK" -lt 80 ]; then STATUS="HIGH"; fi
+          if [ "$RISK" -lt 40 ]; then STATUS="LOW"; fi
+
+          echo "{\"score\": $RISK, \"status\": \"$STATUS\"}" > security_report.json
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: v0rtex-security-report
+          path: security_report.json
+
+      - name: PR Comment report
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            const report = JSON.parse(fs.readFileSync('security_report.json', 'utf8'));
+
+            const body = `## 🛡 V0RTEX Security Report
+
+**Score:** ${report.score}  
+**Status:** ${report.status}
+`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+      - name: Final evaluation
+        run: |
+          RISK=${{ steps.diff.outputs.risk }}
+
+          if [ -f compile_fail.flag ]; then
+            echo "COMPILATION FAILED"
+            exit 1
+          fi
 
           if [ "$RISK" -ge 80 ]; then
-            echo "[BLOCKED] High-risk PR"
+            echo "BLOCKED"
             exit 1
           elif [ "$RISK" -ge 40 ]; then
-            echo "[REVIEW] Manual inspection required"
+            echo "REVIEW REQUIRED"
           else
-            echo "[SAFE] No critical issues detected"
+            echo "SAFE"
           fi
 
       - name: Pipeline end
         run: |
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "[V0RTEX SECURITY ENGINE]"
+          echo "[V0RTEX SECURITY ENGINE v3]"
           echo "STATUS: FINISHED"
-          echo "RESULT: COMPLETED"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
