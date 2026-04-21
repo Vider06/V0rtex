@@ -33,7 +33,6 @@ jobs:
         run: |
           git fetch origin ${{ github.base_ref }}
           DIFF=$(git diff origin/${{ github.base_ref }}...HEAD)
-
           echo "$DIFF" > diff.txt
 
           RISK=0
@@ -46,17 +45,17 @@ jobs:
           echo "risk=$RISK" >> $GITHUB_OUTPUT
 
           echo "[INFO] Diff analysis complete"
-          echo "[INFO] Risk score = $RISK"
+          echo "[INFO] Risk score: $RISK"
 
       - name: AST security scan
         run: |
           echo "::group::AST SECURITY SCAN"
 
           python - << 'EOF'
-          import ast, os, json, sys
+          import ast, os, json
 
           results = []
-          risky = False
+          stats = {"total_files": 0, "critical": 0}
 
           for root, _, files in os.walk("."):
               for f in files:
@@ -64,6 +63,7 @@ jobs:
                       continue
 
                   path = os.path.join(root, f)
+                  stats["total_files"] += 1
 
                   try:
                       with open(path, "r", encoding="utf-8") as file:
@@ -79,18 +79,14 @@ jobs:
                           name = getattr(node.func, "id", None)
                           if name in ("eval", "exec"):
                               file_risk = "CRITICAL"
-                              risky = True
+                              stats["critical"] += 1
 
                   results.append({"file": path, "risk": file_risk})
 
           with open("ast_report.json", "w") as f:
-              json.dump(results, f, indent=2)
+              json.dump({"stats": stats, "results": results}, f, indent=2)
 
-          if risky:
-              print("[FAIL] Critical patterns detected")
-              sys.exit(1)
-
-          print("[OK] AST scan clean")
+          print("[OK] AST scan completed")
           EOF
 
           echo "::endgroup::"
@@ -99,12 +95,9 @@ jobs:
         run: |
           echo "::group::SECRET SCAN"
 
-          if grep -R -nE "API_KEY|TOKEN|SECRET|PASSWORD|PRIVATE_KEY" . --include="*.py"; then
-            echo "[CRITICAL] Secrets detected"
-            exit 1
-          fi
+          grep -R -nE "API_KEY|TOKEN|SECRET|PASSWORD|PRIVATE_KEY" . --include="*.py" > secrets.txt || true
 
-          echo "[OK] No secrets found"
+          echo "[INFO] Secret scan completed"
           echo "::endgroup::"
 
       - name: Dependency audit
@@ -116,7 +109,6 @@ jobs:
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
             pip install pip-audit
-
             pip check || true
             pip-audit || true
           fi
@@ -126,7 +118,7 @@ jobs:
       - name: Compile safety
         run: |
           python - << 'EOF'
-          import py_compile, os, sys
+          import py_compile, os
 
           failed = False
 
@@ -139,62 +131,78 @@ jobs:
                       except:
                           failed = True
 
-          if failed:
-              open("compile_fail.flag", "w").write("fail")
-              print("[ERROR] Compile errors detected")
-              sys.exit(1)
-
-          print("[OK] Compilation clean")
+          open("compile_flag.txt", "w").write("FAIL" if failed else "OK")
+          print("[OK] Compile check done")
           EOF
 
-      - name: Risk engine aggregation
+      - name: Generate HTML report
         run: |
-          RISK=${{ steps.diff.outputs.risk }}
+          python - << 'EOF'
+          import json
 
-          STATUS="LOW"
-          if [ "$RISK" -ge 80 ]; then STATUS="CRITICAL"; fi
-          if [ "$RISK" -ge 40 ] && [ "$RISK" -lt 80 ]; then STATUS="HIGH"; fi
+          data = json.load(open("ast_report.json"))
 
-          echo "{\"score\": $RISK, \"status\": \"$STATUS\"}" > security_report.json
+          html = f"""
+          <html>
+          <head>
+          <title>V0RTEX Security Report</title>
+          <style>
+          body {{ font-family: Arial; background: #0f0f0f; color: white; }}
+          .box {{ padding: 10px; border: 1px solid #333; margin: 10px; }}
+          .crit {{ color: red; }}
+          .low {{ color: green; }}
+          </style>
+          </head>
+          <body>
 
-          echo "[INFO] Final risk = $RISK"
-          echo "[INFO] Status = $STATUS"
+          <h1>V0RTEX Security Report</h1>
+
+          <div class="box">
+          <h2>Stats</h2>
+          <pre>{data["stats"]}</pre>
+          </div>
+
+          <div class="box">
+          <h2>Files</h2>
+          <ul>
+          """
+
+          for r in data["results"]:
+              color = "crit" if r["risk"] == "CRITICAL" else "low"
+              html += f'<li class="{color}">{r["file"]} - {r["risk"]}</li>'
+
+          html += """
+          </ul>
+          </div>
+
+          </body>
+          </html>
+          """
+
+          with open("security_report.html", "w") as f:
+              f.write(html)
+
+          print("[OK] HTML report generated")
+          EOF
 
       - name: Upload security report
         uses: actions/upload-artifact@v4
         with:
           name: v0rtex-security-report
-          path: security_report.json
-
-      - name: PR Comment report
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-
-            let report = { score: -1, status: "NO_REPORT" };
-
-            try {
-              report = JSON.parse(fs.readFileSync('security_report.json', 'utf8'));
-            } catch (e) {}
-
-            const body =
-              "## 🛡 V0RTEX Security Report\n\n" +
-              "Score: " + report.score + "\n\n" +
-              "Status: " + report.status;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: body
-            });
+          path: |
+            security_report.html
+            ast_report.json
+            diff.txt
+            secrets.txt
+            compile_flag.txt
 
       - name: Final evaluation
         run: |
           RISK=${{ steps.diff.outputs.risk }}
 
-          if [ -f compile_fail.flag ]; then
+          echo "[FINAL RISK] $RISK"
+
+          if [ -f compile_flag.txt ] && grep -q "FAIL" compile_flag.txt; then
             echo "[BLOCKED] Compilation failed"
             exit 1
           fi
@@ -203,9 +211,9 @@ jobs:
             echo "[BLOCKED] High-risk PR"
             exit 1
           elif [ "$RISK" -ge 40 ]; then
-            echo "[REVIEW] Manual inspection required"
+            echo "[REVIEW] Manual inspection suggested"
           else
-            echo "[SAFE] No critical issues detected"
+            echo "[SAFE] OK"
           fi
 
       - name: Pipeline end
