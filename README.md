@@ -111,15 +111,15 @@ Misuse is discouraged.
 ## 📎 Useful Attachments
 
 ### 📚 Documentation
-- 📖 [Wiki ufficiale](https://github.com/Vider06/V0rtex/wiki)
-- 🧭 [Repository principale](https://github.com/Vider06/V0rtex)
+- 📖 [Official Wiki](https://github.com/Vider06/V0rtex/wiki)
+- 🧭 [Main Repository](https://github.com/Vider06/V0rtex)
 
 ### ⚖️ Legal & Policies
 - 📜 [License](https://github.com/Vider06/V0rtex/blob/main/LICENSE)
 - 📌 [Code of Conduct](https://github.com/Vider06/V0rtex/blob/main/CODE_OF_CONDUCT.md)
 - 🔐 [Security Policy](https://github.com/Vider06/V0rtex/blob/main/SECURITY.md)
 
-### 🧩 Supported Systems & Branch Docs
+### 🧩 Supported Systems & Branch Changelogs
 - 🪟 [Windows Release Changelog](https://github.com/Vider06/V0rtex/blob/Windows_Release/CHANGELOG.md)
 - 🐧 [Linux Release Changelog](https://github.com/Vider06/V0rtex/blob/Linux_Release/CHANGELOG.md)
 - 🍎 [macOS Release Changelog](https://github.com/Vider06/V0rtex/blob/Macos_Release/CHANGELOG.md)
@@ -132,9 +132,9 @@ Misuse is discouraged.
 
 ### ⚙️ Installation Modes
 - 🚀 Automatic Installer (Main Branch)
-- 🧰 Manual Installation (Branch-based setup via OS-specific releases)
+- 🧰 Manual Installation (branch-based setup depending on OS release)
 
 ### 🧠 Notes
-- Installer gestisce solo dipendenze core V0RTEX
-- Le dipendenze runtime sono gestite dallo setup wizard interno
-- Ogni branch OS mantiene changelog separato per tracciabilità
+- The installer only manages core V0RTEX dependencies
+- Runtime dependencies are handled by the internal setup wizard
+- Each OS branch maintains its own changelog for traceability
