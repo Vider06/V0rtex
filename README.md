@@ -109,8 +109,36 @@ For educational and cybersecurity research only.
 Misuse is discouraged.
 
 ---
+# 📎 Useful Attachments
 
-# 📜 License
+This section contains important project resources, legal documents, and plugin repositories related to V0RTEX.
 
-Copyright © 2024–2026 Vider_06  
-All rights reserved.
+---
+
+## 📄 Project Documents
+
+- [License](https://github.com/Vider06/V0rtex/blob/main/LICENSE)
+- [Code of Conduct](https://github.com/Vider06/V0rtex/blob/main/CODE_OF_CONDUCT.md)
+- [Contributing Guidelines](https://github.com/Vider06/V0rtex/blob/main/CONTRIBUTING.md)
+- [Changelog](https://github.com/Vider06/V0rtex/blob/main/CHANGELOG.md)
+
+---
+
+## 🔌 Official Plugin Repository
+
+- [Official Plugins](https://github.com/Vider06/V0rtex-Plugin-Official)
+
+---
+
+## 🚫 Banned / Restricted Plugins
+
+- [Banned Plugins](https://github.com/Vider06/V0rtex-Banned-Plugins)
+
+---
+
+## ⚠️ Note
+
+Plugins are separated for security and stability reasons:
+
+- Official plugins are tested and maintained  
+- Banned plugins are blocked due to risk, instability, or policy violations
