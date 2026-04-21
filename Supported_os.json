@@ -1,0 +1,14 @@
+{
+  "linux": {
+    "status": "Not Stable",
+    "notes": "Functional but may contain bugs or incomplete features"
+  },
+  "windows": {
+    "status": "Released",
+    "notes": "Fully supported and stable production build"
+  },
+  "macos": {
+    "status": "Work in Progress",
+    "notes": "Not yet available, planned for future release"
+  }
+}
