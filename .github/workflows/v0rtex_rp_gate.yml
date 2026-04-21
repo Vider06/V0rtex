@@ -221,4 +221,5 @@ jobs:
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "[V0RTEX SECURITY ENGINE v3]"
           echo "STATUS: FINISHED"
+          echo "CHECK ARTIFACT INSIDE OF WORKFLOW"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
