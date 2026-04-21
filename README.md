@@ -40,11 +40,11 @@ The installer will:
 ---
 
 ## 🟡 Manual Installation (Advanced Users)
-
+```bash
 git clone -b Windows_Release https://github.com/Vider06/V0rtex.git  
 cd V0rtex  
 python v0rtex.py  
-
+```
 ---
 
 # 🧠 Repository Structure
