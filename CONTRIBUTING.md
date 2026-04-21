@@ -18,6 +18,7 @@ You agree that:
 - Your contribution does not include malicious, hidden, or unauthorized functionality
 
 If you do not agree, you must not submit a contribution.
+
 ---
 
 ## Before You Start
