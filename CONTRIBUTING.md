@@ -8,15 +8,16 @@ By submitting a contribution (Pull Request, patch, or any code change), you gran
 
 You acknowledge that:
 - Your contribution may be modified or merged without further notice
-- Your contribution becomes part of a closed-source proprietary project
+- Your contribution becomes part of V0RTEX and is subject to its license terms
 - You retain authorship of your original submission, but not exclusive rights once merged
 
-You confirm that:
+You agree that:
+- You will not assert any ownership claims over merged contributions within V0RTEX
 - You are the sole author of the submitted code
 - You have the legal right to grant the above license
 - Your contribution does not include malicious, hidden, or unauthorized functionality
 
-If you do not agree, do not submit a contribution.
+If you do not agree, you must not submit a contribution.
 ---
 
 ## Before You Start
