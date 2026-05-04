@@ -26,8 +26,9 @@ V0RTEX is a unified security analysis platform that combines:
 ## 🟢 Automatic Installer (Recommended)
 
 Run:
+```bash
 python v0rtex_installer.py
-
+```
 The installer will:
 - Detect your operating system automatically  
 - Select the correct repository branch  
@@ -37,11 +38,11 @@ The installer will:
 ---
 
 ## 🟡 Manual Installation
-
+```bash
 git clone -b Windows_Release https://github.com/Vider06/V0rtex.git  
 cd V0rtex  
 python v0rtex.py  
-
+```
 ---
 
 # 🧠 Repository Structure
@@ -148,6 +149,6 @@ Misuse is discouraged.
 
 # 📦 License
 
-V0RTEX is licensed under the proprietary **VORTEX SOFTWARE LICENSE**.
+V0RTEX is licensed under the proprietary **[VORTEX SOFTWARE LICENSE](https://github.com/Vider06/V0rtex/blob/main/LICENSE)**.
 
 Copyright © 2024–2026 Vider_06. All rights reserved.
