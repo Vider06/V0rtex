@@ -7,6 +7,28 @@ Format: `[version] — date — summary`
 
 ---
 
+## [1.1.1.X0] — 2026-06-03
+
+### Added
+
+#### AI Core Module
+- **Intelligent Threat Analysis Engine** — Integrated a local AI subsystem designed for semantic context mapping, heuristic anomaly detection, and correlation of extracted indicators.
+- **Context-Aware Vulnerability Mapping** — Dynamic mapping of scan targets against contextual exploit chains based on intelligence parsed by the new core.
+
+#### Sandbox Protection & Anti-Analysis
+- **Guardian Environment Monitor** — Proactive, multi-layered background agent tasked with continuous verification of the execution environment (detecting automated sandboxes, debugging hooks, and analysis artifacts).
+- **Automated Panic System** — Emergency panic routine programmed to gracefully intercept runtime bypass attempts, state corruption, or memory manipulation, freezing execution states before exposure.
+- **Forensic Self-Destruct Sequence** — High-integrity, secure deletion routine engineered to instantly purge volatile data storage, encryption keys, and operational logs inside `Temp_Log_Storage` in hostile execution environments.
+
+#### Scanning & Core Vectors
+- **Universal Processing Functions** — Refactored low-level analysis loops into highly generic, modular functions to maximize reuse across different modules.
+- **Advanced Deobfuscation & Scanning Algorithms** — Added novel decoding routines and signature-matching helpers to effectively analyze heavily packed, obfuscated, or legacy malware data streams.
+
+### Changed
+- Version bumped to 1.1.1.X0.
+
+---
+
 ## [1.0.1.X1] — 2026-03-23
 
 ### Fixed
