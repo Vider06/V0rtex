@@ -86,7 +86,7 @@ def _vx_load_ver():
                 str(_d.get("author","Vider_06")).strip())
     except Exception:
         _vx_load_ver._from_file = False
-        return (".".join(["1","0","1","X1"]), "V"+"0RTEX", "Vider"+"_06")
+        return (".".join(["1","1","1","X0"]), "V"+"0RTEX", "Vider"+"_06")
 
 _VX_VER, _VX_NAME, _VX_AUTH = _vx_load_ver()
 _pre_sl(f"version loaded: {_VX_VER}  from_file={_vx_load_ver._from_file}", "BOOT")
@@ -113,8 +113,8 @@ _T = "".join
 
 _RUN_AS      = _T(["run", "as"])
 _ADM_BADGE   = _T(["⚠ ELEV", "ATED ·", " ADMIN"])
-_ADM_BADGE_W = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX v","1.0.1",".X1  by Vider_06"])
-_ADM_BADGE_R = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX RECOVERY TERMINAL  v","1.0.1",".X1"])
+_ADM_BADGE_W = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX v","1.1.1",".X0  by Vider_06"])
+_ADM_BADGE_R = _T(["⚠ ELEV","ATED · "," ADMIN  —  V0RTEX RECOVERY TERMINAL  v","1.1.1",".X0"])
 _ADM_BADGE_S = _T(["⚡ ELEV", "ATED — ", "ADMIN"])
 
 
@@ -5073,7 +5073,7 @@ def _run_setup_ui():
                     _bat = (
                         '@echo off\r\n'
                         'setlocal EnableDelayedExpansion\r\n'
-                        'title V0RTEX v1.0.1.X1 - Launcher\r\n'
+                        'title V0RTEX v1.1.1.X0 - Launcher\r\n'
                         'color 0A\r\n'
                         'python --version >nul 2>&1\r\n'
                         'if %errorLevel% neq 0 (\r\n'
@@ -49277,4 +49277,4 @@ if _RECOVERY_REQUESTED[0] and not _APP_DYING[0]:
     try: root.destroy()
     except Exception: pass
     import time as _t_rec; _t_rec.sleep(0.15)
-    _unified_recovery_ui(tb_str="Launched manually from Settings")
+    _unified_recovery_ui(tb_str="Launched manually from Settings")
