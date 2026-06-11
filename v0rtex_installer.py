@@ -106,39 +106,6 @@ def git_clone(branch):
         error(f"Git execution sequence aborted with deployment error: {e}")
         sys.exit(1)
 
-def install_dynamic_dependencies(entry_file):
-    log("Parsing script AST architecture for external structural mapping...")
-    if not os.path.exists(entry_file):
-        return
-
-    with open(entry_file, "r", encoding="utf-8") as f:
-        tree = ast.parse(f.read(), filename=entry_file)
-
-    required_modules = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                required_modules.add(alias.name.split('.')[0])
-        elif isinstance(node, ast.ImportFrom):
-            if node.level == 0 and node.module:
-                required_modules.add(node.module.split('.')[0])
-
-    try:
-        builtins_list = sys.stdlib_module_names
-    except AttributeError:
-        builtins_list = sys.builtin_module_names | {"os", "sys", "time", "json", "hashlib", "shutil", "zipfile", "threading", "subprocess", "platform", "stat", "traceback", "argparse", "tkinter", "math", "random", "datetime", "logging", "ctypes", "typing", "ast"}
-
-    for module in required_modules:
-        if module not in builtins_list and module != "v0rtex":
-            try:
-                __import__(module)
-            except ImportError:
-                log(f"Dependency gap identified. Injecting package resource: \033[96m{module}\033[0m...")
-                try:
-                    subprocess.check_call([sys.executable, "-m", "pip", "install", module], stdout=subprocess.DEVNULL)
-                except Exception as e:
-                    error(f"Pip package injection failure for module [{module}]: {e}")
-
 def run_vortex():
     original_cwd = os.getcwd()
     os.chdir(INSTALL_DIR)
@@ -153,8 +120,6 @@ def run_vortex():
         error("Execution sequence halted: No suitable execution gateway (v0rtex.py/main.py) found.")
         os.chdir(original_cwd)
         return
-
-    install_dynamic_dependencies(entry)
 
     print("\n\033[90m--------------------------------------------------------\033[0m")
     success(f"Passing kernel thread handling to framework subsystem: \033[92m{entry}\033[0m")
